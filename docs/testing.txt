@@ -1,0 +1,1256 @@
+Bạn đang đóng vai trò đồng thời là:
+
+* Senior QA Automation Engineer
+* Senior React/TypeScript Test Engineer
+* Senior Spring Boot Test Engineer
+* Application Security Engineer
+* Performance Test Engineer
+* Production Release Gate Reviewer
+
+Nhiệm vụ của bạn là tự động khảo sát, xây dựng, chạy và đánh giá một hệ thống kiểm thử production-grade cho repository hiện tại.
+
+Không chỉ viết test mẫu. Bạn phải thực sự:
+
+1. Đọc và hiểu codebase.
+2. Khởi động được hệ thống hoặc từng thành phần.
+3. Thiết kế chiến lược kiểm thử dựa trên rủi ro.
+4. Cài đặt các công cụ kiểm thử phù hợp.
+5. Viết test.
+6. Chạy test.
+7. Phân tích lỗi.
+8. Sửa test hoặc sửa bug thật bằng thay đổi nhỏ nhất có thể.
+9. Chạy regression sau mỗi thay đổi.
+10. Xuất báo cáo kiểm định đầy đủ.
+11. Đưa ra kết luận PASS, PASS WITH RISKS hoặc FAIL cho khả năng release.
+
+Không dừng lại chỉ để mô tả kế hoạch. Hãy thực hiện công việc trong repository.
+
+# 1. Thông tin hệ thống
+
+Hệ thống là website thương mại điện tử bán điện thoại:
+
+Frontend:
+
+* React
+* TypeScript
+* Redux
+* Có thể sử dụng React Router hoặc thư viện tương đương
+* Hãy tự khảo sát package.json để xác định chính xác framework, package manager, build tool và thư viện đang dùng
+
+Backend:
+
+* Spring Boot
+* Kiến trúc monolith
+* MySQL
+* Hãy tự khảo sát pom.xml hoặc build.gradle để xác định phiên bản Java, Spring Boot, security framework, persistence framework và thư viện đang dùng
+
+Tích hợp ngoài:
+
+* Cổng thanh toán
+* Mail sender
+* Cổng thanh toán hiện không có sandbox và có khả năng thực hiện chuyển tiền thật
+
+Các vai trò:
+
+* Khách vãng lai
+* Khách hàng
+* Quản trị viên
+
+Mục tiêu kiểm thử:
+
+* Giảm bug trước khi release
+* Tự động hóa regression
+* Kiểm thử chức năng
+* Kiểm thử API
+* Kiểm thử tích hợp
+* Kiểm thử end-to-end
+* Kiểm thử hiệu năng
+* Kiểm thử bảo mật
+* Đánh giá mức độ sẵn sàng production
+
+# 2. Quy tắc an toàn bắt buộc
+
+Tuân thủ tuyệt đối các quy tắc sau:
+
+1. Không được kết nối hoặc chạy test trên production.
+2. Không được sử dụng database production.
+3. Không được xóa, sửa hoặc migrate dữ liệu bên ngoài môi trường test.
+4. Không được thực hiện thanh toán thật.
+5. Không được gửi tiền thật, tạo lệnh chuyển tiền thật hoặc xác nhận giao dịch thật.
+6. Không được gọi endpoint thanh toán có khả năng tạo giao dịch tài chính thật.
+7. Không được gửi email cho khách hàng thật.
+8. Không được dùng credential thật nếu có thể tránh được.
+9. Không được in password, token, secret, API key hoặc thông tin nhạy cảm vào log và báo cáo.
+10. Không tắt cơ chế bảo mật chỉ để test pass.
+11. Không thay đổi logic nghiệp vụ chỉ để làm cho test pass.
+12. Không chạy destructive security testing trên bất kỳ server bên ngoài nào.
+13. Chỉ được chạy security test chủ động trên localhost hoặc môi trường test được khởi động từ repository.
+14. Không chạy lệnh xóa nguy hiểm như xóa thư mục diện rộng, reset database bên ngoài test container hoặc force push.
+15. Không commit file .env, credential, token hoặc dữ liệu nhạy cảm.
+
+Đối với thanh toán:
+
+* Phải mock hoặc stub payment gateway ở cấp adapter/service/HTTP.
+* Kiểm thử request mapping, chữ ký, callback, webhook, idempotency và cập nhật trạng thái bằng dữ liệu giả.
+* Nếu code hiện tại không thể mock an toàn, hãy refactor nhỏ nhất để tách payment adapter khỏi nghiệp vụ.
+* Nếu vẫn không thể kiểm thử mà không giao dịch thật, đánh dấu các test đó là BLOCKED.
+* Tuyệt đối không thử giao dịch thật dù giá trị nhỏ.
+* Không yêu cầu người dùng chuyển tiền để hoàn thành test.
+
+Đối với mail sender:
+
+* Dùng mock mail sender, GreenMail, MailHog, fake SMTP hoặc giải pháp tương đương.
+* Không gửi thư tới địa chỉ thật.
+* Dùng địa chỉ thuộc miền example.com hoặc mailbox test cục bộ.
+
+# 3. Nguyên tắc làm việc
+
+* Trước tiên hãy khảo sát repository, không giả định cấu trúc thư mục.
+* Phát hiện package manager từ lock file.
+* Phát hiện Maven hoặc Gradle từ file build.
+* Tận dụng công cụ và convention đã có trong dự án.
+* Chỉ thêm dependency thật sự cần thiết.
+* Không thay đổi hàng loạt code không liên quan.
+* Mọi bug được sửa phải có regression test chứng minh.
+* Phân biệt rõ:
+
+  * Lỗi sản phẩm
+  * Lỗi test
+  * Lỗi môi trường
+  * Thiếu dữ liệu test
+  * Chức năng chưa triển khai
+* Không làm test pass bằng cách bỏ assertion, tăng timeout vô lý hoặc skip test.
+* Test không ổn định phải được điều tra nguyên nhân.
+* Không sử dụng sleep cố định trong E2E nếu có thể chờ theo trạng thái, response hoặc locator.
+* Không phụ thuộc thứ tự thực thi test.
+* Mỗi test phải tự thiết lập và dọn dữ liệu của nó.
+* Ưu tiên kiểm thử hành vi và nghiệp vụ thay vì chi tiết triển khai.
+* Không cố đạt coverage cao bằng các test không có assertion có ý nghĩa.
+* Sau khi hoàn thành từng nhóm test, phải chạy lại nhóm đó.
+* Cuối cùng phải chạy full regression.
+
+Nếu gặp lỗi, hãy tiếp tục xử lý thay vì dừng ngay ở lỗi đầu tiên.
+
+# 4. Giai đoạn 1 – Khảo sát repository
+
+Hãy khảo sát và ghi lại:
+
+## 4.1 Cấu trúc
+
+* Vị trí frontend
+* Vị trí backend
+* File cấu hình môi trường
+* File Docker/Docker Compose
+* Migration database
+* API controller
+* Service
+* Repository
+* Entity
+* DTO
+* Spring Security configuration
+* Redux store
+* Redux slices
+* API client frontend
+* Route frontend
+* Route quản trị
+* Payment integration
+* Mail integration
+* Logging và exception handling
+
+## 4.2 Lệnh hiện có
+
+Xác định và thử các lệnh:
+
+* Cài dependency frontend
+* Build frontend
+* Type check
+* Lint frontend
+* Chạy frontend
+* Build backend
+* Chạy backend
+* Chạy test backend
+* Khởi động MySQL test
+* Khởi động toàn bộ hệ thống
+
+Không tự mặc định npm nếu repository dùng yarn hoặc pnpm.
+
+## 4.3 Kiểm tra baseline
+
+Trước khi sửa code:
+
+* Ghi lại trạng thái git
+* Chạy build frontend
+* Chạy TypeScript check
+* Chạy frontend lint
+* Chạy backend build
+* Chạy các test hiện có
+* Ghi nhận warning và lỗi ban đầu
+
+Tạo file:
+
+* testing/BASELINE_REPORT.md
+* testing/TEST_STRATEGY.md
+* testing/TEST_MATRIX.md
+
+TEST_STRATEGY.md cần mô tả:
+
+* Phạm vi
+* Ngoài phạm vi
+* Rủi ro
+* Các tầng kiểm thử
+* Môi trường
+* Dữ liệu test
+* Release gate
+* Các giả định
+* Các giới hạn, đặc biệt là payment gateway không có sandbox
+
+# 5. Mức độ ưu tiên theo rủi ro
+
+## P0 – Nghiệp vụ bắt buộc phải an toàn
+
+Ưu tiên kiểm thử sâu các khu vực sau:
+
+1. Authentication và authorization.
+2. Phân quyền khách vãng lai, khách hàng và quản trị viên.
+3. Giá sản phẩm và giá khuyến mãi.
+4. Giỏ hàng.
+5. Tồn kho.
+6. Đặt hàng.
+7. Tính tổng tiền.
+8. Mã giảm giá.
+9. Thanh toán.
+10. Payment callback hoặc webhook.
+11. Tính idempotent khi tạo đơn và nhận callback.
+12. Chống tạo trùng đơn khi double click hoặc retry request.
+13. Transaction và rollback.
+14. Chống bán vượt tồn kho.
+15. Hủy đơn và hoàn lại tồn kho nếu nghiệp vụ yêu cầu.
+16. Chuyển trạng thái đơn hàng.
+17. Quyền truy cập trang và API quản trị.
+18. Không cho khách hàng xem hoặc sửa đơn của người khác.
+19. Không cho sửa giá hoặc tổng tiền từ request phía client.
+20. Không cho đánh giá khi chưa mua hoặc đơn chưa hoàn tất.
+
+## P1 – Quan trọng
+
+* Danh sách điện thoại
+* Tìm kiếm
+* Lọc
+* Chi tiết điện thoại
+* Đăng ký
+* Quản lý tài khoản
+* Lịch sử mua hàng
+* Đánh giá
+* Quản lý sản phẩm
+* Quản lý hãng
+* Quản lý thông số
+* Quản lý hình ảnh
+* Quản lý khách hàng
+* Quản lý khuyến mãi
+* Quản lý banner
+
+## P2 – Báo cáo và trải nghiệm bổ sung
+
+* Thống kê doanh thu
+* Thống kê đơn hàng
+* Điện thoại bán chạy
+* Empty state
+* Error state
+* Responsive UI
+* Accessibility cơ bản
+* Trạng thái loading
+* Thông báo thành công và thất bại
+
+# 6. Kiến trúc kiểm thử cần xây dựng
+
+Tự lựa chọn phiên bản công cụ tương thích với repository.
+
+Ưu tiên các công cụ sau nếu phù hợp:
+
+## 6.1 Frontend
+
+* Vitest hoặc Jest
+* React Testing Library
+* @testing-library/user-event
+* MSW để mock API
+* Redux test store hoặc store thật với state cô lập
+* Playwright cho E2E
+* Công cụ coverage tương thích với test runner
+
+Không dùng Enzyme cho dự án mới.
+
+## 6.2 Backend
+
+* JUnit 5
+* Spring Boot Test
+* Mockito
+* MockMvc hoặc RestAssured
+* Testcontainers với MySQL
+* Awaitility nếu thật sự cần kiểm tra xử lý bất đồng bộ
+* JaCoCo cho coverage
+
+Ưu tiên Testcontainers MySQL thay vì H2 để tránh khác biệt SQL, constraint, transaction và kiểu dữ liệu.
+
+Nếu Docker không khả dụng:
+
+* Kiểm tra xem repository có test database riêng hay không.
+* Không được dùng production database.
+* Ghi rõ hạn chế trong báo cáo.
+* Không âm thầm chuyển sang H2 nếu ứng dụng phụ thuộc hành vi MySQL.
+
+## 6.3 Contract/API
+
+* Kiểm tra API contract dựa trên OpenAPI nếu dự án có OpenAPI.
+* Kiểm tra status code, schema, validation, content type và error response.
+* Nếu chưa có OpenAPI, không cần tạo toàn bộ tài liệu API trước khi test; có thể lập inventory endpoint từ controller.
+
+## 6.4 Performance
+
+Ưu tiên k6 hoặc công cụ phù hợp đang có trong repository.
+
+## 6.5 Security
+
+Sử dụng các công cụ phù hợp và chạy an toàn:
+
+* npm audit hoặc audit tương đương
+* Maven/Gradle dependency vulnerability scanner nếu có thể tích hợp hợp lý
+* OWASP Dependency-Check nếu tương thích
+* Semgrep hoặc static scanner tương đương nếu đã có hoặc có thể chạy an toàn
+* OWASP ZAP Baseline chỉ với localhost/môi trường test
+* Kiểm thử bảo mật thủ công thông qua automated integration tests
+
+Không tự động nâng toàn bộ dependency major version chỉ để xóa cảnh báo.
+
+# 7. Backend unit test
+
+Viết unit test cho logic nghiệp vụ quan trọng, bao gồm khi codebase có các chức năng tương ứng:
+
+## Sản phẩm
+
+* Tạo sản phẩm hợp lệ
+* Thiếu trường bắt buộc
+* Giá âm hoặc bằng zero nếu không được phép
+* Giá khuyến mãi lớn hơn giá gốc
+* Tồn kho âm
+* Sản phẩm không tồn tại
+* Cập nhật sản phẩm
+* Xóa sản phẩm đang được tham chiếu bởi đơn hàng
+* Trạng thái hết hàng
+
+## Giỏ hàng
+
+* Thêm sản phẩm hợp lệ
+* Thêm cùng sản phẩm nhiều lần
+* Số lượng bằng zero
+* Số lượng âm
+* Số lượng vượt tồn kho
+* Xóa sản phẩm
+* Tính tổng
+* Giá thay đổi sau khi thêm giỏ
+* Không tin giá do frontend truyền lên
+
+## Đơn hàng
+
+* Tạo đơn hợp lệ
+* Giỏ hàng trống
+* Sản phẩm không tồn tại
+* Sản phẩm hết hàng
+* Số lượng vượt tồn kho
+* Địa chỉ giao hàng không hợp lệ
+* Tổng tiền được tính tại backend
+* Giảm tồn kho đúng
+* Rollback toàn bộ khi một dòng sản phẩm thất bại
+* Không tạo đơn trùng do retry
+* Không tạo đơn trùng do double submit
+* Chuyển trạng thái hợp lệ
+* Từ chối chuyển trạng thái không hợp lệ
+* Hủy đơn theo quy tắc nghiệp vụ
+* Không hủy đơn đã giao
+* Khôi phục tồn kho khi hủy nếu nghiệp vụ quy định
+* Không khôi phục tồn kho hai lần
+
+## Khuyến mãi
+
+* Mã hợp lệ
+* Mã không tồn tại
+* Mã hết hạn
+* Chưa đến thời gian sử dụng
+* Hết lượt sử dụng
+* Không đủ giá trị đơn tối thiểu
+* Giảm theo phần trăm
+* Giảm số tiền cố định
+* Giới hạn mức giảm tối đa
+* Không cho tổng tiền âm
+* Không áp dụng hai lần
+* Hai request dùng lượt cuối cùng đồng thời
+* Phân biệt hoa thường và khoảng trắng theo nghiệp vụ
+
+## Thanh toán
+
+* Tạo payment request giả
+* Mapping số tiền đúng
+* Mapping mã đơn đúng
+* Chữ ký hợp lệ
+* Chữ ký không hợp lệ
+* Callback thành công
+* Callback thất bại
+* Callback lặp lại
+* Callback đến sai thứ tự
+* Callback cho đơn không tồn tại
+* Callback có số tiền không khớp
+* Callback không được thay đổi đơn đã ở trạng thái cuối
+* Chỉ đánh dấu đã thanh toán sau khi callback được xác minh
+* Không tin trạng thái thanh toán từ frontend
+
+## Đánh giá
+
+* Khách đã mua và đơn đã giao được đánh giá
+* Khách chưa mua không được đánh giá
+* Không đánh giá sản phẩm thuộc đơn người khác
+* Rating ngoài phạm vi
+* Nội dung rỗng hoặc quá dài
+* Nội dung có HTML/script
+* Đánh giá trùng theo quy tắc nghiệp vụ
+* Admin ẩn/xóa đánh giá
+* User thường không thể dùng API quản trị đánh giá
+
+## Thống kê
+
+* Tổng doanh thu chỉ tính đơn hợp lệ theo nghiệp vụ
+* Không tính đơn hủy
+* Tránh cộng tiền sai do join nhiều bảng
+* Biên ngày/tháng/năm
+* Timezone
+* Không dùng floating point cho tiền
+* Kết quả khi không có dữ liệu
+
+# 8. Backend integration và API test
+
+Sử dụng Spring Boot integration test cùng MySQL Testcontainers nếu khả dụng.
+
+Kiểm tra:
+
+* Migration/schema chạy thành công trên database sạch
+* Foreign key
+* Unique constraint
+* Not null constraint
+* Transaction isolation
+* Serialization/deserialization
+* Validation
+* Global exception handler
+* Error response thống nhất
+* Content type
+* HTTP method
+* Status code
+* Pagination
+* Sorting
+* Filter
+* Search
+* Unicode tiếng Việt
+* Dữ liệu có dấu
+* Chuỗi rỗng
+* Chuỗi rất dài
+* Giá trị biên
+* ID không hợp lệ
+* ID không tồn tại
+
+Tạo API test cho toàn bộ controller có trong repository, ưu tiên endpoint P0.
+
+Kiểm tra ít nhất:
+
+* Request hợp lệ
+* Thiếu authentication
+* Token/session không hợp lệ
+* Sai role
+* Thiếu field
+* Sai kiểu dữ liệu
+* Không tìm thấy tài nguyên
+* Conflict
+* Validation error
+* Internal error không làm lộ stack trace
+* Người dùng A không được truy cập dữ liệu người dùng B
+
+# 9. Authentication và authorization
+
+Tự xác định hệ thống dùng JWT, session, OAuth hay cơ chế khác.
+
+Kiểm thử:
+
+* Đăng ký hợp lệ
+* Email hoặc username trùng
+* Password yếu theo quy tắc hiện tại
+* Password không được lưu dạng plaintext
+* Đăng nhập đúng
+* Đăng nhập sai
+* Tài khoản bị khóa hoặc vô hiệu hóa
+* Logout
+* Token hết hạn
+* Token bị sửa
+* Token thiếu
+* Refresh token nếu có
+* Route admin chỉ dành cho admin
+* API admin chỉ dành cho admin
+* Không dựa riêng vào bảo vệ route frontend
+* User không thể tự gửi role ADMIN khi đăng ký hoặc cập nhật profile
+* Mass assignment
+* IDOR/BOLA
+* User A không thể đọc/sửa/xóa tài khoản, giỏ hàng, đơn hàng hoặc đánh giá của user B
+* Admin endpoint phải được bảo vệ phía backend
+* Không lộ thông tin phân biệt “tài khoản tồn tại” nếu thiết kế yêu cầu chống enumeration
+* Không ghi password/token vào log
+
+Nếu CSRF có liên quan đến cơ chế authentication, kiểm thử CSRF phù hợp.
+
+# 10. Frontend unit/component test
+
+Viết test có ý nghĩa cho:
+
+## Redux
+
+* Initial state
+* Pending
+* Fulfilled
+* Rejected
+* Reducer
+* Selector
+* Async thunk
+* Error state
+* State reset sau logout
+* Không giữ dữ liệu nhạy cảm của user cũ sau khi đổi tài khoản
+
+## Authentication UI
+
+* Form đăng nhập
+* Form đăng ký
+* Validation
+* Hiển thị lỗi backend
+* Loading state
+* Chống double submit
+* Redirect sau đăng nhập
+* Logout
+* Route protection
+* Admin route protection
+
+## Danh sách và tìm kiếm sản phẩm
+
+* Loading
+* Thành công
+* Không có dữ liệu
+* Lỗi API
+* Search
+* Debounce nếu có
+* Filter theo hãng, giá, RAM, ROM, màu
+* Kết hợp nhiều filter
+* Reset filter
+* Pagination
+* URL query state nếu có
+* Ảnh lỗi hoặc thiếu ảnh
+
+## Chi tiết sản phẩm
+
+* Thông tin sản phẩm
+* Giá
+* Giá khuyến mãi
+* Tồn kho
+* Biến thể nếu có
+* Thông số
+* Đánh giá
+* Thêm vào giỏ
+* Sản phẩm hết hàng
+* Số lượng không hợp lệ
+
+## Giỏ hàng
+
+* Render item
+* Tăng/giảm số lượng
+* Xóa item
+* Vượt tồn kho
+* Tổng tiền
+* Empty state
+* Lỗi cập nhật
+* Rollback UI khi API thất bại
+* Không tin giá lưu lâu trong client
+
+## Checkout
+
+* Validation thông tin giao hàng
+* COD
+* Phương thức thanh toán ngoài được mock
+* Mã giảm giá hợp lệ/không hợp lệ
+* Chống double submit
+* Xử lý API timeout
+* Xử lý order đã tạo nhưng frontend mất response
+* Hiển thị tổng tiền do backend xác nhận
+
+## Admin
+
+* Product form
+* Validation
+* CRUD
+* Inventory
+* Price
+* Order status
+* Customer management
+* Review moderation
+* Promotion
+* Banner
+* Statistics loading/error/empty state
+* User thường không render và không truy cập được admin function
+
+Mock network bằng MSW hoặc giải pháp tương đương, không mock trực tiếp toàn bộ implementation nếu điều đó làm test mất giá trị.
+
+# 11. End-to-end test bằng Playwright
+
+Khởi động frontend, backend và test database trong môi trường cô lập.
+
+Tạo test data xác định, không phụ thuộc dữ liệu có sẵn.
+
+Thiết kế fixture cho:
+
+* Khách vãng lai
+* Khách hàng A
+* Khách hàng B
+* Quản trị viên
+* Sản phẩm còn hàng
+* Sản phẩm hết hàng
+* Sản phẩm có khuyến mãi
+* Mã giảm giá hợp lệ
+* Mã hết hạn
+* Đơn chờ xử lý
+* Đơn đang giao
+* Đơn đã giao
+* Đơn đã hủy
+
+Tự động hóa các luồng:
+
+## E2E-01: Khách vãng lai xem và tìm kiếm
+
+* Mở trang chủ
+* Xem danh sách
+* Search
+* Filter
+* Mở chi tiết
+* Xem đánh giá
+
+## E2E-02: Đăng ký và đăng nhập
+
+* Đăng ký
+* Validation
+* Đăng nhập
+* Đăng xuất
+* Đăng nhập sai
+* Session/token được xử lý đúng
+
+## E2E-03: Mua hàng COD
+
+* Đăng nhập
+* Chọn sản phẩm còn hàng
+* Thêm giỏ
+* Cập nhật số lượng
+* Checkout
+* Áp dụng mã giảm giá
+* Chọn COD
+* Tạo đơn
+* Kiểm tra đơn xuất hiện trong lịch sử
+* Kiểm tra tổng tiền
+* Kiểm tra tồn kho backend thay đổi đúng
+
+## E2E-04: Chống double submit
+
+* Kích hoạt hai lần gửi đặt hàng gần đồng thời
+* Xác minh chỉ có một đơn hoặc hành vi idempotent theo thiết kế
+* Xác minh tồn kho chỉ bị trừ một lần
+
+## E2E-05: Hủy đơn
+
+* Tạo đơn
+* Hủy khi còn được phép
+* Kiểm tra trạng thái
+* Kiểm tra tồn kho
+* Không hủy được khi trạng thái không cho phép
+
+## E2E-06: Đánh giá
+
+* Không cho đánh giá khi chưa mua
+* Cho đánh giá sau khi đơn đã giao
+* Hiển thị đánh giá
+* Kiểm tra quyền sở hữu
+
+## E2E-07: Admin quản lý sản phẩm
+
+* Admin đăng nhập
+* Thêm sản phẩm
+* Sửa giá
+* Sửa tồn kho
+* Kiểm tra frontend khách hàng phản ánh dữ liệu mới
+* Xóa hoặc vô hiệu hóa theo quy tắc
+
+## E2E-08: Admin xử lý đơn
+
+* Xem đơn
+* Xác nhận
+* Chuyển đang giao
+* Chuyển đã giao
+* Kiểm tra lịch sử khách hàng
+* Thử chuyển trạng thái sai
+
+## E2E-09: Authorization
+
+* User truy cập URL admin
+* User gọi trực tiếp API admin
+* User A thử truy cập đơn User B
+* Khách vãng lai thử gọi API yêu cầu đăng nhập
+* Xác minh backend từ chối đúng
+
+## E2E-10: Payment mock
+
+* Không gọi payment gateway thật
+* Dùng stub/mock adapter
+* Tạo payment request giả
+* Mô phỏng callback thành công
+* Mô phỏng callback thất bại
+* Mô phỏng callback trùng
+* Mô phỏng callback sai chữ ký
+* Kiểm tra trạng thái đơn và payment
+
+Chạy E2E ít nhất trên Chromium.
+
+Nếu chi phí hợp lý và môi trường hỗ trợ, chạy thêm Firefox và WebKit cho các luồng smoke P0.
+
+Chụp screenshot, trace và video khi E2E thất bại nếu Playwright hỗ trợ.
+
+# 12. Kiểm thử concurrency và transaction
+
+Đây là phần bắt buộc.
+
+Viết integration test đa luồng hoặc performance scenario để kiểm tra:
+
+1. Hai khách mua sản phẩm chỉ còn một đơn vị.
+2. Hai request đồng thời dùng lượt cuối cùng của coupon.
+3. Một khách double click đặt hàng.
+4. Client retry request sau timeout.
+5. Hai payment callback giống nhau.
+6. Admin cập nhật trạng thái trong khi khách hủy đơn.
+7. Hai admin cùng cập nhật tồn kho.
+8. Một order có nhiều item, item cuối thất bại.
+9. Callback đến trước khi frontend nhận response tạo order.
+10. Callback đến sau khi đơn bị hủy.
+
+Xác minh:
+
+* Không có tồn kho âm
+* Không oversell
+* Không trừ kho hai lần
+* Không dùng coupon vượt giới hạn
+* Không tạo đơn trùng
+* Không ghi nhận thanh toán hai lần
+* Transaction rollback đầy đủ
+* Có optimistic/pessimistic locking hoặc cơ chế idempotency phù hợp nếu cần
+
+Nếu phát hiện race condition:
+
+* Viết test tái hiện được lỗi.
+* Sửa bằng thay đổi tối thiểu và đúng bản chất.
+* Không chỉ thêm synchronized trong memory nếu hệ thống có thể chạy nhiều instance trong tương lai.
+* Ghi rõ cách sửa và giới hạn còn lại.
+
+# 13. Kiểm thử dữ liệu và tiền tệ
+
+Kiểm tra:
+
+* Tiền dùng BigDecimal hoặc kiểu chính xác tương đương ở backend
+* Không dùng float/double để tính tiền
+* Quy tắc làm tròn
+* Giá bằng zero
+* Giá âm
+* Giá cực lớn
+* Overflow
+* Số lượng cực lớn
+* Discount lớn hơn tổng tiền
+* Tổng tiền không âm
+* Backend tự tính lại toàn bộ giá trị
+* Database precision/scale phù hợp
+* Timezone cho ngày tạo đơn, khuyến mãi và báo cáo
+* Unicode tiếng Việt
+* Chuẩn hóa email, số điện thoại và khoảng trắng nếu nghiệp vụ yêu cầu
+
+# 14. Kiểm thử bảo mật
+
+Chỉ kiểm thử trên localhost/môi trường test.
+
+## 14.1 Static và dependency scanning
+
+Chạy các scanner phù hợp.
+
+Phân loại kết quả:
+
+* Critical
+* High
+* Medium
+* Low
+* False positive
+* Không thể xác minh
+
+Không báo cáo một dependency vulnerability là exploitable nếu chưa xác định đường sử dụng liên quan.
+
+## 14.2 Security test ở API
+
+Kiểm tra có kiểm soát:
+
+* SQL injection
+* Stored XSS
+* Reflected XSS
+* IDOR/BOLA
+* Broken access control
+* Mass assignment
+* Invalid JWT/session
+* CSRF nếu có liên quan
+* CORS
+* Input validation
+* Path traversal ở upload/download nếu có
+* Upload file nguy hiểm nếu có upload ảnh
+* MIME type giả
+* File quá lớn
+* Tên file nguy hiểm
+* Error message làm lộ stack trace
+* Sensitive data exposure
+* Password hashing
+* Hard-coded secret
+* Debug endpoint
+* Actuator endpoint
+* Swagger/OpenAPI exposure
+* Rate limiting cho login nếu hệ thống có yêu cầu
+* Brute-force protection
+* Account enumeration
+* Security header
+* Cookie Secure, HttpOnly, SameSite nếu dùng cookie
+* Cache dữ liệu nhạy cảm
+* Log injection
+* Open redirect nếu có redirect thanh toán
+
+Các payload chỉ được sử dụng ở mức an toàn để chứng minh validation và encoding. Không phá hoại hệ thống.
+
+## 14.3 Business logic security
+
+Kiểm tra:
+
+* Client sửa giá sản phẩm
+* Client sửa discount
+* Client gửi tổng tiền giả
+* Client tự đổi trạng thái order
+* Client tự gán ADMIN
+* Client mua số lượng âm
+* Client dùng coupon nhiều lần
+* Client đánh giá sản phẩm chưa mua
+* User truy cập order người khác
+* Callback payment giả
+* Callback payment sai số tiền
+* Replay callback
+* Admin action không có authorization
+
+# 15. Kiểm thử hiệu năng
+
+Trước hết tạo baseline, không khẳng định khả năng production khi chưa có hạ tầng giống production.
+
+Dùng dữ liệu giả và test environment.
+
+Các workload mặc định tạm thời:
+
+## Smoke
+
+* 1–2 virtual users
+* Khoảng 1 phút
+* Xác minh script và hệ thống hoạt động
+
+## Normal load
+
+* Tăng dần tới 20 virtual users
+* Duy trì khoảng 3–5 phút
+
+## Peak load tạm thời
+
+* Tăng dần tới 50 virtual users
+* Duy trì khoảng 3 phút
+
+## Stress thăm dò
+
+* Tăng dần tới 100 virtual users nếu máy test chịu được
+* Dừng hoặc giảm tải nếu môi trường không ổn định
+
+Không chạy stress test trên server bên ngoài hoặc production.
+
+Scenario:
+
+* Xem danh sách sản phẩm
+* Search/filter
+* Xem chi tiết
+* Đăng nhập
+* Thêm giỏ
+* Xem giỏ
+* Tạo đơn COD bằng dữ liệu test
+* Xem lịch sử đơn
+* Admin xem danh sách đơn nếu hợp lý
+
+Không gọi cổng thanh toán thật trong performance test.
+
+Thu thập nếu có thể:
+
+* Request count
+* Error rate
+* Throughput
+* p50
+* p90
+* p95
+* p99
+* CPU
+* Memory
+* Database connection
+* Slow query
+* Deadlock
+* Connection pool exhaustion
+
+Ngưỡng tạm thời để đánh giá ban đầu:
+
+* P0 API error rate dưới 1%
+* API đọc phổ biến p95 dưới 1 giây trong normal load
+* API tạo đơn p95 dưới 2 giây trong normal load
+* Không có HTTP 5xx liên tục
+* Không có tồn kho âm hoặc đơn trùng
+* Không có connection leak
+* Không có deadlock chưa xử lý
+
+Đây là ngưỡng giả định. Ghi rõ cần hiệu chỉnh theo SLA thực tế.
+
+Xuất:
+
+* testing/performance/
+* testing/PERFORMANCE_REPORT.md
+
+# 16. Coverage và chất lượng test
+
+Thiết lập coverage report.
+
+Mục tiêu tạm thời:
+
+Backend:
+
+* Tổng line coverage tối thiểu 80%
+* Tổng branch coverage tối thiểu 70%
+* Service P0 tối thiểu 90% line coverage
+* Logic order/payment/inventory/coupon phải có branch coverage cao và test biên
+
+Frontend:
+
+* Tổng line coverage tối thiểu 75%
+* Tổng branch coverage tối thiểu 65%
+* Redux và component P0 tối thiểu 85% line coverage
+
+Không làm giảm chất lượng assertion để đạt số coverage.
+
+Không bắt buộc test code generated, DTO thuần, getter/setter hoặc cấu hình không có logic nếu không mang lại giá trị.
+
+Nếu không đạt ngưỡng:
+
+* Nêu coverage thực tế
+* Nêu vùng chưa được test
+* Đánh giá rủi ro
+* Không giả mạo kết quả
+
+# 17. Quy trình xử lý khi test thất bại
+
+Với mỗi thất bại:
+
+1. Chạy lại test riêng lẻ.
+2. Xác định lỗi có ổn định hay flaky.
+3. Đọc log frontend/backend/database.
+4. Phân loại:
+
+   * PRODUCT_BUG
+   * TEST_BUG
+   * ENVIRONMENT
+   * DATA_SETUP
+   * NOT_IMPLEMENTED
+   * BLOCKED_EXTERNAL_SERVICE
+5. Nếu là test bug, sửa test.
+6. Nếu là product bug:
+
+   * Viết hoặc giữ regression test thất bại.
+   * Sửa code nhỏ nhất có thể.
+   * Chạy lại test liên quan.
+   * Chạy regression vùng ảnh hưởng.
+7. Không xóa test vì test phát hiện bug.
+8. Không nới lỏng assertion để che lỗi.
+9. Ghi bug vào testing/BUG_REPORT.md.
+
+Mỗi bug cần có:
+
+* ID
+* Tiêu đề
+* Severity
+* Priority
+* Thành phần
+* Điều kiện
+* Bước tái hiện
+* Kết quả mong đợi
+* Kết quả thực tế
+* Root cause
+* File/dòng liên quan
+* Test tái hiện
+* Cách sửa
+* Regression result
+* Rủi ro còn lại
+
+Severity:
+
+* Critical: mất tiền, sai thanh toán, lộ quyền admin, mất dữ liệu nghiêm trọng, oversell lớn
+* High: không thể đặt hàng, truy cập dữ liệu người khác, bypass authorization, tồn kho sai
+* Medium: chức năng quan trọng hoạt động sai nhưng có workaround
+* Low: lỗi giao diện hoặc tình huống ít ảnh hưởng
+
+# 18. Release gate
+
+Chỉ kết luận PASS khi:
+
+* Build frontend thành công
+* Type check thành công
+* Frontend lint không có lỗi nghiêm trọng
+* Backend build thành công
+* P0 unit test pass
+* P0 integration/API test pass
+* P0 E2E pass
+* Không còn Critical defect
+* Không còn High defect chưa được chấp nhận
+* Không có authorization bypass
+* Không có order duplication đã biết
+* Không có overselling đã biết
+* Không có payment callback vulnerability đã biết
+* Không có transaction corruption đã biết
+* Migration database sạch chạy thành công
+* Security scan không còn Critical/High có thể khai thác trong phạm vi hệ thống
+* Performance baseline không vi phạm nghiêm trọng ngưỡng tạm thời
+* Không có test P0 bị skip không có lý do
+
+Kết luận:
+
+* PASS: đáp ứng release gate
+* PASS WITH RISKS: không có Critical/High blocker nhưng còn hạn chế hoặc Medium risk cần chấp nhận
+* FAIL: có Critical/High, P0 thất bại hoặc không thể xác minh an toàn các luồng cốt lõi
+
+Việc payment gateway không có sandbox phải được ghi rõ là một giới hạn. Payment integration chỉ được PASS ở mức contract/mock/integration nội bộ, không được tuyên bố đã kiểm thử giao dịch thật.
+
+# 19. File và báo cáo phải tạo
+
+Tạo thư mục testing nếu chưa có.
+
+Tạo hoặc cập nhật:
+
+* testing/BASELINE_REPORT.md
+* testing/TEST_STRATEGY.md
+* testing/TEST_MATRIX.md
+* testing/BUG_REPORT.md
+* testing/SECURITY_REPORT.md
+* testing/PERFORMANCE_REPORT.md
+* testing/FINAL_TEST_REPORT.md
+* testing/RELEASE_CHECKLIST.md
+* testing/TEST_COMMANDS.md
+
+Có thể thêm:
+
+* testing/e2e/
+* testing/performance/
+* testing/security/
+* scripts/test-all.*
+* docker-compose.test.yml
+* cấu hình coverage
+* cấu hình Playwright
+* cấu hình Testcontainers
+* fake payment provider
+* fake mail provider
+
+TEST_MATRIX.md phải có:
+
+* Test ID
+* Module
+* Role
+* Level
+* Priority
+* Preconditions
+* Scenario
+* Expected result
+* Automation status
+* Last result
+* Evidence
+
+FINAL_TEST_REPORT.md phải có:
+
+1. Executive summary
+2. Phạm vi đã kiểm thử
+3. Phạm vi chưa kiểm thử
+4. Kiến trúc test đã thêm
+5. Môi trường
+6. Các lệnh đã chạy
+7. Tổng số test
+8. Passed
+9. Failed
+10. Skipped
+11. Blocked
+12. Coverage frontend
+13. Coverage backend
+14. E2E result
+15. Security findings
+16. Performance result
+17. Danh sách bug theo severity
+18. Các thay đổi production code
+19. Các giới hạn
+20. Rủi ro còn lại
+21. Release recommendation
+22. Kết luận PASS, PASS WITH RISKS hoặc FAIL
+
+Mọi kết quả phải dựa trên output thực tế. Không tự bịa số lượng test, coverage hoặc performance.
+
+# 20. Lệnh kiểm thử tổng
+
+Tạo một lệnh tổng phù hợp với hệ điều hành/repository, ví dụ:
+
+* scripts/test-all.sh
+* scripts/test-all.ps1
+* npm script ở root
+* Makefile target
+
+Lệnh tổng cần thực hiện theo thứ tự hợp lý:
+
+1. Kiểm tra môi trường.
+2. Cài dependency khi cần.
+3. Khởi động test database.
+4. Backend unit test.
+5. Backend integration test.
+6. Backend coverage.
+7. Frontend type check.
+8. Frontend lint.
+9. Frontend unit/component test.
+10. Frontend coverage.
+11. Khởi động ứng dụng test.
+12. E2E smoke/P0.
+13. Security scan an toàn.
+14. Performance smoke hoặc baseline.
+15. Tổng hợp báo cáo.
+16. Dọn container/process test.
+
+Lệnh phải trả exit code khác zero khi release gate thất bại.
+
+# 21. Cấu hình CI
+
+Nếu repository chưa có CI, hãy tạo cấu hình CI phù hợp với nền tảng đã phát hiện.
+
+Nếu không phát hiện nền tảng, ưu tiên tạo GitHub Actions nhưng ghi rõ giả định.
+
+CI nên chia thành các job:
+
+* backend-build-test
+* frontend-build-test
+* integration-test
+* e2e-test
+* security-scan
+* performance-smoke
+* release-gate
+
+Upload artifact:
+
+* Coverage report
+* JUnit/XML report
+* Playwright report
+* Screenshot/trace khi lỗi
+* Security report
+* Performance report
+* Final test report
+
+Không đưa secret vào workflow.
+
+Không chạy full stress test trên mỗi pull request. Chỉ chạy performance smoke trong PR; full baseline có thể chạy thủ công hoặc theo lịch.
+
+# 22. Thứ tự triển khai ưu tiên
+
+Nếu repository lớn hoặc thời gian có hạn, thực hiện theo thứ tự:
+
+1. Baseline build.
+2. Test environment và MySQL cô lập.
+3. Authentication/authorization.
+4. Order, inventory và transaction.
+5. Cart và price calculation.
+6. Coupon.
+7. Payment mock/callback/idempotency.
+8. P0 API integration.
+9. P0 frontend component.
+10. P0 Playwright E2E.
+11. Security.
+12. Concurrency.
+13. Performance.
+14. P1/P2 regression.
+15. CI và final report.
+
+Không dành phần lớn thời gian cho test giao diện đơn giản trong khi order/payment/authorization chưa được bảo vệ.
+
+# 23. Yêu cầu về kết quả cuối cùng trong phản hồi
+
+Sau khi hoàn tất, phản hồi cuối cùng phải trình bày:
+
+## Summary
+
+* Đã khảo sát gì
+* Đã thêm công cụ gì
+* Đã viết bao nhiêu test
+* Đã chạy những lệnh gì
+* Bao nhiêu pass/fail/skip/blocked
+* Coverage thực tế
+* Bug quan trọng nhất
+* Security finding quan trọng nhất
+* Performance result
+* Những file đã thay đổi
+
+## Release decision
+
+Một trong:
+
+* PASS
+* PASS WITH RISKS
+* FAIL
+
+Kèm lý do cụ thể.
+
+## Important limitations
+
+Phải nhắc lại:
+
+* Không thực hiện thanh toán thật
+* Payment gateway không có sandbox
+* Phần payment chỉ được kiểm định qua mock, contract và callback giả
+* Mọi phần không chạy được phải được ghi là BLOCKED, không được xem là PASS
+
+## Commands
+
+Cung cấp lệnh để tôi có thể chạy lại:
+
+* Toàn bộ test
+* Backend test
+* Frontend test
+* E2E
+* Security
+* Performance
+* Xem report
+
+# 24. Bắt đầu thực hiện
+
+Bắt đầu ngay bằng cách:
+
+1. Khảo sát cây thư mục và file cấu hình.
+2. Ghi baseline.
+3. Xác định cách khởi động frontend, backend và MySQL test.
+4. Tạo TEST_STRATEGY.md và TEST_MATRIX.md.
+5. Xây dựng test theo thứ tự ưu tiên P0.
+6. Chạy test thật.
+7. Sửa các vấn đề có thể sửa an toàn.
+8. Chạy full regression.
+9. Xuất FINAL_TEST_REPORT.md.
+10. Đưa ra release decision.
+
+Không chỉ trả lời bằng kế hoạch. Hãy thao tác trực tiếp trên repository và cung cấp bằng chứng từ các lệnh đã chạy.

@@ -1,0 +1,59 @@
+# ============================================================
+# GreenPhone – Production Docker Compose for VPS (103.77.208.221)
+# ============================================================
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: greenphone-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
+      MYSQL_DATABASE: greenphone
+      TZ: UTC
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ../GreenPhone-Backend
+      dockerfile: Dockerfile
+    container_name: greenphone-backend
+    restart: always
+    env_file:
+      - ../GreenPhone-Backend/.env
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/greenphone?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true
+      DB_USERNAME: root
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+      SPRING_FLYWAY_ENABLED: "true"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 90s
+      retries: 3
+
+  frontend:
+    build:
+      context: ../Frontend
+      dockerfile: Dockerfile
+    container_name: greenphone-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  mysql_data:

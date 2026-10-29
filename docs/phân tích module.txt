@@ -1,0 +1,54 @@
+1.	Các đối tượng sử dụng phần mềm
+Đối tượng	Mô tả
+Khách vãng lai	Người chưa đăng nhập, có thể xem và tìm kiếm điện thoại
+Khách hàng	Người đã đăng ký/đăng nhập, có thể mua điện thoại và quản lý đơn hàng
+Quản trị viên	Người quản lý toàn bộ website, sản phẩm, khách hàng và đơn hàng
+
+2.	Các chức năng của phần mềm
+A.	Khách vãng lai
+Chức năng	Mô tả
+Xem danh sách điện thoại	Xem các mẫu điện thoại đang bán
+Tìm kiếm điện thoại	Tìm theo tên máy, hãng, giá
+Lọc điện thoại	Lọc theo hãng, mức giá, dung lượng, RAM, màu sắc
+Xem chi tiết điện thoại	Xem hình ảnh, giá, thông số kỹ thuật, bảo hành
+Xem đánh giá sản phẩm	Xem đánh giá và nhận xét của khách hàng đã mua
+Đăng ký tài khoản	Tạo tài khoản khách hàng
+Đăng nhập	Đăng nhập để mua hàng
+
+B.	Khách hàng
+Chức năng	Mô tả
+Quản lý tài khoản	Cập nhật họ tên, số điện thoại, địa chỉ
+Xem điện thoại	Xem danh sách và chi tiết điện thoại
+Thêm vào giỏ hàng	Thêm điện thoại muốn mua vào giỏ
+Cập nhật giỏ hàng	Thay đổi số lượng hoặc xóa sản phẩm
+Đặt hàng	Nhập thông tin giao hàng và xác nhận mua
+Thanh toán	Chọn phương thức thanh toán như COD, chuyển khoản, ví điện tử
+Theo dõi đơn hàng	Xem trạng thái đơn: chờ xác nhận, đang giao, đã giao
+Hủy đơn hàng	Hủy đơn khi đơn chưa được xử lý hoặc chưa giao
+Xem lịch sử mua hàng	Xem các điện thoại đã từng mua
+Sử dụng mã giảm giá	Nhập mã khuyến mãi khi thanh toán, nếu có
+Đánh giá sản phẩm	Đánh giá điện thoại sau khi mua
+Đăng xuất	Đăng xuất khỏi tài khoản
+
+
+C.	Quản trị viên
+Chức năng	Mô tả
+Đăng nhập quản trị	Đăng nhập vào trang quản trị hệ thống
+Quản lý điện thoại	Thêm, sửa, xóa, xem danh sách điện thoại
+Quản lý hãng điện thoại	Thêm, sửa, xóa hãng như Apple, Samsung, Xiaomi, OPPO
+Quản lý thông số kỹ thuật	Cập nhật RAM, ROM, chip, màn hình, camera, pin, hệ điều hành
+Quản lý hình ảnh sản phẩm	Thêm, sửa, xóa hình ảnh điện thoại
+Quản lý giá bán	Cập nhật giá gốc, giá khuyến mãi
+Quản lý số lượng tồn kho	Cập nhật số lượng điện thoại còn hàng hoặc hết hàng
+Quản lý đơn hàng	Xem danh sách đơn, chi tiết đơn, cập nhật trạng thái đơn
+Xác nhận đơn hàng	Duyệt đơn hàng khách đã đặt
+Cập nhật trạng thái giao hàng	Cập nhật trạng thái: đang xử lý, đang giao, đã giao, đã hủy
+Quản lý khách hàng	Cập nhật trạng thái: đang xử lý, đang giao, đã giao, đã hủy
+Quản lý đánh giá	Xem, ẩn hoặc xóa đánh giá không phù hợp
+Quản lý khuyến mãi	Tạo, sửa, xóa mã giảm giá hoặc chương trình khuyến mãi
+Thống kê doanh thu	Xem doanh thu theo ngày, tháng, năm
+Thống kê đơn hàng	Xem số lượng đơn thành công, đơn hủy, đơn đang xử lý
+Thống kê điện thoại bán chạy	Xem những mẫu điện thoại được mua nhiều nhất
+Quản lý banner	Thêm, sửa, xóa banner quảng cáo trên trang chủ
+Đăng xuất	Thoát khỏi trang quản trị
+

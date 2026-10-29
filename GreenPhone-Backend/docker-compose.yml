@@ -1,0 +1,31 @@
+# ============================================================
+# GreenPhone Backend + Cloudflared Tunnel
+# MySQL chạy trên host, backend kết nối qua host.docker.internal
+# ============================================================
+services:
+  backend:
+    build: .
+    container_name: greenphone-backend
+    ports:
+      - "8080:8080"
+    environment:
+      # Override DB_URL: dùng host.docker.internal để kết nối MySQL trên host
+      DB_URL: jdbc:mysql://host.docker.internal:3306/greenphone
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 90s
+      retries: 3
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: greenphone-tunnel
+    command: tunnel --url http://backend:8080 --no-autoupdate
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped

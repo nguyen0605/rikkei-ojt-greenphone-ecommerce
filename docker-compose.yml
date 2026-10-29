@@ -1,0 +1,74 @@
+# ============================================================
+# GreenPhone – Full Stack: MySQL 8.0 + Backend + Frontend
+#
+# Usage:
+#   docker compose up -d --build
+#   Frontend: http://localhost:3000  (Nginx, /api proxy to backend)
+#   Backend:  http://localhost:8080  (Swagger: /swagger-ui/index.html)
+#   MySQL:    localhost:3306 (user: root, pass: root, db: greenphone)
+# ============================================================
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: greenphone-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: greenphone
+      TZ: UTC
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./deploy/mysql-init:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./GreenPhone-Backend
+    container_name: greenphone-backend
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./GreenPhone-Backend/.env
+    environment:
+      DB_URL: ${DB_URL:-jdbc:mysql://mysql:3306/greenphone?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true}
+      DB_USERNAME: ${DB_USERNAME:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 90s
+      retries: 3
+
+  frontend:
+    build: ./Frontend
+    container_name: greenphone-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Cloudflare Quick Tunnel – random *.trycloudflare.com domain, no API key.
+  # URL appears in `docker logs greenphone-tunnel` (changes on every restart).
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: greenphone-tunnel
+    command: tunnel --no-autoupdate --url http://frontend:80
+    depends_on:
+      frontend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mysql_data:

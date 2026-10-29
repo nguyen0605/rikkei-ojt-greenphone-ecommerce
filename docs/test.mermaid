@@ -1,0 +1,30 @@
+flowchart TD
+    A["1. Khách có đơn hàng PENDING + UNPAID sau khi đặt hàng"]
+    B["2. Frontend gọi POST /api/payments {orderId, method}"]
+    C["3. PaymentService.createPayment(): tải Order theo orderId"]
+    D["4. Tạo PAYMENT: amount=order.finalAmount, status=PENDING, method từ request"]
+    E{"5. paymentMethod?"}
+    F1["5a. COD: giữ nguyên, shipper thu tiền khi giao"]
+    F2["5b. BANK_TRANSFER"]
+    G2["6b. Frontend gọi GET /api/payments/qr/{orderId}"]
+    H2["7b. PaymentService.getQRCode(): description='GREENPHONE'+orderId"]
+    I2["8b. SepayService.generateQRUrl(): đọc SEPA_ACCOUNT_NUMBER, SEPA_BANK_CODE (MBB)"]
+    J2["9b. Sinh VietQR URL → Khách quét mã, chuyển khoản với nội dung 'GREENPHONE{id}'"]
+    K2["10b. Sepay webhook: POST /api/webhooks/sepay"]
+    L2["11b. SepayWebhookController: xác thực chữ ký HMAC-SHA256 hoặc Apikey"]
+    M2["12b. SepayService.processPaymentWebhook():"]
+    N2["13b. Idempotency: paymentRepository.findByTransactionCode() → trả duplicate nếu đã xử lý"]
+    O2["14b. extractOrderId(): parse 'GREENPHONE'+số từ nội dung CK → tìm Order"]
+    P2["15b. Terminal guard: từ chối nếu order DELIVERED/CANCELLED"]
+    Q2["16b. Amount check: transferAmount >= order.finalAmount"]
+    R2["17b. Status guard: payment đã PAID → trả duplicate"]
+    S2["18b. payment.status=PAID, transactionCode, paidAt=now → save"]
+    T2["19b. order.paymentStatus=PAID, order.orderStatus=CONFIRMED → save"]
+    U2["20b. Catch DataIntegrityViolationException → race condition an toàn"]
+    V["21. OrderTimeoutScheduler (@Scheduled 60s): huỷ PENDING+UNPAID > 10 phút → hoàn tồn"]
+
+    A --> B --> C --> D --> E
+    E --> F1
+    E --> F2 --> G2 --> H2 --> I2 --> J2 --> K2 --> L2 --> M2 --> N2 --> O2 --> P2 --> Q2 --> R2 --> S2 --> T2 --> U2
+    F1 --> V
+    U2 --> V

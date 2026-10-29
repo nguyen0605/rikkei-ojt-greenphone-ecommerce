@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: GreenPhone
+  flyway:
+    enabled: 
+    baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration
+  datasource:
+    # connectionTimeZone=UTC: JVM runs UTC and writes LocalDateTime (UTC wall clock)
+    # into datetime columns; pin the MySQL session tz to UTC so comparisons (e.g.
+    # the order-timeout scheduler) are consistent instead of 7h off.
+    url: ${DB_URL:jdbc:mysql://localhost:3306/greenphone?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: ${DDL_AUTO:validate}
+    show-sql: ${SHOW_SQL:false}
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.MySQLDialect
+        default_batch_fetch_size: 16
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
+
+server:
+  port: ${SERVER_PORT:8080}
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:86400000}
+
+logging:
+  level:
+    com.re.greenphone: ${LOG_LEVEL:DEBUG}

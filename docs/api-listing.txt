@@ -1,0 +1,205 @@
+# GREENPHONE SYSTEM - FULL API LISTING
+# Generated from: docs/phân tích module.txt & docs/greenphone.sql
+# =============================================================================
+
+METHOD          ENDPOINT                                            DESCRIPTION                                                         ROLE            CATEGORY
+---------------------------------------------------------------------------------------------------------------------------------------------------
+# ============================================================
+# A. AUTHENTICATION (Xác thực)
+# ============================================================
+POST            /api/auth/register                                  Đăng ký tài khoản khách hàng                                        GUEST           Auth
+POST            /api/auth/login                                     Đăng nhập vào hệ thống                                              GUEST           Auth
+POST            /api/auth/logout                                    Đăng xuất khỏi tài khoản                                            CUSTOMER/ADMIN  Auth
+GET             /api/auth/me                                        Lấy thông tin người dùng hiện tại                                   CUSTOMER/ADMIN  Auth
+
+# ============================================================
+# B. PHONE - PUBLIC (Điện thoại - công khai)
+# ============================================================
+GET             /api/phones                                         Xem danh sách điện thoại (có phân trang)                            GUEST           Phone
+GET             /api/phones/{id}                                    Xem chi tiết điện thoại (hình ảnh, giá, thông số, bảo hành)        GUEST           Phone
+GET             /api/phones/search                                  Tìm kiếm điện thoại theo tên, hãng, giá                             GUEST           Phone
+GET             /api/phones/filters                                 Lấy danh sách bộ lọc (hãng, khoảng giá, RAM, ROM, màu)             GUEST           Phone
+
+# ============================================================
+# C. BRAND - PUBLIC (Hãng điện thoại - công khai)
+# ============================================================
+GET             /api/brands                                         Xem danh sách hãng điện thoại                                       GUEST           Brand
+
+# ============================================================
+# D. BANNER - PUBLIC (Banner - công khai)
+# ============================================================
+GET             /api/banners                                        Xem danh sách banner đang active trên trang chủ                     GUEST           Banner
+
+# ============================================================
+# E. REVIEW - PUBLIC (Đánh giá - công khai)
+# ============================================================
+GET             /api/phones/{phoneId}/reviews                       Xem danh sách đánh giá của điện thoại                               GUEST           Review
+GET             /api/phones/{phoneId}/reviews/summary               Xem tổng quan đánh giá (trung bình sao, phân bố)                    GUEST           Review
+
+# ============================================================
+# F. USER PROFILE (Quản lý tài khoản cá nhân)
+# ============================================================
+GET             /api/users/profile                                  Xem thông tin tài khoản cá nhân                                     CUSTOMER        User
+PUT             /api/users/profile                                  Cập nhật họ tên, số điện thoại, địa chỉ                             CUSTOMER        User
+PUT             /api/users/password                                 Đổi mật khẩu                                                        CUSTOMER        User
+
+# ============================================================
+# G. CART (Giỏ hàng)
+# ============================================================
+GET             /api/cart                                           Xem giỏ hàng hiện tại (danh sách sản phẩm + tổng tiền)             CUSTOMER        Cart
+POST            /api/cart/items                                     Thêm điện thoại (biến thể) vào giỏ hàng                             CUSTOMER        Cart
+PUT             /api/cart/items/{id}                                Cập nhật số lượng sản phẩm trong giỏ                                CUSTOMER        Cart
+DELETE          /api/cart/items/{id}                                Xóa một sản phẩm khỏi giỏ hàng                                      CUSTOMER        Cart
+DELETE          /api/cart                                           Xóa toàn bộ giỏ hàng                                                CUSTOMER        Cart
+
+# ============================================================
+# H. ORDER (Đơn hàng)
+# ============================================================
+POST            /api/orders                                         Đặt hàng (nhập thông tin giao hàng, xác nhận mua)                   CUSTOMER        Order
+GET             /api/orders                                         Xem danh sách đơn hàng của bản thân                                 CUSTOMER        Order
+GET             /api/orders/{id}                                    Xem chi tiết một đơn hàng                                           CUSTOMER        Order
+PUT             /api/orders/{id}/cancel                             Hủy đơn hàng (chỉ khi đơn chưa xử lý/chưa giao)                    CUSTOMER        Order
+GET             /api/orders/history                                 Xem lịch sử mua hàng (các đơn đã giao thành công)                  CUSTOMER        Order
+
+# ============================================================
+# I. PAYMENT (Thanh toán)
+# ============================================================
+POST            /api/orders/{orderId}/payment                       Thanh toán đơn hàng (COD, chuyển khoản, ví điện tử)                 CUSTOMER        Payment
+GET             /api/orders/{orderId}/payment                       Xem thông tin thanh toán của đơn hàng                               CUSTOMER        Payment
+
+# ============================================================
+# J. PROMOTION - USER (Khuyến mãi - phía khách hàng)
+# ============================================================
+POST            /api/promotions/apply                               Áp dụng mã giảm giá khi thanh toán                                  CUSTOMER        Promotion
+GET             /api/promotions/my                                  Xem danh sách mã giảm giá đã nhận                                   CUSTOMER        Promotion
+
+# ============================================================
+# K. REVIEW - USER (Đánh giá - phía khách hàng)
+# ============================================================
+POST            /api/reviews                                        Đánh giá điện thoại sau khi mua                                     CUSTOMER        Review
+PUT             /api/reviews/{id}                                   Chỉnh sửa đánh giá đã viết                                          CUSTOMER        Review
+DELETE          /api/reviews/{id}                                   Xóa đánh giá của bản thân                                           CUSTOMER        Review
+GET             /api/reviews/my                                     Xem danh sách đánh giá của bản thân                                 CUSTOMER        Review
+
+# ============================================================
+# L. ADMIN - AUTH (Đăng nhập quản trị)
+# ============================================================
+POST            /api/admin/auth/login                               Đăng nhập vào trang quản trị                                        ADMIN           Admin Auth
+POST            /api/admin/auth/logout                              Đăng xuất khỏi trang quản trị                                       ADMIN           Admin Auth
+
+# ============================================================
+# M. ADMIN - PHONE MANAGEMENT (Quản lý điện thoại)
+# ============================================================
+GET             /api/admin/phones                                   Xem danh sách toàn bộ điện thoại (có phân trang, tìm kiếm)         ADMIN           Admin Phone
+GET             /api/admin/phones/{id}                              Xem chi tiết điện thoại (kèm biến thể, hình ảnh)                    ADMIN           Admin Phone
+POST            /api/admin/phones                                   Thêm điện thoại mới (kèm thông số kỹ thuật)                         ADMIN           Admin Phone
+PUT             /api/admin/phones/{id}                              Cập nhật thông tin điện thoại + thông số kỹ thuật                   ADMIN           Admin Phone
+DELETE          /api/admin/phones/{id}                              Xóa điện thoại                                                      ADMIN           Admin Phone
+
+# ============================================================
+# N. ADMIN - PHONE VARIANT MANAGEMENT (Quản lý biến thể)
+# ============================================================
+GET             /api/admin/phones/{phoneId}/variants                Xem danh sách biến thể của điện thoại                               ADMIN           Admin Variant
+POST            /api/admin/phones/{phoneId}/variants                Thêm biến thể mới (RAM, ROM, màu, giá, tồn kho)                     ADMIN           Admin Variant
+PUT             /api/admin/variants/{id}                            Cập nhật biến thể (giá gốc, giá KM, số lượng tồn kho)               ADMIN           Admin Variant
+DELETE          /api/admin/variants/{id}                            Xóa biến thể                                                        ADMIN           Admin Variant
+
+# ============================================================
+# O. ADMIN - PHONE IMAGE MANAGEMENT (Quản lý hình ảnh)
+# ============================================================
+GET             /api/admin/phones/{phoneId}/images                  Xem danh sách hình ảnh của điện thoại                               ADMIN           Admin Image
+POST            /api/admin/phones/{phoneId}/images                  Thêm hình ảnh cho điện thoại                                        ADMIN           Admin Image
+PUT             /api/admin/images/{id}                              Cập nhật hình ảnh (đổi ảnh, đặt ảnh chính)                          ADMIN           Admin Image
+DELETE          /api/admin/images/{id}                              Xóa hình ảnh                                                        ADMIN           Admin Image
+
+# ============================================================
+# P. ADMIN - BRAND MANAGEMENT (Quản lý hãng)
+# ============================================================
+GET             /api/admin/brands                                   Xem danh sách hãng điện thoại                                       ADMIN           Admin Brand
+POST            /api/admin/brands                                   Thêm hãng mới (Apple, Samsung, Xiaomi, OPPO...)                    ADMIN           Admin Brand
+PUT             /api/admin/brands/{id}                              Cập nhật thông tin hãng (tên, logo)                                 ADMIN           Admin Brand
+DELETE          /api/admin/brands/{id}                              Xóa hãng                                                            ADMIN           Admin Brand
+
+# ============================================================
+# Q. ADMIN - ORDER MANAGEMENT (Quản lý đơn hàng)
+# ============================================================
+GET             /api/admin/orders                                   Xem danh sách đơn hàng (có lọc theo trạng thái, phân trang)       ADMIN           Admin Order
+GET             /api/admin/orders/{id}                              Xem chi tiết đơn hàng (kèm danh sách sản phẩm)                     ADMIN           Admin Order
+PUT             /api/admin/orders/{id}/status                       Cập nhật trạng thái đơn hàng                                        ADMIN           Admin Order
+PUT             /api/admin/orders/{id}/confirm                      Xác nhận / duyệt đơn hàng khách đã đặt                              ADMIN           Admin Order
+PUT             /api/admin/orders/{id}/delivery-status              Cập nhật trạng thái giao hàng (đang xử lý, đang giao, đã giao)     ADMIN           Admin Order
+
+# ============================================================
+# R. ADMIN - CUSTOMER MANAGEMENT (Quản lý khách hàng)
+# ============================================================
+GET             /api/admin/users                                    Xem danh sách khách hàng (có phân trang, tìm kiếm)                  ADMIN           Admin User
+GET             /api/admin/users/{id}                               Xem chi tiết khách hàng (kèm lịch sử đơn hàng)                      ADMIN           Admin User
+PUT             /api/admin/users/{id}/status                        Cập nhật trạng thái khách hàng (ACTIVE / LOCKED)                    ADMIN           Admin User
+
+# ============================================================
+# S. ADMIN - REVIEW MANAGEMENT (Quản lý đánh giá)
+# ============================================================
+GET             /api/admin/reviews                                  Xem danh sách đánh giá (có lọc theo trạng thái, phân trang)        ADMIN           Admin Review
+PUT             /api/admin/reviews/{id}/status                      Ẩn / Hiện đánh giá (SHOW / HIDDEN)                                  ADMIN           Admin Review
+DELETE          /api/admin/reviews/{id}                             Xóa đánh giá không phù hợp                                          ADMIN           Admin Review
+
+# ============================================================
+# T. ADMIN - PROMOTION MANAGEMENT (Quản lý khuyến mãi)
+# ============================================================
+GET             /api/admin/promotions                               Xem danh sách khuyến mãi (có phân trang)                            ADMIN           Admin Promotion
+GET             /api/admin/promotions/{id}                          Xem chi tiết khuyến mãi                                             ADMIN           Admin Promotion
+POST            /api/admin/promotions                               Tạo chương trình khuyến mãi / mã giảm giá mới                        ADMIN           Admin Promotion
+PUT             /api/admin/promotions/{id}                          Cập nhật khuyến mãi                                                 ADMIN           Admin Promotion
+DELETE          /api/admin/promotions/{id}                          Xóa khuyến mãi                                                      ADMIN           Admin Promotion
+
+# ============================================================
+# U. ADMIN - STATISTICS (Thống kê)
+# ============================================================
+GET             /api/admin/statistics/revenue                       Thống kê doanh thu (theo ngày, tháng, năm)                          ADMIN           Admin Statistics
+GET             /api/admin/statistics/orders                        Thống kê đơn hàng (thành công, hủy, đang xử lý)                     ADMIN           Admin Statistics
+GET             /api/admin/statistics/top-selling                   Thống kê điện thoại bán chạy nhất                                   ADMIN           Admin Statistics
+
+# ============================================================
+# V. ADMIN - BANNER MANAGEMENT (Quản lý banner)
+# ============================================================
+GET             /api/admin/banners                                  Xem danh sách banner                                                ADMIN           Admin Banner
+POST            /api/admin/banners                                  Thêm banner quảng cáo mới                                           ADMIN           Admin Banner
+PUT             /api/admin/banners/{id}                             Cập nhật banner                                                     ADMIN           Admin Banner
+DELETE          /api/admin/banners/{id}                             Xóa banner                                                          ADMIN           Admin Banner
+
+# ============================================================
+# SUMMARY
+# ============================================================
+
+POST            /api/auth/verify-otp                                 Verify OTP nhan duoc qua email                                      GUEST           Auth
+POST            /api/auth/forgot-password                            Yeu cau gui OTP de dat lai mat khau                                 GUEST           Auth
+POST            /api/auth/reset-password                             Dat lai mat khau bang OTP                                           GUEST           Auth
+POST            /api/auth/logout                                     Dang xuat khoi tai khoan                                            CUSTOMER/ADMIN  Auth
+# Tổng số API: 71 endpoints
+#   - GUEST:             11 APIs
+#   - CUSTOMER:          22 APIs
+#   - ADMIN:             38 APIs
+#
+# Categories:
+#   Auth (GUEST + CUSTOMER/ADMIN):   4
+#   Phone (Public):                  4
+#   Brand (Public):                  1
+#   Banner (Public):                 1
+#   Review (Public):                 2
+#   User Profile:                    3
+#   Cart:                            5
+#   Order:                           5
+#   Payment:                         2
+#   Promotion (User):                2
+#   Review (User):                   4
+#   Admin Auth:                      2
+#   Admin Phone:                     5
+#   Admin Variant:                   4
+#   Admin Image:                     4
+#   Admin Brand:                     4
+#   Admin Order:                     5
+#   Admin User:                      3
+#   Admin Review:                    3
+#   Admin Promotion:                 5
+#   Admin Statistics:                3
+#   Admin Banner:                    4
