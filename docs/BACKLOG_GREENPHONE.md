@@ -263,15 +263,19 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 
 ### 👤 FE 3: Đăng Dương (`@dangduongre`)
 
-#### 🎯 Task FE3-01: Mini-Cart Slide-Over Drawer (Quản Lý Giỏ Hàng Nhanh)
-- **Mục tiêu:** Ngăn kéo giỏ hàng trượt từ bên phải màn hình ra khi người dùng bấm icon giỏ hàng hoặc vừa bấm "Thêm vào giỏ", hiển thị danh sách máy đã chọn, tăng giảm số lượng tức thì.
+#### 🎯 Task FE3-01: Giao Diện Đặt Hàng & Thanh Toán Đa Bước (Multi-Step Checkout Flow)
+- **Mục tiêu:** Xây dựng giao diện đặt hàng và thanh toán đa bước (Multi-step Checkout) chuyên nghiệp cho GreenPhone: Tiếp nhận thông tin người mua, địa chỉ nhận hàng, chọn hình thức giao hàng, chọn phương thức thanh toán (COD / Chuyển khoản QR), tóm tắt đơn hàng và chuyển sang trang Đặt hàng thành công (`/checkout/success`).
 - **Đường dẫn file:**
-  - `Frontend/src/components/cart/CartDrawer.tsx`
-  - `Frontend/src/store/slices/cartSlice.ts`
-  - `Frontend/src/services/cartService.ts`
-- **Cần gì:** Redux Toolkit cart slice, Ant Design Drawer component.
-- **Làm gì:** Tính tổng tiền tự động, có nút "Xem giỏ hàng chi tiết" và "Thanh toán ngay".
-- **Tiêu chuẩn nghiệm thu:** Thêm điện thoại vào giỏ thì drawer tự động mở, số lượng trên icon giỏ hàng ở Header tự động tăng.
+  - `Frontend/src/pages/CheckoutPage.tsx`
+  - `Frontend/src/pages/CheckoutSuccessPage.tsx`
+  - `Frontend/src/components/checkout/CheckoutSteps.tsx`
+  - `Frontend/src/components/checkout/ShippingForm.tsx`
+  - `Frontend/src/components/checkout/PaymentMethodSelect.tsx`
+  - `Frontend/src/components/checkout/OrderSummary.tsx`
+  - `Frontend/src/store/slices/checkoutSlice.ts`
+- **Cần gì:** Ant Design Form, Steps, Button, Redux `checkoutSlice` và `cartSlice`.
+- **Làm gì:** Tiến trình 3 bước (1. Giao hàng -> 2. Thanh toán -> 3. Hoàn tất), validate form chặt chẽ (Tên >= 2 ký tự, SĐT đúng 10 số, Địa chỉ >= 5 ký tự), tính toán tiền hàng kèm voucher và phí ship, đặt hàng xong xóa giỏ hàng và điều hướng sang `/checkout/success`.
+- **Tiêu chuẩn nghiệm thu:** Nhập sai định dạng SĐT báo lỗi ngay; đặt hàng thành công giỏ hàng tự động reset về 0 và hiển thị mã đơn hàng.
 
 #### 🎯 Task FE3-02: Trang Giỏ Hàng Chi Tiết (/cart) & Áp Dụng Mã Giảm Giá
 - **Mục tiêu:** Trang xem lại toàn bộ giỏ hàng trước khi thanh toán: danh sách máy, phân loại cấu hình (Màu sắc, Dung lượng), ô nhập mã Voucher giảm giá, bảng tính chi tiết tiền hàng và tiền chiết khấu.

@@ -121,7 +121,7 @@
      - Thư viện ảnh slider Swiper: Bấm đổi thumbnail ảnh góc cạnh máy mượt mà.
      - Bảng chọn Dung lượng (128GB vs 256GB vs 512GB): Khi bấm chọn bản 512GB, giá bán tự động đổi từ 29.990.000đ thành 35.990.000đ.
      - Bảng thông số kỹ thuật (Màn hình Super Retina XDR, Chip A17 Pro, Pin 4422 mAh) hiển thị rõ ràng.
-  2. Bấm nút **"Thêm Vào Giỏ Hàng"** $\rightarrow$ Ngăn kéo Mini-cart tự động mở ra.
+  2. Bấm nút **"Thêm Vào Giỏ Hàng"** $\rightarrow$ Icon giỏ hàng trên thanh Header lập tức nhảy số hiển thị huy hiệu (Badge count tăng lên 1) kèm thông báo Toast xanh.
 
 ---
 
@@ -154,14 +154,16 @@
 
 ---
 
-### 👤 6. FE 3: Đăng Dương (`@dangduongre`) - Cart Drawer & Admin Management
+### 👤 6. FE 3: Đăng Dương (`@dangduongre`) - Checkout, Cart & Admin Management
 
-#### 🧪 Kịch bản Test 16: Mini-Cart Slide-Over Drawer
-- **File phụ trách:** `Frontend/src/components/cart/CartDrawer.tsx`
+#### 🧪 Kịch bản Test 16: Giao Diện Đặt Hàng & Thanh Toán Đa Bước (Multi-Step Checkout Flow)
+- **File phụ trách:** `Frontend/src/pages/CheckoutPage.tsx`
 - **Các bước Demo:**
-  1. Bấm vào icon Giỏ hàng ở Header: Ngăn kéo trượt ra từ mép phải màn hình.
-  2. Hiển thị ảnh thu nhỏ của máy, tên máy, cấu hình màu/dung lượng đã chọn, nút bấm tăng/giảm số lượng `+` / `-`.
-  3. Bấm nút `+` $\rightarrow$ Số lượng tăng lên 2, tổng tiền tạm tính nhảy ngay lập tức. Bấm nút "Xem giỏ hàng" dẫn sang `/cart`.
+  1. Từ trang Giỏ hàng `/cart`, bấm nút **"Tiến hành đặt hàng"** $\rightarrow$ Hệ thống chuyển sang trang `/checkout`.
+  2. **Bước 1 - Thông tin giao hàng:** Điền Họ tên `Nguyễn Văn A`, SĐT `0912345678`, Địa chỉ `123 Đường Cầu Giấy, Hà Nội`. Bấm "Tiếp tục".
+  3. **Bước 2 - Phương thức thanh toán:** Chọn phương thức "Thanh toán khi nhận hàng (COD)" hoặc "Chuyển khoản ngân hàng".
+  4. **Bước 3 - Xác nhận & Đặt hàng:** Kiểm tra bảng tóm tắt đơn hàng hiển thị đúng giá tiền và voucher đã áp dụng.
+  5. Bấm nút **"Đặt hàng ngay"** $\rightarrow$ Hệ thống điều hướng sang trang `/checkout/success`, hiển thị thông báo "Đặt hàng thành công!" và giỏ hàng tự động reset về 0.
 
 #### 🧪 Kịch bản Test 17: Trang Giỏ Hàng Chi Tiết (/cart) & Áp Dụng Mã Giảm Giá
 - **File phụ trách:** `Frontend/src/pages/cart/CartPage.tsx`
