@@ -61,11 +61,33 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 
 # 🚀 SPRINT 1: NỀN TẢNG KIẾN TRÚC, AUTHENTICATION, DANH MỤC ĐIỆN THOẠI & BASE FRONTEND
 
+## 🎯 SPRINT 1 GOAL (MỤC TIÊU SPRINT 1)
+> **"Hoàn thiện nền móng kiến trúc hệ thống (Backend Spring Boot 3 & Frontend React 19), bảo mật định danh JWT Bearer, hệ thống quản lý danh mục smartphone kèm ma trận biến thể cấu hình (Color/Storage), luồng mua sắm cốt lõi (Cart -> Multi-Step Checkout -> Order Success) cùng giao diện quản trị sản phẩm cơ bản; đóng gói và vận hành ổn định trên môi trường VPS Ubuntu."**
+
+---
+
+### 📊 BẢNG PHÂN BỔ STORY POINTS & VẬN TỐC NHÓM (TEAM VELOCITY) - SPRINT 1
+- **Quy mô:** 6 Thành viên (Thời lượng: 2 tuần / 10 ngày làm việc)
+- **Phương pháp ước lượng:** Scrum Planning Poker (Thang Fibonacci: 1, 2, 3, 5, 8)
+- **Tổng Story Points cam kết:** **70 SP**
+- **Tổng Story Points hoàn thành:** **70 SP (Đạt 100% cam kết)**
+- **Vận tốc trung bình (Average Velocity):** **11.6 SP / thành viên**
+
+| Thành viên | Vai trò phụ trách | Danh sách Task Sprint 1 | Story Points | Trạng thái |
+| :--- | :--- | :--- | :---: | :---: |
+| **dangnguyen vu** | BE 1 (Lead Tech, Infra & Auth) | BE1-01 (3 SP), BE1-02 (5 SP), BE1-03 (3 SP) | **11 SP** | ✅ Hoàn thành 100% |
+| **38.Phucthinh** | BE 2 (Catalog, Media & Spec Tree) | BE2-01 (3 SP), BE2-02 (3 SP), BE2-03 (5 SP) | **11 SP** | ✅ Hoàn thành 100% |
+| **Đạt Phan Văn** | BE 3 (Cart, Voucher Engine & Stock) | BE3-01 (5 SP), BE3-02 (3 SP), BE3-03 (3 SP) | **11 SP** | ✅ Hoàn thành 100% |
+| **Toàn Nguyễn Văn** | FE 1 (Base App, Auth & PDP) | FE1-01 (5 SP), FE1-02 (3 SP), FE1-03 (5 SP) | **13 SP** | ✅ Hoàn thành 100% |
+| **vũ Nguyễn Lê** | FE 2 (Layout, Homepage & Filters) | FE2-01 (3 SP), FE2-02 (3 SP), FE2-03 (5 SP) | **11 SP** | ✅ Hoàn thành 100% |
+| **Đăng Dương** | FE 3 (Checkout, Cart & Admin CRUD) | FE3-01 (5 SP), FE3-02 (3 SP), FE3-03 (5 SP) | **13 SP** | ✅ Hoàn thành 100% |
+| **TỔNG CỘNG** | **Toàn đội GreenPhone** | **18 Nhiệm vụ cốt lõi** | **70 SP** | **✅ ĐẠT 100% CAM KẾT** |
+
 ---
 
 ### 👤 BE 1: dangnguyen vu (`@dangnguyenvu`)
 
-#### 🎯 Task BE1-01: Base Architecture, Exception Handling & API Response Standard
+#### 🎯 Task BE1-01: Base Architecture, Exception Handling & API Response Standard [3 SP]
 - **Mục tiêu:** Xây dựng khung chuẩn hệ thống Backend Spring Boot: Cấu trúc DTO chuẩn `ApiResponse<T>`, bộ mã lỗi định danh `ErrorCode`, bắt lỗi tập trung `GlobalExceptionHandler`, cấu hình CORS và Swagger OpenAPI 3.
 - **Đường dẫn file:**
   - `GreenPhone-Backend/src/main/java/com/re/greenphone/common/dto/ApiResponse.java`
@@ -78,7 +100,7 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 - **CẤM ĐIỀU GÌ:** Cấm in stacktrace ra console `e.printStackTrace()`. Cấm trả về 200 OK khi có lỗi.
 - **Tiêu chuẩn nghiệm thu:** Mọi lỗi nhập liệu hoặc lỗi hệ thống đều trả về JSON đúng format `ApiResponse` kèm HTTP Status chuẩn.
 
-#### 🎯 Task BE1-02: Authentication Service (JWT Bearer & User Security)
+#### 🎯 Task BE1-02: Authentication Service (JWT Bearer & User Security) [5 SP]
 - **Mục tiêu:** Hệ thống đăng ký tài khoản khách hàng, đăng nhập sinh chuỗi mã hóa JWT Bearer Token, kiểm tra tài khoản kích hoạt và phân quyền Role `ROLE_CUSTOMER` vs `ROLE_ADMIN`.
 - **Đường dẫn file:**
   - `GreenPhone-Backend/src/main/java/com/re/greenphone/security/JwtTokenProvider.java`
@@ -91,7 +113,7 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 - **CẤM ĐIỀU GÌ:** Cấm lưu secret key trong code Java. Cấm lưu mật khẩu thô.
 - **Tiêu chuẩn nghiệm thu:** Test Swagger đăng ký tài khoản mới $\rightarrow$ đăng nhập nhận JWT $\rightarrow$ gửi JWT vào header gọi được API lấy thông tin profile cá nhân.
 
-#### 🎯 Task BE1-03: User Profile & Sổ Địa Chỉ Giao Hàng (User Address Management)
+#### 🎯 Task BE1-03: User Profile & Sổ Địa Chỉ Giao Hàng (User Address Management) [3 SP]
 - **Mục tiêu:** Cho phép khách hàng quản lý thông tin hồ sơ (Họ tên, SĐT, Email, Avatar) và cập nhật địa chỉ giao hàng nhận máy.
 - **Đường dẫn file:**
   - `GreenPhone-Backend/src/main/java/com/re/greenphone/entity/User.java`
@@ -107,7 +129,7 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 
 ### 👤 BE 2: 38.Phucthinh (`@38phucthinh`)
 
-#### 🎯 Task BE2-01: Tích Hợp Upload Đa Phương Tiện (Cloudinary Image Service)
+#### 🎯 Task BE2-01: Tích Hợp Upload Đa Phương Tiện (Cloudinary Image Service) [3 SP]
 - **Mục tiêu:** Service upload ảnh điện thoại các góc cạnh, ảnh banner quảng cáo và ảnh avatar người dùng lên Cloudinary CDN với độ trễ thấp và tự động tối ưu hóa.
 - **Đường dẫn file:**
   - `GreenPhone-Backend/src/main/java/com/re/greenphone/config/CloudinaryConfig.java`
@@ -118,7 +140,7 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 - **CẤM ĐIỀU GÌ:** Cấm lưu trữ ảnh trực tiếp trong thư mục ổ cứng server. Cấm upload file không lọc đuôi extension.
 - **Tiêu chuẩn nghiệm thu:** Upload thử 1 ảnh điện thoại trả về link CDN `https://res.cloudinary.com/...` hiển thị ảnh rõ nét.
 
-#### 🎯 Task BE2-02: Quản Lý Hãng Sản Xuất (Brand) & Banner Khuyến Mãi
+#### 🎯 Task BE2-02: Quản Lý Hãng Sản Xuất (Brand) & Banner Khuyến Mãi [3 SP]
 - **Mục tiêu:** Cung cấp API quản lý các thương hiệu smartphone hàng đầu (Apple, Samsung, Xiaomi, OPPO, Vivo) và các banner chiến dịch quảng cáo trang chủ.
 - **Đường dẫn file:**
   - `GreenPhone-Backend/src/main/java/com/re/greenphone/entity/Brand.java`
@@ -132,7 +154,7 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 - **CẤM ĐIỀU GÌ:** Cấm xóa Hãng nếu đang có dòng điện thoại thuộc hãng đó trong hệ thống.
 - **Tiêu chuẩn nghiệm thu:** Gọi `GET /api/v1/brands` trả về đầy đủ logo và tên các hãng Apple, Samsung, Xiaomi.
 
-#### 🎯 Task BE2-03: Cây Thuộc Tính & Thông Số Kỹ Thuật (Option & OptionItem Tree)
+#### 🎯 Task BE2-03: Cây Thuộc Tính & Thông Số Kỹ Thuật (Option & OptionItem Tree) [5 SP]
 - **Mục tiêu:** Xây dựng hệ thống cấu hình thông số kỹ thuật linh hoạt cho smartphone: RAM (8GB, 12GB, 16GB), Dung lượng ROM (128GB, 256GB, 512GB, 1TB), Màu sắc, Chipset, Dung lượng Pin.
 - **Đường dẫn file:**
   - `GreenPhone-Backend/src/main/java/com/re/greenphone/entity/Option.java`
@@ -148,7 +170,7 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 
 ### 👤 BE 3: Đạt Phan Văn (`@dtphanvan3`)
 
-#### 🎯 Task BE3-01: Module Quản Lý Mã Giảm Giá & Voucher Engine (Promotion Service)
+#### 🎯 Task BE3-01: Module Quản Lý Mã Giảm Giá & Voucher Engine (Promotion Service) [5 SP]
 - **Mục tiêu:** Xây dựng nghiệp vụ voucher khuyến mãi giảm giá theo % hoặc tiền cố định, kiểm tra điều kiện áp dụng (ngày hiệu lực, đơn hàng tối thiểu, lượt dùng còn lại).
 - **Đường dẫn file:**
   - `GreenPhone-Backend/src/main/java/com/re/greenphone/entity/Promotion.java`
@@ -161,7 +183,7 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 - **CẤM ĐIỀU GÌ:** Cấm tiền giảm giá lớn hơn tổng tiền đơn hàng. Cấm dùng voucher đã hết lượt.
 - **Tiêu chuẩn nghiệm thu:** Áp dụng mã `GREENPHONE500K` vào đơn 10 triệu thành công trừ đúng 500k; thử áp mã hết hạn báo lỗi rõ ràng.
 
-#### 🎯 Task BE3-02: Giỏ Hàng & Quản Lý Cart Items (Shopping Cart Service)
+#### 🎯 Task BE3-02: Giỏ Hàng & Quản Lý Cart Items (Shopping Cart Service) [3 SP]
 - **Mục tiêu:** Quản lý giỏ hàng mua sắm của khách hàng: thêm máy theo biến thể màu/dung lượng, tăng giảm số lượng, tính tổng tiền tạm tính realtime.
 - **Đường dẫn file:**
   - `GreenPhone-Backend/src/main/java/com/re/greenphone/entity/Cart.java`
@@ -174,7 +196,7 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 - **CẤM ĐIỀU GÌ:** Cấm thêm sản phẩm vào giỏ khi số lượng trong kho đã hết (`stock == 0`).
 - **Tiêu chuẩn nghiệm thu:** Thêm 1 chiếc iPhone 15 Pro Max 256GB vào giỏ, kiểm tra giỏ hàng thấy đúng tên máy, màu sắc, giá và số lượng.
 
-#### 🎯 Task BE3-03: Kiểm Tra Tồn Kho Biến Thể Thời Gian Thực & Validate Variant
+#### 🎯 Task BE3-03: Kiểm Tra Tồn Kho Biến Thể Thời Gian Thực & Validate Variant [3 SP]
 - **Mục tiêu:** Service kiểm tra số lượng tồn kho từng SKU biến thể điện thoại (kết hợp Màu + Dung lượng ROM) để báo trạng thái còn hàng/hết hàng cho client.
 - **Đường dẫn file:**
   - `GreenPhone-Backend/src/main/java/com/re/greenphone/entity/PhoneVariant.java`
@@ -188,7 +210,7 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 
 ### 👤 FE 1: Toàn Nguyễn Văn (`@toannguynvan12`)
 
-#### 🎯 Task FE1-01: Khởi Tạo Dự Án Frontend & Cấu Hình Kiến Trúc Base (React 19 + Vite)
+#### 🎯 Task FE1-01: Khởi Tạo Dự Án Frontend & Cấu Hình Kiến Trúc Base (React 19 + Vite) [5 SP]
 - **Mục tiêu:** Dựng khung chuẩn Frontend: Cấu hình Vite, Tailwind CSS, Ant Design Theme (màu chủ đạo: Xanh lá Green lá mạ công nghệ `#10B981` & Đen sang trọng), Axios Client tự động đính kèm JWT Bearer.
 - **Đường dẫn file:**
   - `Frontend/src/services/api.ts` (Axios Client)
@@ -199,7 +221,7 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 - **Làm gì:** Cấu hình Interceptors gắn `Authorization: Bearer <token>` vào mọi request bảo vệ; xử lý bắt lỗi 401 tự động xóa token và chuyển về trang Login.
 - **Tiêu chuẩn nghiệm thu:** Dự án build không lỗi qua `npm run build`, layout hiển thị đúng theme màu sắc của GreenPhone.
 
-#### 🎯 Task FE1-02: Giao Diện Đăng Ký, Đăng Nhập & Quên Mật Khẩu (Auth Pages)
+#### 🎯 Task FE1-02: Giao Diện Đăng Ký, Đăng Nhập & Quên Mật Khẩu (Auth Pages) [3 SP]
 - **Mục tiêu:** Giao diện trang Login và Register chuyên nghiệp, kiểm tra tính hợp lệ của form bằng React Hook Form + Zod, hỗ trợ thông báo lỗi trực quan.
 - **Đường dẫn file:**
   - `Frontend/src/pages/auth/LoginPage.tsx`
@@ -211,7 +233,7 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 - **CẤM ĐIỀU GÌ:** Cấm gửi request khi form validate còn lỗi.
 - **Tiêu chuẩn nghiệm thu:** Nhập đúng tài khoản đăng nhập thành công, Header tự động hiển thị tên người dùng và avatar.
 
-#### 🎯 Task FE1-03: Giao Diện Trang Chi Tiết Điện Thoại (Product Detail Page - PDP)
+#### 🎯 Task FE1-03: Giao Diện Trang Chi Tiết Điện Thoại (Product Detail Page - PDP) [5 SP]
 - **Mục tiêu:** Màn hình xem chi tiết điện thoại: Slider ảnh sản phẩm phóng to, bảng chọn dung lượng (128GB, 256GB, 512GB) và màu sắc (Titan Tự nhiên, Titan Đen, Titan Xanh), giá bán tự động đổi theo cấu hình chọn, nút "Thêm vào giỏ" và "Mua ngay".
 - **Đường dẫn file:**
   - `Frontend/src/pages/product/ProductDetailPage.tsx`
@@ -226,7 +248,7 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 
 ### 👤 FE 2: vũ Nguyễn Lê (`@vunguynle1`)
 
-#### 🎯 Task FE2-01: Thiết Kế Header, Navigation Bar & Footer Thương Hiệu
+#### 🎯 Task FE2-01: Thiết Kế Header, Navigation Bar & Footer Thương Hiệu [3 SP]
 - **Mục tiêu:** Xây dựng Header chuẩn e-commerce công nghệ: Logo GreenPhone, ô tìm kiếm thông minh có gợi ý, danh mục hãng (Apple, Samsung, Xiaomi), icon giỏ hàng kèm badge số lượng, menu tài khoản người dùng và Footer chính sách bảo hành.
 - **Đường dẫn file:**
   - `Frontend/src/components/layout/Header.tsx`
@@ -237,7 +259,7 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 - **Làm gì:** Header cố định khi cuộn trang (Sticky), hiển thị số lượng sản phẩm trong giỏ lấy từ Redux cart state.
 - **Tiêu chuẩn nghiệm thu:** Giao diện co giãn chuẩn trên cả Desktop và màn hình điện thoại di động (Responsive).
 
-#### 🎯 Task FE2-02: Giao Diện Trang Chủ (Homepage) & Banner Chiến Dịch
+#### 🎯 Task FE2-02: Giao Diện Trang Chủ (Homepage) & Banner Chiến Dịch [3 SP]
 - **Mục tiêu:** Trang chủ bắt mắt: Slider banner quảng cáo chiến dịch mở bán, danh mục chọn nhanh theo hãng, danh sách "Điện thoại hot nhất", "Flash Sale giá sốc", và cam kết chính hãng 100% đổi mới 30 ngày.
 - **Đường dẫn file:**
   - `Frontend/src/pages/home/HomePage.tsx`
@@ -248,7 +270,7 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 - **Làm gì:** Hiển thị thẻ card điện thoại gồm ảnh đại diện, tên máy, nhãn giảm giá %, giá bán và giá niêm yết gạch ngang, thông số tóm tắt (RAM/ROM).
 - **Tiêu chuẩn nghiệm thu:** Bấm vào thẻ điện thoại chuyển hướng mượt mà sang trang chi tiết đúng slug của máy.
 
-#### 🎯 Task FE2-03: Giao Diện Trang Danh Sách Sản Phẩm & Sidebar Bộ Lọc Động
+#### 🎯 Task FE2-03: Giao Diện Trang Danh Sách Sản Phẩm & Sidebar Bộ Lọc Động [5 SP]
 - **Mục tiêu:** Trang `/products` có Sidebar lọc đa tiêu chí: Lọc theo Hãng (Apple, Samsung, Xiaomi), Lọc theo Mức giá (Dưới 5 triệu, 5-10 triệu, 10-20 triệu, Trên 20 triệu), Lọc theo RAM, Bộ nhớ trong ROM; đồng bộ URL query parameters.
 - **Đường dẫn file:**
   - `Frontend/src/pages/product/ProductsPage.tsx`
@@ -263,7 +285,7 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 
 ### 👤 FE 3: Đăng Dương (`@dangduongre`)
 
-#### 🎯 Task FE3-01: Giao Diện Đặt Hàng & Thanh Toán Đa Bước (Multi-Step Checkout Flow)
+#### 🎯 Task FE3-01: Giao Diện Đặt Hàng & Thanh Toán Đa Bước (Multi-Step Checkout Flow) [5 SP]
 - **Mục tiêu:** Xây dựng giao diện đặt hàng và thanh toán đa bước (Multi-step Checkout) chuyên nghiệp cho GreenPhone: Tiếp nhận thông tin người mua, địa chỉ nhận hàng, chọn hình thức giao hàng, chọn phương thức thanh toán (COD / Chuyển khoản QR), tóm tắt đơn hàng và chuyển sang trang Đặt hàng thành công (`/checkout/success`).
 - **Đường dẫn file:**
   - `Frontend/src/pages/CheckoutPage.tsx`
@@ -277,7 +299,7 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 - **Làm gì:** Tiến trình 3 bước (1. Giao hàng -> 2. Thanh toán -> 3. Hoàn tất), validate form chặt chẽ (Tên >= 2 ký tự, SĐT đúng 10 số, Địa chỉ >= 5 ký tự), tính toán tiền hàng kèm voucher và phí ship, đặt hàng xong xóa giỏ hàng và điều hướng sang `/checkout/success`.
 - **Tiêu chuẩn nghiệm thu:** Nhập sai định dạng SĐT báo lỗi ngay; đặt hàng thành công giỏ hàng tự động reset về 0 và hiển thị mã đơn hàng.
 
-#### 🎯 Task FE3-02: Trang Giỏ Hàng Chi Tiết (/cart) & Áp Dụng Mã Giảm Giá
+#### 🎯 Task FE3-02: Trang Giỏ Hàng Chi Tiết (/cart) & Áp Dụng Mã Giảm Giá [3 SP]
 - **Mục tiêu:** Trang xem lại toàn bộ giỏ hàng trước khi thanh toán: danh sách máy, phân loại cấu hình (Màu sắc, Dung lượng), ô nhập mã Voucher giảm giá, bảng tính chi tiết tiền hàng và tiền chiết khấu.
 - **Đường dẫn file:**
   - `Frontend/src/pages/cart/CartPage.tsx`
@@ -287,7 +309,7 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 - **Làm gì:** Nhập mã giảm giá hợp lệ thì hiển thị số tiền được giảm màu xanh lá cây và trừ trực tiếp vào tổng tiền cần thanh toán.
 - **Tiêu chuẩn nghiệm thu:** Xóa sản phẩm khỏi giỏ có hộp thoại xác nhận; giỏ hàng rỗng hiển thị thông báo "Chưa có sản phẩm nào".
 
-#### 🎯 Task FE3-03: Giao Diện Quản Trị: Quản Lý Sản Phẩm & Biến Thể Kho Máy (Admin Product CRUD)
+#### 🎯 Task FE3-03: Giao Diện Quản Trị: Quản Lý Sản Phẩm & Biến Thể Kho Máy (Admin Product CRUD) [5 SP]
 - **Mục tiêu:** Giao diện dành cho Admin để thêm mới mẫu điện thoại, upload ảnh lên Cloudinary, tạo ma trận biến thể cấu hình (Dung lượng 128/256/512GB + Màu Đen/Trắng/Xanh) kèm số lượng tồn kho từng loại.
 - **Đường dẫn file:**
   - `Frontend/src/pages/admin/AdminProductsPage.tsx`
@@ -301,6 +323,10 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 ---
 
 # 🚀 SPRINT 2: ĐẶT HÀNG, THANH TOÁN VIETQR SEPAY, BỘ LỌC ĐA TIÊU CHÍ & ADMIN QUẢN TRỊ
+
+## 🎯 SPRINT 2 GOAL (MỤC TIÊU SPRINT 2)
+> **"Tích hợp cổng thanh toán tự động VietQR qua Webhook SePay, cơ chế khóa bi quan (@Lock) chống bán âm kho biến thể, công cụ lập lịch hủy đơn quá hạn (@Scheduled), hệ thống đánh giá sản phẩm (Reviews), quản trị đơn hàng & thương hiệu phía Admin, cùng tối ưu hóa trải nghiệm Mobile-First."**
+- **Tổng điểm ước tính:** **68 SP**
 
 ---
 
@@ -373,6 +399,10 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 
 # 🚀 SPRINT 3: BÁO CÁO DOANH THU ADMIN, BẢO MẬT NÂNG CAO & KIỂM THỬ TOÀN DIỆN (E2E)
 
+## 🎯 SPRINT 3 GOAL (MỤC TIÊU SPRINT 3)
+> **"Xây dựng hệ thống báo cáo & biểu đồ doanh thu trực quan cho Admin, phân quyền người dùng (RBAC), xuất dữ liệu tài chính Excel, nâng cao an ninh hệ thống (Rate Limiting, Reverse Proxy SSL), tối ưu SEO Google và tự động hóa kiểm thử tích hợp E2E."**
+- **Tổng điểm ước tính:** **65 SP**
+
 ---
 
 ### 👤 BE 1: dangnguyen vu (`@dangnguyenvu`)
@@ -408,6 +438,9 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 ---
 
 # 🚀 SPRINT 4: TỔNG KẾT, BẢO TRÌ, DEPLOY VPS CHÍNH THỨC & BẢO VỆ ĐỒ ÁN
+
+## 🎯 SPRINT 4 GOAL (MỤC TIÊU SPRINT 4)
+> **"Tổng duyệt toàn bộ hệ thống trên Production VPS, đóng gói tài liệu kỹ thuật bàn giao, tối ưu chỉ số Google Lighthouse (> 90 điểm), diễn tập kịch bản thuyết trình và bảo vệ đồ án OJT trước Hội đồng Mentor Rikkei."**
 - Toàn đội tập trung hoàn thiện báo cáo đồ án, tổng duyệt kịch bản demo (Slide thuyết trình + Video demo + Hệ thống chạy trực tiếp trên VPS).
 - Đóng gói tài liệu bàn giao, sơ đồ kiến trúc, tài liệu API Swagger và bộ test case hoàn chỉnh.
 

@@ -5,6 +5,21 @@
 
 ---
 
+## 🎯 SPRINT 1 GOAL & TỔNG KẾT METRICS (TEAM VELOCITY)
+
+### 1. Tuyên Ngôn Mục Tiêu Sprint 1 (Sprint 1 Goal):
+> **"Hoàn thiện nền móng kiến trúc hệ thống (Backend Spring Boot 3 & Frontend React 19), bảo mật định danh JWT Bearer, hệ thống quản lý danh mục smartphone kèm ma trận biến thể cấu hình (Color/Storage), luồng mua sắm cốt lõi (Cart -> Multi-Step Checkout -> Order Success) cùng giao diện quản trị sản phẩm cơ bản; sẵn sàng môi trường triển khai thực tế trên VPS."**
+
+### 2. Số Liệu Nghiệm Thu Thực Tế (Sprint 1 Metrics):
+- **Thời lượng:** 2 tuần (10 ngày làm việc).
+- **Tổng số thành viên:** 6 thành viên (3 Backend + 3 Frontend).
+- **Tổng Story Points cam kết & hoàn thành:** **70 / 70 SP (Đạt 100% cam kết)**.
+- **Vận tốc nhóm (Team Velocity):** **11.6 SP / thành viên**.
+- **Tỷ lệ hoàn thành công việc:** **18 / 18 nhiệm vụ cốt lõi (100% Done)**.
+- **Chất lượng kiểm thử:** 100% kịch bản kiểm thử (Postman/Swagger & UI DevTools) đều vượt qua, không lỗi crash, không xung đột dữ liệu.
+
+---
+
 ## 👥 PHÂN CHIA NHIỆM VỤ DEMO TRONG BUỔI BÁO CÁO
 
 ---
