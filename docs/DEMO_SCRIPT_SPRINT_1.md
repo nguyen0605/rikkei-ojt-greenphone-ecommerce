@@ -13,10 +13,12 @@
 ### 2. Số Liệu Nghiệm Thu Thực Tế (Sprint 1 Metrics):
 - **Thời lượng:** 2 tuần (10 ngày làm việc).
 - **Tổng số thành viên:** 6 thành viên (3 Backend + 3 Frontend).
-- **Tổng Story Points cam kết & hoàn thành:** **70 / 70 SP (Đạt 100% cam kết)**.
-- **Vận tốc nhóm (Team Velocity):** **11.6 SP / thành viên**.
-- **Tỷ lệ hoàn thành công việc:** **18 / 18 nhiệm vụ cốt lõi (100% Done)**.
-- **Chất lượng kiểm thử:** 100% kịch bản kiểm thử (Postman/Swagger & UI DevTools) đều vượt qua, không lỗi crash, không xung đột dữ liệu.
+- **Tổng Story Points cam kết ban đầu:** **70 SP (18 tasks)**.
+- **Story Points hoàn thành nghiệm thu (Done):** **62 SP (16 tasks - 88.6%)**.
+- **Story Points hoãn chuyển tiếp Sprint 2 (Delay):** **8 SP (2 tasks - 11.4%)**.
+- **Vận tốc nhóm thực tế (Actual Velocity):** **10.3 SP / thành viên**.
+- **Chất lượng kiểm thử:** 100% kịch bản kiểm thử của 16 tasks hoàn thành (Postman/Swagger & UI DevTools) đều đạt tiêu chuẩn không lỗi crash.
+- **Tệp báo cáo PDF chính thức:** Đã kết xuất đầy đủ tại `docs/BAO_CAO_NGHIEM_THU_SPRINT_1_GREENPHONE.pdf`.
 
 ---
 

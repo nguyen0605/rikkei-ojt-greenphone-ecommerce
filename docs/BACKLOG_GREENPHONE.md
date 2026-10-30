@@ -69,26 +69,31 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 ### 📊 BẢNG PHÂN BỔ STORY POINTS & VẬN TỐC NHÓM (TEAM VELOCITY) - SPRINT 1
 - **Quy mô:** 6 Thành viên (Thời lượng: 2 tuần / 10 ngày làm việc)
 - **Phương pháp ước lượng:** Scrum Planning Poker (Thang Fibonacci: 1, 2, 3, 5, 8)
-- **Tổng Story Points cam kết:** **70 SP**
-- **Tổng Story Points hoàn thành:** **70 SP (Đạt 100% cam kết)**
-- **Vận tốc trung bình (Average Velocity):** **11.6 SP / thành viên**
+- **Tổng Story Points cam kết ban đầu:** **70 SP (18 tasks)**
+- **Tổng Story Points hoàn thành thực tế (Done):** **62 SP (16 tasks - 88.6%)**
+- **Nhiệm vụ chuyển tiếp Sprint 2 (Delay):** **8 SP (2 tasks - 11.4%)**
+- **Vận tốc thực tế (Actual Velocity):** **10.3 SP / thành viên**
 
-| Thành viên | Vai trò phụ trách | Danh sách Task Sprint 1 | Story Points | Trạng thái |
-| :--- | :--- | :--- | :---: | :---: |
-| **dangnguyen vu** | BE 1 (Lead Tech, Infra & Auth) | BE1-01 (3 SP), BE1-02 (5 SP), BE1-03 (3 SP) | **11 SP** | ✅ Hoàn thành 100% |
-| **38.Phucthinh** | BE 2 (Catalog, Media & Spec Tree) | BE2-01 (3 SP), BE2-02 (3 SP), BE2-03 (5 SP) | **11 SP** | ✅ Hoàn thành 100% |
-| **Đạt Phan Văn** | BE 3 (Cart, Voucher Engine & Stock) | BE3-01 (5 SP), BE3-02 (3 SP), BE3-03 (3 SP) | **11 SP** | ✅ Hoàn thành 100% |
-| **Toàn Nguyễn Văn** | FE 1 (Base App, Auth & PDP) | FE1-01 (5 SP), FE1-02 (3 SP), FE1-03 (5 SP) | **13 SP** | ✅ Hoàn thành 100% |
-| **vũ Nguyễn Lê** | FE 2 (Layout, Homepage & Filters) | FE2-01 (3 SP), FE2-02 (3 SP), FE2-03 (5 SP) | **11 SP** | ✅ Hoàn thành 100% |
-| **Đăng Dương** | FE 3 (Checkout, Cart & Admin CRUD) | FE3-01 (5 SP), FE3-02 (3 SP), FE3-03 (5 SP) | **13 SP** | ✅ Hoàn thành 100% |
-| **TỔNG CỘNG** | **Toàn đội GreenPhone** | **18 Nhiệm vụ cốt lõi** | **70 SP** | **✅ ĐẠT 100% CAM KẾT** |
+| Thành viên | Vai trò phụ trách | Cam kết (SP) | Hoàn thành thực tế | Delay sang S2 | Tỷ lệ bàn giao |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| **dangnguyen vu** | BE 1 (Lead Tech, Infra & Auth) | 11 SP | **11 SP** | 0 SP | ✅ 100% |
+| **38.Phucthinh** | BE 2 (Catalog, Media & Spec Tree) | 11 SP | **11 SP** | 0 SP | ✅ 100% |
+| **Đạt Phan Văn** | BE 3 (Cart, Voucher Engine & Stock) | 11 SP | **8 SP** | 3 SP (Validate Variant) | ⚠️ 72.7% |
+| **Toàn Nguyễn Văn** | FE 1 (Base App, Auth & PDP) | 13 SP | **13 SP** | 0 SP | ✅ 100% |
+| **vũ Nguyễn Lê** | FE 2 (Layout, Homepage & Filters) | 11 SP | **11 SP** | 0 SP | ✅ 100% |
+| **Đăng Dương** | FE 3 (Checkout, Cart & Admin CRUD) | 13 SP | **8 SP** | 5 SP (Multi-step Checkout) | ⚠️ 61.5% |
+| **TỔNG CỘNG** | **Toàn đội GreenPhone** | **70 SP** | **62 SP (16 tasks)** | **8 SP (2 tasks)** | **🎯 88.6% DONE** |
+
+> ⚠️ **Báo cáo 2 nhiệm vụ Delay:**
+> 1. `[3 SP] [BE3] Kiểm Tra Tồn Kho Biến Thể Thời Gian Thực`: Chuyển sang Sprint 2 để tích hợp đồng bộ với khóa bi quan `@Lock(LockModeType.PESSIMISTIC_WRITE)` và SePay Webhook.
+> 2. `[5 SP] [FE3] Giao Diện Đặt Hàng & Thanh Toán Đa Bước`: Chuyển sang Sprint 2 để ghép trực tiếp với API thanh toán VietQR động.
 
 ```mermaid
 xychart-beta
-    title "Phân Bổ Story Points Sprint 1 Theo 6 Thành Viên (Tổng: 70 SP)"
+    title "Phân Bổ Story Points Hoàn Thành Sprint 1 Theo 6 Thành Viên (Tổng Done: 62 SP, Delay: 8 SP)"
     x-axis ["BE1: dangnguyen", "BE2: Phucthinh", "BE3: Đạt Phan", "FE1: Toàn Nguyễn", "FE2: vũ Lê", "FE3: Đăng Dương"]
     y-axis "Story Points (SP)" 0 --> 16
-    bar [11, 11, 11, 13, 11, 13]
+    bar [11, 11, 8, 13, 11, 8]
 ```
 
 ---
