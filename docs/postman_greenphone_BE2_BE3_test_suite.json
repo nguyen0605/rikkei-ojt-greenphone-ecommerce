@@ -1,0 +1,4817 @@
+{
+  "info": {
+    "_postman_id": "2b034a43-3463-4e33-a1a7-eca05262d144",
+    "name": "GreenPhone - BE2 & BE3 Full Backend Test Suite (Excluding BE1 Leader)",
+    "description": "Bộ kịch bản Test Postman toàn diện cho toàn bộ các Task Backend của BE2 (38.Phucthinh) và BE3 (Đạt Phan Văn) thuộc dự án GreenPhone. Đã tách riêng và không bao gồm các task của leader dangnguyen vu.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "admin_email",
+      "value": "admin@greenphone.vn",
+      "type": "string"
+    },
+    {
+      "key": "admin_password",
+      "value": "admin123",
+      "type": "string"
+    },
+    {
+      "key": "customer_email",
+      "value": "an.nguyen@example.com",
+      "type": "string"
+    },
+    {
+      "key": "customer_password",
+      "value": "password123",
+      "type": "string"
+    },
+    {
+      "key": "token_admin",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "token_customer",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "created_brand_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "created_banner_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "created_option_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "created_item_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "created_phone_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "created_variant_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "created_promo_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "cart_item_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "created_order_id",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00. Auth Helpers (Trích xuất Token Tự động)",
+      "description": "Chạy 2 request này đầu tiên để tự động lưu token_admin và token_customer vào biến collection.",
+      "item": [
+        {
+          "name": "0.1 [Helper] Đăng nhập Admin - Tự động trích xuất token_admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.token) {",
+                  "    pm.collectionVariables.set('token_admin', res.data.token);",
+                  "    console.log('Saved token_admin successfully');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "0.2 [Helper] Đăng nhập Customer - Tự động trích xuất token_customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.token) {",
+                  "    pm.collectionVariables.set('token_customer', res.data.token);",
+                  "    console.log('Saved token_customer successfully');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{customer_email}}\",\n  \"password\": \"{{customer_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "01. [BE2] Quản lý Thương hiệu - Brand Management",
+      "description": "Các kịch bản kiểm thử API Public và Admin cho Brand (BE2 Phucthinh).",
+      "item": [
+        {
+          "name": "TC_BE2_BR01 - [Public] Lấy danh sách thương hiệu đang hoạt động",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(Array.isArray(res.data)).to.be.true;",
+                  "pm.expect(res.data.length).to.be.above(0);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/brands",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "brands"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_BR02 - [Admin] Danh sách thương hiệu có phân trang & tìm kiếm",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(res.data).to.have.property('items');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/brands?keyword=Apple&page=0&size=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "brands"
+              ],
+              "query": [
+                {
+                  "key": "keyword",
+                  "value": "Apple"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_BR03 - [Admin] Tạo mới thương hiệu thành công",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 201\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([201]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.id) {",
+                  "    pm.collectionVariables.set('created_brand_id', res.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/brands",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "brands"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Brand 8f3f99e7\",\n  \"logoUrl\": \"https://res.cloudinary.com/greenphone/image/upload/v1/test-brand.png\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_BR04 - [Admin] Tạo thương hiệu thất bại - Tên rỗng (Validation 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 400\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(res.code).to.eq(400);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/brands",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "brands"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"logoUrl\": \"https://res.cloudinary.com/logo.png\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_BR05 - [Admin] Cập nhật thông tin thương hiệu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(res.data.name).to.eq('Updated Brand Name');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/brands/{{created_brand_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "brands",
+                "{{created_brand_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Brand Name\",\n  \"logoUrl\": \"https://res.cloudinary.com/updated-logo.png\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_BR06 - [Admin] Cập nhật trạng thái thương hiệu (INACTIVE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(res.data.status).to.eq('INACTIVE');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/brands/{{created_brand_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "brands",
+                "{{created_brand_id}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"INACTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_BR07 - [Admin] Xóa thương hiệu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/brands/{{created_brand_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "brands",
+                "{{created_brand_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_BR08 - [Security] Khách không token gọi API Admin Brand bị chặn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 401, 403\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([401, 403]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/admin/brands",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "brands"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02. [BE2] Quản lý Banner Quảng cáo - Banner Management",
+      "description": "Các kịch bản kiểm thử API Banner trang chủ và Banner Admin (BE2 Phucthinh).",
+      "item": [
+        {
+          "name": "TC_BE2_BN01 - [Public] Lấy danh sách banner kích hoạt trên trang chủ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(Array.isArray(res.data)).to.be.true;"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/banners",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "banners"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_BN02 - [Admin] Danh sách toàn bộ banner phân trang",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/banners?page=0&size=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "banners"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_BN03 - [Admin] Tạo mới banner thành công",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 201\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([201]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.id) {",
+                  "    pm.collectionVariables.set('created_banner_id', res.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/banners",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "banners"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Flash Sale iPhone 15 Pro Max\",\n  \"imageUrl\": \"https://res.cloudinary.com/greenphone/banner-sale.webp\",\n  \"linkUrl\": \"/products?brandIds=1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_BN04 - [Admin] Tạo banner thất bại - Thiếu URL ảnh (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 400\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/banners",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "banners"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Invalid Banner\",\n  \"imageUrl\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_BN05 - [Admin] Cập nhật thông tin banner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/banners/{{created_banner_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "banners",
+                "{{created_banner_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Mega Sale Tuần Lễ Vàng\",\n  \"imageUrl\": \"https://res.cloudinary.com/greenphone/banner-mega.webp\",\n  \"linkUrl\": \"/products\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_BN06 - [Admin] Xóa banner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/banners/{{created_banner_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "banners",
+                "{{created_banner_id}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03. [BE2] Cây Thuộc tính & Thông số - Option & Spec Tree",
+      "description": "Cây danh mục thuộc tính RAM, ROM, Màu sắc, Tính năng linh hoạt (BE2 Phucthinh).",
+      "item": [
+        {
+          "name": "TC_BE2_OP01 - [Public] Lấy cây cấu hình thông số kỹ thuật (Option Catalog)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(Array.isArray(res.data)).to.be.true;"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/options",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "options"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_OP02 - [Admin] Lấy danh sách nhóm thuộc tính (Categories)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/options",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "options"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_OP03 - [Admin] Lấy danh sách loại Option Types",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/options/types",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "options",
+                "types"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_OP04 - [Admin] Tạo mới nhóm thuộc tính",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 201\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([201]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.id) {",
+                  "    pm.collectionVariables.set('created_option_id', res.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/options",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "options"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"FEATURE\",\n  \"label\": \"Tính Năng AI fb6640\",\n  \"enabled\": true,\n  \"maxItems\": 10,\n  \"sortOrder\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_OP05 - [Admin] Cập nhật nhóm thuộc tính",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/options/{{created_option_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "options",
+                "{{created_option_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"FEATURE\",\n  \"label\": \"Tính Năng AI Độc Quyền\",\n  \"enabled\": true,\n  \"maxItems\": 10,\n  \"sortOrder\": 6\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_OP06 - [Admin] Lấy danh sách giá trị con (Option Items) của nhóm",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/options/{{created_option_id}}/items",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "options",
+                "{{created_option_id}}",
+                "items"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_OP07 - [Admin] Thêm giá trị con vào nhóm thuộc tính",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 201\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([201]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.id) {",
+                  "    pm.collectionVariables.set('created_item_id', res.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/options/{{created_option_id}}/items",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "options",
+                "{{created_option_id}}",
+                "items"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"value\": \"Khoanh tròn tìm kiếm\",\n  \"hexColor\": null,\n  \"sortOrder\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_OP08 - [Admin] Cập nhật giá trị thuộc tính con",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/options/items/{{created_item_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "options",
+                "items",
+                "{{created_item_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"value\": \"Circle to Search AI\",\n  \"hexColor\": null,\n  \"sortOrder\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_OP09 - [Admin] Kiểm tra mức độ sử dụng của thuộc tính con",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/options/items/{{created_item_id}}/usage",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "options",
+                "items",
+                "{{created_item_id}}",
+                "usage"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_OP10 - [Admin] Xóa giá trị thuộc tính con",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/options/items/{{created_item_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "options",
+                "items",
+                "{{created_item_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_OP11 - [Admin] Xóa nhóm thuộc tính",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/options/{{created_option_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "options",
+                "{{created_option_id}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "04. [BE2] Danh mục Điện thoại, Bộ lọc & Biến thể",
+      "description": "API tìm kiếm, lọc đa tiêu chí, chi tiết máy, quản lý điện thoại & biến thể SKU (BE2 Phucthinh).",
+      "item": [
+        {
+          "name": "TC_BE2_PH01 - [Public] Lấy danh sách điện thoại phân trang",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(res.data).to.have.property('items');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones?page=0&size=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "phones"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_PH02 - [Public] Lọc điện thoại đa tiêu chí (Hãng + Giá + RAM)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones?brandIds=1&minPrice=10000000&maxPrice=35000000&rams=8GB&sort=price_asc",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "phones"
+              ],
+              "query": [
+                {
+                  "key": "brandIds",
+                  "value": "1"
+                },
+                {
+                  "key": "minPrice",
+                  "value": "10000000"
+                },
+                {
+                  "key": "maxPrice",
+                  "value": "35000000"
+                },
+                {
+                  "key": "rams",
+                  "value": "8GB"
+                },
+                {
+                  "key": "sort",
+                  "value": "price_asc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_PH03 - [Public] Lấy chi tiết điện thoại thành công",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(res.data).to.have.property('id');",
+                  "pm.expect(res.data).to.have.property('name');",
+                  "pm.expect(res.data).to.have.property('variants');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "phones",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_PH04 - [Public] Chi tiết điện thoại thất bại - ID không tồn tại (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 404\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([404]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(res.code).to.eq(404);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones/999999",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "phones",
+                "999999"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_PH05 - [Public] Tìm kiếm điện thoại theo từ khóa",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(res.data).to.have.property('items');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones/search?q=iPhone",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "phones",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "iPhone"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_PH06 - [Public] Lấy dữ liệu cấu hình bộ lọc động (Filters Metadata)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(res.data).to.have.property('brands');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones/filters",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "phones",
+                "filters"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_PH07 - [Admin] Danh sách điện thoại có tìm kiếm & lọc trạng thái",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/phones?page=0&size=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "phones"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_PH08 - [Admin] Xem chi tiết điện thoại",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/phones/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "phones",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_PH09 - [Admin] Tạo mới điện thoại kèm thông số kỹ thuật",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 201\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([201]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.id) {",
+                  "    pm.collectionVariables.set('created_phone_id', res.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/phones",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "phones"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"brandId\": 1,\n  \"name\": \"GreenPhone Test Ultra f306af\",\n  \"description\": \"Điện thoại thử nghiệm cấu hình đỉnh cao\",\n  \"screen\": \"6.8 inch Dynamic AMOLED 2X 120Hz\",\n  \"os\": \"Android 15 OneUI 7.0\",\n  \"chip\": \"Snapdragon 8 Gen 4\",\n  \"rearCamera\": \"200MP + 50MP + 12MP\",\n  \"frontCamera\": \"40MP Dual Pixel\",\n  \"battery\": \"5500 mAh Sạc siêu nhanh 65W\",\n  \"warranty\": \"12 tháng chính hãng 1 đổi 1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_PH10 - [Admin] Cập nhật thông tin thông số kỹ thuật điện thoại",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/phones/{{created_phone_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "phones",
+                "{{created_phone_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"brandId\": 1,\n  \"name\": \"GreenPhone Test Ultra Pro Max\",\n  \"description\": \"Phiên bản nâng cấp màn hình phủ titan\",\n  \"screen\": \"6.9 inch OLED Super Retina XDR\",\n  \"os\": \"Android 15\",\n  \"chip\": \"Snapdragon 8 Gen 4 AI\",\n  \"rearCamera\": \"200MP\",\n  \"frontCamera\": \"50MP\",\n  \"battery\": \"6000 mAh\",\n  \"warranty\": \"24 tháng bảo hành VIP\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_PH11 - [Admin] Đổi trạng thái điện thoại (PUBLISHED / HIDDEN)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/phones/{{created_phone_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "phones",
+                "{{created_phone_id}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PUBLISHED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_PH12 - [Admin] Lấy danh sách biến thể của điện thoại",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/phones/1/variants",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "phones",
+                "1",
+                "variants"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_PH13 - [Admin] Thêm biến thể SKU cho điện thoại",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 201\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([201]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.id) {",
+                  "    pm.collectionVariables.set('created_variant_id', res.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/phones/{{created_phone_id}}/variants",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "phones",
+                "{{created_phone_id}}",
+                "variants"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ramItemId\": 3,\n  \"storageItemId\": 8,\n  \"colorItemId\": 12,\n  \"price\": 28990000,\n  \"discountPrice\": 26990000,\n  \"stockQuantity\": 50,\n  \"sku\": \"GP-TEST-0BDCF8DE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_PH14 - [Admin] Cập nhật giá và tồn kho biến thể",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/phones/{{created_phone_id}}/variants/{{created_variant_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "phones",
+                "{{created_phone_id}}",
+                "variants",
+                "{{created_variant_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ramItemId\": 3,\n  \"storageItemId\": 8,\n  \"colorItemId\": 12,\n  \"price\": 27990000,\n  \"discountPrice\": 25990000,\n  \"stockQuantity\": 100,\n  \"sku\": \"GP-TEST-UPDATED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_PH15 - [Admin] Xóa biến thể",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/phones/{{created_phone_id}}/variants/{{created_variant_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "phones",
+                "{{created_phone_id}}",
+                "variants",
+                "{{created_variant_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_PH16 - [Admin] Xóa điện thoại",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/phones/{{created_phone_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "phones",
+                "{{created_phone_id}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05. [BE2] Cloudinary Media & Ảnh Sản phẩm",
+      "description": "Upload CDN, sắp xếp thứ tự ảnh, cập nhật ảnh chính (BE2 Phucthinh).",
+      "item": [
+        {
+          "name": "TC_BE2_MED01 - [Admin] Lấy danh sách ảnh sản phẩm",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(Array.isArray(res.data)).to.be.true;"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/phones/1/images",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "phones",
+                "1",
+                "images"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_MED02 - [Admin] Sắp xếp thứ tự ảnh hiển thị (Reorder)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/phones/1/images/reorder",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "phones",
+                "1",
+                "images",
+                "reorder"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"imageIds\": [\n    1,\n    2\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_MED03 - [Admin] Cập nhật metadata hình ảnh (isPrimary / caption)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/phones/1/images/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "phones",
+                "1",
+                "images",
+                "1"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isPrimary\": true,\n  \"caption\": \"Mặt trước màn hình Dynamic AMOLED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_MED04 - [Admin] Xóa ảnh sản phẩm thất bại - ID không tồn tại (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 404\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([404]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/phones/1/images/999999",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "phones",
+                "1",
+                "images",
+                "999999"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "06. [BE2] Đánh giá Sản phẩm - Reviews & Ratings",
+      "description": "API xem review, tổng hợp sao, đánh giá sau mua, kiểm duyệt (BE2 Phucthinh).",
+      "item": [
+        {
+          "name": "TC_BE2_REV01 - [Public] Lấy danh sách đánh giá của sản phẩm",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(res.data).to.have.property('items');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/reviews/phone/1?page=0&size=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "reviews",
+                "phone",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_REV02 - [Public] Xem tóm tắt thống kê đánh giá (Rating Summary)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(res.data).to.have.property('averageRating');",
+                  "pm.expect(res.data).to.have.property('totalReviews');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/reviews/phone/1/summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "reviews",
+                "phone",
+                "1",
+                "summary"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_REV03 - [Customer] Lấy danh sách sản phẩm đủ điều kiện đánh giá",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/reviews/eligible",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "reviews",
+                "eligible"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_REV04 - [Customer] Xem lịch sử đánh giá cá nhân",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/reviews/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "reviews",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_REV05 - [Customer] Gửi đánh giá thất bại - Số sao ngoài khoảng 1-5 (Validation 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 400\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(res.code).to.eq(400);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/reviews",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "reviews"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderDetailId\": 1,\n  \"rating\": 6,\n  \"content\": \"Máy quá xuất sắc 6 sao\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_REV06 - [Admin] Danh sách đánh giá cần kiểm duyệt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/reviews?page=0&size=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "reviews"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_REV07 - [Admin] Cập nhật trạng thái duyệt/ẩn đánh giá",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/reviews/1/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "reviews",
+                "1",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"APPROVED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "07. [BE2] Cấu hình Cửa hàng - System Settings",
+      "description": "Cấu hình hotline, phí vận chuyển, địa chỉ cửa hàng (BE2 Phucthinh).",
+      "item": [
+        {
+          "name": "TC_BE2_SET01 - [Public] Lấy cấu hình công khai của cửa hàng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(res.data).to.be.an('object');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_SET02 - [Admin] Xem toàn bộ cài đặt hệ thống",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "settings"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE2_SET03 - [Admin] Cập nhật thông tin hotline & phí ship",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "settings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shop_hotline\": \"1900 6868\",\n  \"shop_shipping_fee\": \"30000\",\n  \"shop_address\": \"123 Đường Cầu Giấy, Hà Nội\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "08. [BE3] Mã Giảm giá - Promotion & Voucher Engine",
+      "description": "Khuyến mãi phần trăm, tiền mặt, điều kiện tối thiểu, claim voucher (BE3 Đạt Phan Văn).",
+      "item": [
+        {
+          "name": "TC_BE3_PR01 - [Public] Xem danh sách mã khuyến mãi đang áp dụng công khai",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(Array.isArray(res.data)).to.be.true;"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/promotions/public",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "promotions",
+                "public"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_PR02 - [Customer] Lấy danh sách voucher khả dụng theo giá trị đơn hàng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/promotions/available?orderAmount=15000000",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "promotions",
+                "available"
+              ],
+              "query": [
+                {
+                  "key": "orderAmount",
+                  "value": "15000000"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_PR03 - [Customer] Xem ví voucher cá nhân",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/promotions/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "promotions",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_PR04 - [Customer] Nhận voucher thất bại - Mã code không tồn tại (400/404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 400, 404\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400, 404]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/promotions/claim",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "promotions",
+                "claim"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"KHONG_TON_TAI_999\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_PR05 - [Admin] Danh sách toàn bộ voucher hệ thống",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/promotions?page=0&size=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "promotions"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_PR06 - [Admin] Xem chi tiết voucher theo ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/promotions/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "promotions",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_PR07 - [Admin] Tạo mới mã voucher giảm giá",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 201\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([201]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.id) {",
+                  "    pm.collectionVariables.set('created_promo_id', res.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/promotions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "promotions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"TESTPROMOA162CB\",\n  \"name\": \"Khuyến Mãi Tri Ân Khách Hàng\",\n  \"description\": \"Giảm ngay 200k cho đơn từ 5 triệu\",\n  \"discountType\": \"FIXED_AMOUNT\",\n  \"discountValue\": 200000,\n  \"maxDiscountAmount\": 200000,\n  \"minOrderValue\": 5000000,\n  \"quantity\": 100,\n  \"startDate\": \"2026-01-01T00:00:00\",\n  \"endDate\": \"2026-12-31T23:59:59\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_PR08 - [Admin] Tạo voucher thất bại - Thiếu thông tin bắt buộc (Validation 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 400\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/promotions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "promotions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"\",\n  \"discountType\": \"FIXED_AMOUNT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_PR09 - [Admin] Cập nhật mã voucher",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/promotions/{{created_promo_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "promotions",
+                "{{created_promo_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"TESTPROMO_UPDATED\",\n  \"name\": \"Khuyến Mãi Tri Ân Cập Nhật\",\n  \"description\": \"Giảm 300k cho đơn từ 8 triệu\",\n  \"discountType\": \"FIXED_AMOUNT\",\n  \"discountValue\": 300000,\n  \"maxDiscountAmount\": 300000,\n  \"minOrderValue\": 8000000,\n  \"quantity\": 150,\n  \"startDate\": \"2026-01-01T00:00:00\",\n  \"endDate\": \"2026-12-31T23:59:59\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_PR10 - [Admin] Xóa/ngừng voucher",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/promotions/{{created_promo_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "promotions",
+                "{{created_promo_id}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "09. [BE3] Giỏ hàng Mua sắm - Shopping Cart Service",
+      "description": "Thêm biến thể vào giỏ, cập nhật số lượng, tính tiền tạm tính (BE3 Đạt Phan Văn).",
+      "item": [
+        {
+          "name": "TC_BE3_CT01 - [Customer] Lấy thông tin giỏ hàng hiện tại",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(res.data).to.have.property('items');",
+                  "pm.expect(res.data).to.have.property('totalAmount');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/cart",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "cart"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_CT02 - [Customer] Thêm sản phẩm biến thể vào giỏ hàng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.items && res.data.items.length > 0) {",
+                  "    pm.collectionVariables.set('cart_item_id', res.data.items[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/cart/items",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "cart",
+                "items"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneVariantId\": 1,\n  \"quantity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_CT03 - [Customer] Thêm vào giỏ thất bại - Biến thể không tồn tại (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 404\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([404]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/cart/items",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "cart",
+                "items"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneVariantId\": 999999,\n  \"quantity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_CT04 - [Customer] Thêm vào giỏ thất bại - Số lượng bằng 0 hoặc âm (Validation 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 400\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/cart/items",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "cart",
+                "items"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneVariantId\": 1,\n  \"quantity\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_CT05 - [Customer] Cập nhật số lượng sản phẩm trong giỏ hàng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/cart/items/{{cart_item_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "cart",
+                "items",
+                "{{cart_item_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_CT06 - [Customer] Xóa một sản phẩm khỏi giỏ hàng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/cart/items/{{cart_item_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "cart",
+                "items",
+                "{{cart_item_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_CT07 - [Customer] Dọn sạch toàn bộ giỏ hàng (Clear Cart)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/cart",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "cart"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. [BE3] Quy trình Đặt hàng & Khóa Tồn kho - Order Flow",
+      "description": "Tạo đơn hàng, trừ tồn kho thời gian thực, hủy đơn hoàn tồn kho (BE3 Đạt Phan Văn).",
+      "item": [
+        {
+          "name": "TC_BE3_ORD01 - [Customer] Tạo đơn hàng mới thành công (COD)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 201\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([201]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "if (res.data && res.data.id) {",
+                  "    pm.collectionVariables.set('created_order_id', res.data.id);",
+                  "    console.log('Saved created_order_id:', res.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiverName\": \"Nguyễn Văn An\",\n  \"receiverPhone\": \"0912345678\",\n  \"shippingAddress\": \"123 Đường Nguyễn Huệ, Quận 1, TP.HCM\",\n  \"paymentMethod\": \"COD\",\n  \"note\": \"Giao giờ hành chính, gọi trước khi giao\",\n  \"userPromotionId\": null,\n  \"items\": [\n    {\n      \"phoneVariantId\": 1,\n      \"quantity\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_ORD02 - [Customer] Tạo đơn hàng thất bại - Thiếu thông tin người nhận (Validation 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 400\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(res.code).to.eq(400);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiverName\": \"\",\n  \"receiverPhone\": \"\",\n  \"shippingAddress\": \"\",\n  \"paymentMethod\": \"COD\",\n  \"items\": [\n    {\n      \"phoneVariantId\": 1,\n      \"quantity\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_ORD03 - [Customer] Lấy danh sách đơn hàng của khách hàng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(res.data).to.have.property('items');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders?page=0&size=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_ORD04 - [Customer] Xem chi tiết đơn hàng vừa tạo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(res.data).to.have.property('orderCode');",
+                  "pm.expect(res.data).to.have.property('totalAmount');",
+                  "pm.expect(res.data).to.have.property('status');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders/{{created_order_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{created_order_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_ORD05 - [Customer] Hủy đơn hàng và kiểm tra hoàn trả tồn kho",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(res.data.status).to.eq('CANCELLED');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders/{{created_order_id}}/cancel",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{created_order_id}}",
+                "cancel"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_ORD06 - [Customer] Hủy đơn hàng thất bại - ID không tồn tại (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 404\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([404]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders/999999/cancel",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "999999",
+                "cancel"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_ORD07 - [Customer] Xem lịch sử mua sắm (Đơn hoàn tất)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_customer}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders/history?page=0&size=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. [BE3] Quản lý Đơn hàng Admin - Order Progress",
+      "description": "Xác nhận đơn hàng, cập nhật vận chuyển, thanh toán, trạng thái đơn (BE3 Đạt Phan Văn).",
+      "item": [
+        {
+          "name": "TC_BE3_AORD01 - [Admin] Lấy danh sách toàn bộ đơn hàng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(res.data).to.have.property('items');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/orders?page=0&size=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_AORD02 - [Admin] Xem chi tiết đơn hàng quản trị",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/orders/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "orders",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_AORD03 - [Admin] Cập nhật tiến độ giao vận chuyển (IN_TRANSIT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/orders/1/delivery",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "orders",
+                "1",
+                "delivery"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"IN_TRANSIT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_AORD04 - [Admin] Cập nhật trạng thái thanh toán (PAID)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/orders/1/payment-status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "orders",
+                "1",
+                "payment-status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentStatus\": \"PAID\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_AORD05 - [Admin] Cập nhật trạng thái tổng thể đơn hàng (SHIPPING)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/orders/1/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "orders",
+                "1",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"SHIPPING\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. [BE3] Báo cáo Thống kê & Phân tích Doanh thu",
+      "description": "Thống kê doanh thu theo ngày/tháng, số lượng đơn, top điện thoại bán chạy (BE3 Đạt Phan Văn).",
+      "item": [
+        {
+          "name": "TC_BE3_STAT01 - [Admin] Thống kê doanh thu theo tháng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/statistics/revenue?period=month",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "statistics",
+                "revenue"
+              ],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "month"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_STAT02 - [Admin] Thống kê doanh thu theo ngày",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/statistics/revenue?period=day",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "statistics",
+                "revenue"
+              ],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "day"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_STAT03 - [Admin] Thống kê số lượng đơn theo các trạng thái",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/statistics/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "statistics",
+                "orders"
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_BE3_STAT04 - [Admin] Thống kê Top smartphone bán chạy nhất",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code la 200\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                  "});",
+                  "pm.test(\"Format response chuan ApiResponse\", function () {",
+                  "    var res = pm.response.json();",
+                  "    pm.expect(res).to.have.property('code');",
+                  "    pm.expect(res).to.have.property('message');",
+                  "    pm.expect(res).to.have.property('timestamp');",
+                  "});",
+                  "var res = pm.response.json();",
+                  "pm.expect(Array.isArray(res.data)).to.be.true;"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_admin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/statistics/top-selling?limit=5",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "statistics",
+                "top-selling"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

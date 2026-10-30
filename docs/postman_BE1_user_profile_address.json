@@ -1,0 +1,399 @@
+{
+  "info": {
+    "_postman_id": "c1f7a284-9842-45e3-99b3-4f27be1ad001",
+    "name": "GreenPhone - [BE1] User Profile & Address Management",
+    "description": "Bộ kịch bản Test Postman hoàn chỉnh cho Task [BE1] User Profile & Sổ Địa Chỉ Giao Hàng (User Address Management) thuộc dự án GreenPhone.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "test_email",
+      "value": "be1_testuser@greenphone.vn",
+      "type": "string"
+    },
+    {
+      "key": "test_password",
+      "value": "Password@123",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00. Tiền điều kiện - Đăng ký tài khoản Test",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Đăng ký thành công (201 Created hoặc đã tồn tại)\", function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 400]);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Nguyễn Văn Khách\",\n  \"email\": \"{{test_email}}\",\n  \"password\": \"{{test_password}}\",\n  \"phone\": \"0987654321\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/register",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "register"
+          ]
+        },
+        "description": "Tạo mới tài khoản khách hàng để test nếu DB chưa có tài khoản này."
+      },
+      "response": []
+    },
+    {
+      "name": "01. Tiền điều kiện - Đăng nhập lấy Token (Auto-set JWT)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Đăng nhập thành công trả về 200 OK\", function () {",
+              "    pm.response.to.have.status(200);",
+              "    var responseData = pm.response.json();",
+              "    pm.expect(responseData.success).to.be.true;",
+              "    if (responseData.data && responseData.data.token) {",
+              "        pm.collectionVariables.set(\"jwt_token\", responseData.data.token);",
+              "        console.log(\"Đã tự động lưu token vào biến jwt_token\");",
+              "    }",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{test_email}}\",\n  \"password\": \"{{test_password}}\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/login",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "login"
+          ]
+        },
+        "description": "Đăng nhập để nhận JWT Token. Test script tự động lưu Token vào biến {{jwt_token}} của collection."
+      },
+      "response": []
+    },
+    {
+      "name": "02. [BE1] Lấy thông tin Profile & Địa chỉ (Happy Path)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Lấy profile thành công 200 OK\", function () {",
+              "    pm.response.to.have.status(200);",
+              "    var json = pm.response.json();",
+              "    pm.expect(json.success).to.be.true;",
+              "    pm.expect(json.data).to.have.property('email');",
+              "    pm.expect(json.data).to.have.property('fullName');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/users/profile",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "users",
+            "profile"
+          ]
+        },
+        "description": "Lấy thông tin tài khoản và địa chỉ giao hàng nhận máy hiện tại của user từ JWT Security Context."
+      },
+      "response": []
+    },
+    {
+      "name": "03. [BE1] Cập nhật Profile & Địa chỉ nhận hàng (Happy Path)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Cập nhật thông tin và địa chỉ thành công 200 OK\", function () {",
+              "    pm.response.to.have.status(200);",
+              "    var json = pm.response.json();",
+              "    pm.expect(json.success).to.be.true;",
+              "    pm.expect(json.data.fullName).to.eql(\"Nguyễn Văn Khách Hàng VIP\");",
+              "    pm.expect(json.data.phone).to.eql(\"0912345678\");",
+              "    pm.expect(json.data.address).to.eql(\"Số 123 Đường Cầu Giấy, Phường Dịch Vọng, Quận Cầu Giấy, Hà Nội\");",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Nguyễn Văn Khách Hàng VIP\",\n  \"phone\": \"0912345678\",\n  \"address\": \"Số 123 Đường Cầu Giấy, Phường Dịch Vọng, Quận Cầu Giấy, Hà Nội\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/users/profile",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "users",
+            "profile"
+          ]
+        },
+        "description": "Cập nhật họ tên, số điện thoại liên lạc và địa chỉ nhận hàng giao máy."
+      },
+      "response": []
+    },
+    {
+      "name": "04. [BE1] Bắt lỗi Validation - SĐT sai định dạng & Để trống tên (400 Bad Request)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Bắt lỗi validation dữ liệu đầu vào 400 Bad Request\", function () {",
+              "    pm.response.to.have.status(400);",
+              "    var json = pm.response.json();",
+              "    pm.expect(json.success).to.be.false;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"\",\n  \"phone\": \"12345\",\n  \"address\": \"Hà Nội\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/users/profile",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "users",
+            "profile"
+          ]
+        },
+        "description": "Payload vi phạm: fullName rỗng, phone không bắt đầu bằng số 0 hoặc không đủ 10-11 chữ số."
+      },
+      "response": []
+    },
+    {
+      "name": "05. [BE1] Test Security - Không đính kèm Token (401 Unauthorized)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Chặn truy cập trái phép khi thiếu Token (401 hoặc 403)\", function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([401, 403]);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/users/profile",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "users",
+            "profile"
+          ]
+        },
+        "description": "Gọi API bảo vệ nhưng cố tình không truyền Header Authorization Bearer để kiểm tra cơ chế phân quyền bảo mật."
+      },
+      "response": []
+    },
+    {
+      "name": "06. [BE1] Đổi mật khẩu - Sai mật khẩu hiện tại (400 Bad Request)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Báo lỗi mật khẩu cũ không đúng 400 Bad Request\", function () {",
+              "    pm.response.to.have.status(400);",
+              "    var json = pm.response.json();",
+              "    pm.expect(json.success).to.be.false;",
+              "    pm.expect(json.message).to.include(\"Current password is incorrect\");",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"oldPassword\": \"SaiMatKhauNhe123\",\n  \"newPassword\": \"NewPassword@2026\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/users/change-password",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "users",
+            "change-password"
+          ]
+        },
+        "description": "Gửi yêu cầu đổi mật khẩu nhưng mật khẩu cũ không khớp với BCrypt hash trong cơ sở dữ liệu."
+      },
+      "response": []
+    },
+    {
+      "name": "07. [BE1] Đổi mật khẩu - Thành công (200 OK)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Đổi mật khẩu thành công 200 OK\", function () {",
+              "    pm.response.to.have.status(200);",
+              "    var json = pm.response.json();",
+              "    pm.expect(json.success).to.be.true;",
+              "    pm.expect(json.data).to.eql(\"Password changed\");",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"oldPassword\": \"{{test_password}}\",\n  \"newPassword\": \"NewPassword@2026\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/users/change-password",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "users",
+            "change-password"
+          ]
+        },
+        "description": "Nhập đúng mật khẩu hiện tại, hệ thống hash mật khẩu mới và lưu vào cơ sở dữ liệu."
+      },
+      "response": []
+    }
+  ]
+}
