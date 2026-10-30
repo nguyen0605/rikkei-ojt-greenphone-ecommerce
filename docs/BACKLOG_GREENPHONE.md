@@ -83,6 +83,14 @@ Dựa trên việc khảo sát toàn bộ mã nguồn hiện tại của GreenPh
 | **Đăng Dương** | FE 3 (Checkout, Cart & Admin CRUD) | FE3-01 (5 SP), FE3-02 (3 SP), FE3-03 (5 SP) | **13 SP** | ✅ Hoàn thành 100% |
 | **TỔNG CỘNG** | **Toàn đội GreenPhone** | **18 Nhiệm vụ cốt lõi** | **70 SP** | **✅ ĐẠT 100% CAM KẾT** |
 
+```mermaid
+xychart-beta
+    title "Phân Bổ Story Points Sprint 1 Theo 6 Thành Viên (Tổng: 70 SP)"
+    x-axis ["BE1: dangnguyen", "BE2: Phucthinh", "BE3: Đạt Phan", "FE1: Toàn Nguyễn", "FE2: vũ Lê", "FE3: Đăng Dương"]
+    y-axis "Story Points (SP)" 0 --> 16
+    bar [11, 11, 11, 13, 11, 13]
+```
+
 ---
 
 ### 👤 BE 1: dangnguyen vu (`@dangnguyenvu`)
