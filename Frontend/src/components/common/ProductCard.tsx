@@ -1,47 +1,41 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ShoppingCart } from 'lucide-react';
 import { App } from 'antd';
 import type { PhoneDTO } from '@/types/api';
-import type { Product } from '@/types';
 import { cn, getOptimizedImageUrl, formatVND } from '@/utils';
-import { useAppDispatch } from '@/store/hooks';
-import { addToCart } from '@/store/slices/cartSlice';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { addCartItem } from '@/store/slices/cartSlice';
+import { phoneService } from '@/services';
 
 interface Props { product: PhoneDTO; className?: string; }
 
-function phoneToProduct(p: PhoneDTO): Product {
-  const mainUrl = getOptimizedImageUrl(p.mainImageUrl || '', { width: 400, height: 400 });
-  return {
-    id: String(p.id),
-    slug: p.name.toLowerCase().replace(/\s+/g, '-'),
-    name: p.name,
-    brand: (p.brandName || '').toLowerCase() as Product['brand'],
-    category: 'smartphone',
-    price: p.lowestPrice || 0,
-    rating: 0,
-    reviewCount: 0,
-    sold: 0,
-    images: [mainUrl],
-    thumbnail: mainUrl,
-    colors: [],
-    storage: [],
-    description: '',
-    specifications: [],
-    features: [],
-    inStock: true,
-  };
-}
-
 export default function ProductCard({ product, className }: Props) {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const { message } = App.useApp();
   const imgUrl = getOptimizedImageUrl(product.mainImageUrl || '', { width: 400, height: 400 });
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const prod = phoneToProduct(product);
-    dispatch(addToCart({ product: prod, quantity: 1 }));
+    if (!isAuthenticated) {
+      navigate('/dang-nhap', { state: { from: location.pathname + location.search } });
+      return;
+    }
+    try {
+      const detail = await phoneService.detail(product.id);
+      const variant = detail.variants?.find((item) => item.stockQuantity > 0);
+      if (!variant) {
+        message.warning('Sáº£n pháº©m nÃ y hiá»‡n Ä‘Ã£ háº¿t hÃ ng');
+        return;
+      }
+      await dispatch(addCartItem({ phoneVariantId: variant.id, quantity: 1 })).unwrap();
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : 'KhÃ´ng thá»ƒ thÃªm vÃ o giá» hÃ ng');
+      return;
+    }
     message.success(`Đã thêm ${product.name} vào giỏ hàng`);
   };
 

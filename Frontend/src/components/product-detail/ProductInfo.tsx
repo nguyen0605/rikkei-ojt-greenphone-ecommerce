@@ -5,8 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import type { Product } from '@/types';
 import { formatVND, formatSold } from '@/utils';
 import { QuantitySelector } from '@/components/common';
-import { useAppDispatch } from '@/store/hooks';
-import { addToCart } from '@/store/slices/cartSlice';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { addCartItem } from '@/store/slices/cartSlice';
 import { message } from 'antd';
 
 interface ProductInfoProps {
@@ -16,6 +16,7 @@ interface ProductInfoProps {
 export default function ProductInfo({ product }: ProductInfoProps) {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const [messageApi, contextHolder] = message.useMessage();
   const [selectedColor, setSelectedColor] = useState(product.colors[0]);
   const [selectedStorage, setSelectedStorage] = useState(product.storage[0]);
@@ -24,28 +25,41 @@ export default function ProductInfo({ product }: ProductInfoProps) {
   const finalPrice =
     product.price + (selectedStorage?.priceModifier || 0);
 
-  const handleAddToCart = () => {
-    dispatch(
-      addToCart({
-        product,
-        quantity,
-        color: selectedColor?.name,
-        storage: selectedStorage?.capacity,
-      }),
-    );
+  const handleAddToCart = async () => {
+    if (!isAuthenticated) {
+      navigate('/dang-nhap', { state: { from: window.location.pathname + window.location.search } });
+      return;
+    }
+    const variantId = Number(selectedColor?.id || selectedStorage?.id);
+    if (!Number.isFinite(variantId) || variantId <= 0) {
+      messageApi.error('Vui lÃ²ng chá»n phiÃªn báº£n sáº£n pháº©m há»£p lá»‡');
+      return;
+    }
+    try {
+      await dispatch(addCartItem({ phoneVariantId: variantId, quantity })).unwrap();
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : 'KhÃ´ng thá»ƒ thÃªm vÃ o giá» hÃ ng');
+      return;
+    }
     messageApi.success('Đã thêm sản phẩm vào giỏ hàng');
   };
 
-  const handleBuyNow = () => {
-    dispatch(
-      addToCart({
-        product,
-        quantity,
-        color: selectedColor?.name,
-        storage: selectedStorage?.capacity,
-      }),
-    );
-    navigate('/thanh-toan');
+  const handleBuyNow = async () => {
+    if (!isAuthenticated) {
+      navigate('/dang-nhap', { state: { from: window.location.pathname + window.location.search } });
+      return;
+    }
+    const variantId = Number(selectedColor?.id || selectedStorage?.id);
+    if (!Number.isFinite(variantId) || variantId <= 0) {
+      messageApi.error('Vui lÃ²ng chá»n phiÃªn báº£n sáº£n pháº©m há»£p lá»‡');
+      return;
+    }
+    try {
+      await dispatch(addCartItem({ phoneVariantId: variantId, quantity })).unwrap();
+      navigate('/thanh-toan');
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : 'KhÃ´ng thá»ƒ thÃªm vÃ o giá» hÃ ng');
+    }
   };
 
   return (

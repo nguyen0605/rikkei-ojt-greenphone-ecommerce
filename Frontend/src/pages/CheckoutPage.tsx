@@ -5,12 +5,12 @@ import PaymentMethodSelect from '@/components/checkout/PaymentMethodSelect';
 import OrderSummary from '@/components/checkout/OrderSummary';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { selectCartSummary } from '@/store/selectors/cartSelectors';
-import { nextStep, prevStep, completeOrder } from '@/store/slices/checkoutSlice';
+import { nextStep, prevStep, completeOrder, resetCheckout } from '@/store/slices/checkoutSlice';
 import { clearCart } from '@/store/slices/cartSlice';
 import { orderService, paymentService, phoneService } from '@/services';
 import { Button, App } from 'antd';
 import { Shield, CheckCircle, Banknote } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { formatVND } from '@/utils';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/routes/routePaths';
@@ -20,6 +20,10 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
   const { message } = App.useApp();
   const [placing, setPlacing] = useState(false);
+
+  useEffect(() => {
+    dispatch(resetCheckout());
+  }, [dispatch]);
 
   const currentStep = useAppSelector((s) => s.checkout.currentStep);
   const shipping = useAppSelector((s) => s.checkout.shipping);
