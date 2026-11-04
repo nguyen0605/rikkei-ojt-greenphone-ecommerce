@@ -85,7 +85,7 @@ public class EmailService {
             helper.setText(htmlBody, true);
             mailSender.send(message);
             log.info("[Async Mail] Email sent successfully to {}: {}", to, subject);
-        } catch (MessagingException e) {
+        } catch (Exception e) {
             log.error("[Async Mail] Failed to send email to {}: {}", to, e.getMessage());
         }
     }
