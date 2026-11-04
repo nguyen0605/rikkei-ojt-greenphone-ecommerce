@@ -12,6 +12,7 @@ import java.util.List;
 public class PhoneDetailDTO {
 
     private Long id;
+    private String slug;
     private Long brandId;
     private String brandName;
     private String name;
@@ -24,6 +25,7 @@ public class PhoneDetailDTO {
     private String battery;
     private String warranty;
     private String status;
+    private String mainImageUrl;
     private List<PhoneImageDTO> images;
     private List<PhoneVariantDTO> variants;
     private Double avgRating;

@@ -20,6 +20,7 @@ public class PhoneVariantDTO {
     private String ram;
     private String storage;
     private String color;
+    private String colorHex;
     private BigDecimal price;
     private BigDecimal discountPrice;
     private Integer stockQuantity;

@@ -43,6 +43,10 @@ public interface PhoneRepository extends JpaRepository<Phone, Long>, JpaSpecific
     /** Detail page: only active phones are visible in the store. */
     Optional<Phone> findByIdAndStatus(Long id, String status);
 
+    /** Find active phone by URL slug (e.g. iphone-15-pro-max). */
+    @Query("SELECT p FROM Phone p WHERE LOWER(REPLACE(p.name, ' ', '-')) = LOWER(:slug) AND p.status = :status")
+    Optional<Phone> findBySlugAndStatus(@Param("slug") String slug, @Param("status") String status);
+
     /** Hard-delete guard: any phone still referencing this brand blocks deletion. */
     boolean existsByBrandId(Long brandId);
 }

@@ -17,5 +17,6 @@ public interface PhoneVariantMapper extends GenericMapper<PhoneVariant, PhoneVar
     @Mapping(expression = "java(entity.getRamItem() != null ? entity.getRamItem().getValue() : null)", target = "ram")
     @Mapping(expression = "java(entity.getStorageItem() != null ? entity.getStorageItem().getValue() : null)", target = "storage")
     @Mapping(expression = "java(entity.getColorItem() != null ? entity.getColorItem().getValue() : null)", target = "color")
+    @Mapping(expression = "java(entity.getColorItem() != null ? entity.getColorItem().getHexColor() : null)", target = "colorHex")
     PhoneVariantDTO toDto(PhoneVariant entity);
 }

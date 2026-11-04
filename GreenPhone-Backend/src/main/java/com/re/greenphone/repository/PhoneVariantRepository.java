@@ -17,6 +17,11 @@ public interface PhoneVariantRepository extends JpaRepository<PhoneVariant, Long
 
     List<PhoneVariant> findByPhoneId(Long phoneId);
 
+    List<PhoneVariant> findByPhoneIdAndStatus(Long phoneId, String status);
+
+    @Query("SELECT v FROM PhoneVariant v JOIN FETCH v.ramItem JOIN FETCH v.storageItem JOIN FETCH v.colorItem WHERE v.phone.id = :phoneId AND v.status = 'ACTIVE' ORDER BY v.price ASC")
+    List<PhoneVariant> findActiveByPhoneIdWithOptionItems(@Param("phoneId") Long phoneId);
+
     Optional<PhoneVariant> findBySku(String sku);
 
     /**
