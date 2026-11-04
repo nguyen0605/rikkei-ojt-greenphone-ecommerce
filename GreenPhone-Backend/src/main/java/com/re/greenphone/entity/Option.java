@@ -17,7 +17,7 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "`OPTION`") // OPTION is a MySQL reserved word — must be quoted
+@Table(name = "`option`") // option is a MySQL reserved word — must be quoted, lowercase for Linux compatibility
 public class Option extends BaseEntity {
 
     /** Category code, e.g. "RAM". Unique. */
