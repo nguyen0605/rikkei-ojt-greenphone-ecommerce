@@ -61,7 +61,10 @@ const persistConfig = {
   key: 'greenphone-root',
   version: 1,
   storage,
-  whitelist: ['cart', 'wishlist', 'checkout'], // persist cart, wishlist, và checkout (shipping info)
+  // Cart and checkout are user/session scoped. Cart is hydrated from the
+  // authenticated user's backend cart, while checkout must start at step 1
+  // for every new order.
+  whitelist: ['wishlist'],
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

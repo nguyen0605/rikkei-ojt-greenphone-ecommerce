@@ -28,7 +28,7 @@ api.interceptors.response.use(
       localStorage.removeItem('greenphone.token');
       localStorage.removeItem('greenphone.user');
       if (window.location.pathname !== '/dang-nhap') {
-        window.location.href = '/';
+        window.location.href = '/dang-nhap';
       }
     }
     // Replace generic axios message with backend message if available

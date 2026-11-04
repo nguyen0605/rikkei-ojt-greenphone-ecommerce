@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button, Empty, App, Popconfirm, Checkbox } from 'antd';
 import { DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, ShoppingOutlined, TagOutlined, CloseOutlined, RightOutlined } from '@ant-design/icons';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { removeFromCart, updateQuantity, moveItem as moveCartItem, clearCart, applyVoucher } from '@/store/slices/cartSlice';
+import { removeCartItem, updateCartItem, moveItem as moveCartItem, clearCartRemote, applyVoucher } from '@/store/slices/cartSlice';
 import { selectCartSummary } from '@/store/selectors/cartSelectors';
 import type { CartItem } from '@/types';
 import { formatVND } from '@/utils';
@@ -21,18 +21,21 @@ export default function CartPage() {
   const summary = useAppSelector(selectCartSummary);
 
   // ── Select all ──
-  const [selected, setSelected] = useState<Set<string>>(new Set(items.map((i) => i.id)));
-  const allSelected = items.length > 0 && selected.size === items.length;
+  const [selected, setSelected] = useState<Set<string> | null>(null);
+  const selectedIds = selected === null
+    ? new Set(items.map((item) => item.id))
+    : new Set(items.filter((item) => selected.has(item.id)).map((item) => item.id));
+  const allSelected = items.length > 0 && selectedIds.size === items.length;
   const toggleAll = () => {
     setSelected(allSelected ? new Set() : new Set(items.map((i) => i.id)));
   };
   const toggleItem = (id: string) => {
-    const next = new Set(selected);
+    const next = new Set(selectedIds);
     if (next.has(id)) next.delete(id);
     else next.add(id);
     setSelected(next);
   };
-  const selectedItems = items.filter((i) => selected.has(i.id));
+  const selectedItems = items.filter((i) => selectedIds.has(i.id));
   const selectedSummary = {
     subtotal: selectedItems.reduce((s, i) => s + i.product.price * i.quantity, 0),
     totalItems: selectedItems.reduce((s, i) => s + i.quantity, 0),
@@ -91,7 +94,7 @@ export default function CartPage() {
             {summary.totalItems} sản phẩm · {appliedVoucher ? `Mã ${appliedVoucher.code} đang áp dụng` : 'Chưa có mã giảm giá'}
           </p>
         </div>
-        <Popconfirm title="Xóa toàn bộ giỏ hàng?" onConfirm={() => { dispatch(clearCart()); message.success('Đã xóa toàn bộ'); }} okText="Xóa" cancelText="Hủy">
+        <Popconfirm title="Xóa toàn bộ giỏ hàng?" onConfirm={() => { void dispatch(clearCartRemote()).unwrap().then(() => message.success('Đã xóa toàn bộ')); }} okText="Xóa" cancelText="Hủy">
           <Button danger type="text" icon={<DeleteOutlined />} className="!text-sm">Xóa tất cả</Button>
         </Popconfirm>
       </div>
@@ -121,7 +124,7 @@ export default function CartPage() {
         <div className="min-w-0 flex-1">
           {/* List header */}
           <div className="mb-2 flex items-center gap-3 px-1 text-sm text-gray-500">
-            <Checkbox checked={allSelected} indeterminate={selected.size > 0 && !allSelected} onChange={toggleAll} />
+            <Checkbox checked={allSelected} indeterminate={selectedIds.size > 0 && !allSelected} onChange={toggleAll} />
             <span>Chọn tất cả ({items.length})</span>
           </div>
 
@@ -130,12 +133,12 @@ export default function CartPage() {
               <CartRow
                 key={item.id}
                 item={item}
-                checked={selected.has(item.id)}
+                checked={selectedIds.has(item.id)}
                 onToggle={() => toggleItem(item.id)}
-                onUpdate={(q) => dispatch(updateQuantity({ id: item.id, quantity: q }))}
+                onUpdate={(q) => { void dispatch(updateCartItem({ id: item.id, quantity: q })); }}
                 onMove={(dir) => dispatch(moveCartItem({ id: item.id, dir }))}
                 onRemove={() => {
-                  dispatch(removeFromCart(item.id));
+                  void dispatch(removeCartItem(item.id)).unwrap();
                   message.success('Đã xóa sản phẩm');
                 }}
               />
