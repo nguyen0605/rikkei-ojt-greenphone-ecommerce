@@ -35,7 +35,10 @@ public class SepayService {
 
     public String generateQRUrl(long amount, String description) {
         String acc = getEnv("SEPAY_ACCOUNT_NUMBER", "0943941773");
-        String bank = getEnv("SEPAY_BANK_CODE", "MBB");
+        String bank = getEnv("SEPAY_BANK_CODE", "MB");
+        if ("MBB".equalsIgnoreCase(bank)) {
+            bank = "MB";
+        }
         String template = "compact";
         String store = getEnv("SEPAY_STORE_NAME", "GreenPhone");
 
@@ -231,6 +234,12 @@ public class SepayService {
         // Case-insensitive contains match — banks may send the content with
         // different casing ("greenphone12", "GreenPhone 12", ...).
         String upper = content.toUpperCase(java.util.Locale.ROOT);
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?i)(?:GREENPHONE|DONHANG|DH)\\s*(\\d+)").matcher(content);
+        if (m.find()) {
+            try {
+                return Long.parseLong(m.group(1));
+            } catch (NumberFormatException ignored) {}
+        }
         String prefix = "GREENPHONE";
         int idx = upper.indexOf(prefix);
         if (idx < 0) return null;

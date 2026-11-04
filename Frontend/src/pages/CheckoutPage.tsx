@@ -5,12 +5,12 @@ import PaymentMethodSelect from '@/components/checkout/PaymentMethodSelect';
 import OrderSummary from '@/components/checkout/OrderSummary';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { selectCartSummary } from '@/store/selectors/cartSelectors';
-import { nextStep, prevStep, completeOrder, resetCheckout } from '@/store/slices/checkoutSlice';
+import { nextStep, prevStep, completeOrder, setCurrentStep } from '@/store/slices/checkoutSlice';
 import { clearCart } from '@/store/slices/cartSlice';
 import { orderService, paymentService, phoneService } from '@/services';
 import { Button, App } from 'antd';
 import { Shield, CheckCircle, Banknote } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { formatVND } from '@/utils';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/routes/routePaths';
@@ -21,11 +21,15 @@ export default function CheckoutPage() {
   const { message } = App.useApp();
   const [placing, setPlacing] = useState(false);
 
-  useEffect(() => {
-    dispatch(resetCheckout());
-  }, [dispatch]);
-
   const currentStep = useAppSelector((s) => s.checkout.currentStep);
+
+  useEffect(() => {
+    if (currentStep === 3) {
+      dispatch(setCurrentStep(1));
+    }
+  }, [currentStep, dispatch]);
+
+  const effectiveStep = currentStep === 3 ? 1 : currentStep;
   const shipping = useAppSelector((s) => s.checkout.shipping);
   const payment = useAppSelector((s) => s.checkout.payment);
   const voucherCode = useAppSelector((s) => s.checkout.voucherCode);
@@ -51,7 +55,7 @@ export default function CheckoutPage() {
   };
 
   const handleNext = () => {
-    if (currentStep === 1 && validateShipping()) {
+    if (effectiveStep === 1 && validateShipping()) {
       dispatch(nextStep());
       window.scrollTo(0, 0);
     }
@@ -120,10 +124,10 @@ export default function CheckoutPage() {
         <Breadcrumb items={[{ label: 'Trang chủ', href: '/' }, { label: 'Giỏ hàng', href: '/gio-hang' }, { label: 'Thanh toán' }]} className="mb-6" />
         <h1 className="mb-2 text-3xl font-bold text-gray-900">Thanh toán</h1>
 
-        <CheckoutSteps current={currentStep} />
+        <CheckoutSteps current={effectiveStep} />
 
         {/* STEP 1: Shipping + Payment */}
-        {currentStep === 1 && (
+        {effectiveStep === 1 && (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="space-y-6 lg:col-span-2">
               <ShippingForm />
@@ -147,7 +151,7 @@ export default function CheckoutPage() {
         )}
 
         {/* STEP 2: Order Confirmation */}
-        {currentStep === 2 && (
+        {effectiveStep === 2 && (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="space-y-6 lg:col-span-2">
               {/* Shipping info summary */}

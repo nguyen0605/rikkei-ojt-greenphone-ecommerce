@@ -321,6 +321,20 @@ class SepayServiceTest {
     // === Edge Cases ===
 
     @Test
+    void extractOrderId_SupportsDHPrefix() {
+        Map<String, Object> payload = Map.of(
+                "id", "txDH1", "transferAmount", 24000000L,
+                "content", "DH100");
+        when(paymentRepository.findByTransactionCode("txDH1")).thenReturn(Optional.empty());
+        when(orderRepository.findById(100L)).thenReturn(Optional.of(testOrder));
+        when(paymentRepository.findByOrderIdOrderByIdAsc(100L)).thenReturn(List.of(testPayment));
+        when(paymentRepository.save(any())).thenReturn(testPayment);
+        when(orderRepository.save(any())).thenReturn(testOrder);
+        Map<String, Object> result = sepayService.processPaymentWebhook(payload);
+        assertThat(result).containsEntry("success", true);
+    }
+
+    @Test
     void extractOrderId_FromContentWithExtraText() {
         // Via processPaymentWebhook
         Map<String, Object> payload = Map.of(
