@@ -65,6 +65,10 @@ public class AdminOrderService {
     }
 
     public OrderDTO updateStatus(Long id, String status) {
+        return updateStatus(id, status, null);
+    }
+
+    public OrderDTO updateStatus(Long id, String status, String reason) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
 
@@ -94,6 +98,15 @@ public class AdminOrderService {
             // Money state: order.paymentStatus is the single source of truth
             if ("PAID".equals(order.getPaymentStatus())) {
                 order.setPaymentStatus("REFUNDED");
+            }
+            if (reason != null && !reason.isBlank()) {
+                String existingNote = order.getNote() != null ? order.getNote().trim() : "";
+                String prefix = "[Lý do hủy: " + reason.trim() + "]";
+                if (existingNote.isEmpty()) {
+                    order.setNote(prefix);
+                } else if (!existingNote.contains("[Lý do hủy:")) {
+                    order.setNote(prefix + " " + existingNote);
+                }
             }
         }
 

@@ -1,20 +1,36 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
-import { Button, Tag, Descriptions, Spin } from 'antd';
-import { CreditCard, Clock } from 'lucide-react';
+import { Button, Tag, Descriptions, Spin, Steps, Modal, message } from 'antd';
+import { CreditCard, Clock, AlertTriangle } from 'lucide-react';
+import { useState } from 'react';
 import { orderService, paymentService } from '@/services';
 import { usePaymentCountdown, formatCountdown } from '@/hooks/usePaymentCountdown';
 import BankTransferPaymentCard from '@/components/checkout/BankTransferPaymentCard';
-import { formatVND } from '@/utils';
+import { formatVND, formatDate } from '@/utils';
+import { extractCancelReason, extractCustomerNote } from '@/utils/orderStateMachine';
 
 const statusColor: Record<string, string> = {
-  PENDING: 'default', CONFIRMED: 'blue', PROCESSING: 'processing',
-  SHIPPING: 'orange', DELIVERED: 'green', CANCELLED: 'red',
+  PENDING: 'default',
+  CONFIRMED: 'blue',
+  PROCESSING: 'processing',
+  SHIPPING: 'orange',
+  DELIVERED: 'green',
+  CANCELLED: 'red',
+};
+
+const statusLabel: Record<string, string> = {
+  PENDING: 'Chờ xác nhận',
+  CONFIRMED: 'Đã xác nhận',
+  PROCESSING: 'Đang xử lý',
+  SHIPPING: 'Đang giao',
+  DELIVERED: 'Đã giao',
+  CANCELLED: 'Đã hủy',
 };
 
 const paymentStatusLabel: Record<string, string> = {
   UNPAID: 'Chưa thanh toán',
   PAID: 'Đã thanh toán',
+  REFUNDED: 'Đã hoàn tiền',
 };
 
 const paymentMethodLabel: Record<string, string> = {
@@ -25,18 +41,33 @@ const paymentMethodLabel: Record<string, string> = {
 
 export default function AccountOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const qc = useQueryClient();
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+
   const { data: order, isLoading } = useQuery({
     queryKey: ['order', id],
     queryFn: () => orderService.detail(Number(id)),
     enabled: !!id,
-    // Poll while the order is still PENDING+UNPAID so the status
-    // flips to CONFIRMED/PAID as soon as the bank webhook lands.
     refetchInterval: (query) => {
       const o = query.state.data;
       if (o && o.orderStatus === 'PENDING' && o.paymentStatus === 'UNPAID') {
         return 5000;
       }
       return false;
+    },
+  });
+
+  // Mutation hủy đơn hàng phía khách hàng
+  const cancelMutation = useMutation({
+    mutationFn: () => orderService.cancel(Number(id)),
+    onSuccess: () => {
+      message.success('Đã hủy đơn hàng thành công');
+      setCancelModalOpen(false);
+      qc.invalidateQueries({ queryKey: ['order', id] });
+      qc.invalidateQueries({ queryKey: ['orders'] });
+    },
+    onError: (err: any) => {
+      message.error(err?.message || 'Không thể hủy đơn hàng');
     },
   });
 
@@ -57,17 +88,94 @@ export default function AccountOrderDetailPage() {
   if (isLoading) return <div className="flex justify-center py-16"><Spin size="large" /></div>;
   if (!order) return <div className="py-16 text-center text-gray-500">Không tìm thấy đơn hàng</div>;
 
+  // Khách hàng được phép hủy khi đơn còn ở PENDING hoặc CONFIRMED
+  const canCustomerCancel = order.orderStatus === 'PENDING' || order.orderStatus === 'CONFIRMED';
+  const cancelReason = extractCancelReason(order.note);
+  const customerNote = extractCustomerNote(order.note);
+
+  // Chỉ số bước trong Stepper
+  const getStepIndex = (status: string) => {
+    switch (status) {
+      case 'PENDING':
+        return 0;
+      case 'CONFIRMED':
+        return 1;
+      case 'PROCESSING':
+        return 2;
+      case 'SHIPPING':
+        return 3;
+      case 'DELIVERED':
+        return 4;
+      default:
+        return 0;
+    }
+  };
+
   return (
     <div>
       {/* Header */}
-      <div className="mb-6 flex flex-wrap items-center gap-4">
-        <Link to="/tai-khoan/don-hang">
-          <Button size="small" className="!rounded-full">&larr; Quay lại</Button>
-        </Link>
-        <h2 className="text-xl font-bold text-gray-900">Đơn hàng #{order.id}</h2>
-        <Tag color={statusColor[order.orderStatus] || 'default'} className="!rounded-full !px-3 !py-0.5 !text-xs !font-semibold">
-          {order.orderStatus}
-        </Tag>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link to="/tai-khoan/don-hang">
+            <Button size="small" className="!rounded-full">&larr; Quay lại danh sách</Button>
+          </Link>
+          <h2 className="text-xl font-bold text-gray-900">Đơn hàng #{order.id}</h2>
+          <Tag color={statusColor[order.orderStatus] || 'default'} className="!rounded-full !px-3 !py-0.5 !text-xs !font-semibold">
+            {statusLabel[order.orderStatus] || order.orderStatus}
+          </Tag>
+        </div>
+
+        {/* Nút Hủy đơn phía khách hàng */}
+        {canCustomerCancel && (
+          <Button
+            danger
+            onClick={() => setCancelModalOpen(true)}
+            className="!rounded-full font-medium"
+          >
+            Hủy đơn hàng
+          </Button>
+        )}
+      </div>
+
+      {/* Stepper Timeline Tiến trình xử lý đơn hàng */}
+      <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-xs">
+        <div className="mb-5 flex items-center justify-between">
+          <h3 className="text-sm font-bold uppercase tracking-wide text-gray-700">
+            📍 Tiến trình đơn hàng
+          </h3>
+          <span className="text-xs text-gray-400">
+            Ngày đặt: {formatDate(order.createdAt)}
+          </span>
+        </div>
+
+        {order.orderStatus === 'CANCELLED' ? (
+          <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-sm font-bold text-rose-800">Đơn hàng đã bị hủy</h4>
+                <p className="mt-1 text-sm text-rose-700">
+                  {cancelReason ? (
+                    <>Lý do: <strong>{cancelReason}</strong></>
+                  ) : (
+                    'Đơn hàng đã được hủy theo yêu cầu. Số lượng tồn kho và voucher đã được khôi phục.'
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <Steps
+            current={getStepIndex(order.orderStatus)}
+            items={[
+              { title: 'Chờ xác nhận', description: 'Tiếp nhận đơn' },
+              { title: 'Đã xác nhận', description: 'Đã duyệt' },
+              { title: 'Đang xử lý', description: 'Đóng gói máy' },
+              { title: 'Đang giao', description: 'Vận chuyển' },
+              { title: 'Hoàn tất', description: 'Đã nhận hàng' },
+            ]}
+          />
+        )}
       </div>
 
       {/* Payment Status Banner */}
@@ -132,7 +240,7 @@ export default function AccountOrderDetailPage() {
               </Tag>
             </Descriptions.Item>
             {order.promotionCode && <Descriptions.Item label="Mã KM">{order.promotionCode}</Descriptions.Item>}
-            {order.note && <Descriptions.Item label="Ghi chú" span={2}>{order.note}</Descriptions.Item>}
+            {customerNote && <Descriptions.Item label="Ghi chú" span={2}>{customerNote}</Descriptions.Item>}
           </Descriptions>
         </div>
       </div>
@@ -158,6 +266,27 @@ export default function AccountOrderDetailPage() {
           <span className="text-red-600">{formatVND(order.finalAmount)}</span>
         </div>
       </div>
+
+      {/* Modal xác nhận hủy đơn phía khách hàng */}
+      <Modal
+        title="Xác nhận hủy đơn hàng"
+        open={cancelModalOpen}
+        onCancel={() => setCancelModalOpen(false)}
+        onOk={() => cancelMutation.mutate()}
+        okText="Xác nhận hủy"
+        okButtonProps={{ danger: true, loading: cancelMutation.isPending }}
+        cancelText="Giữ lại đơn"
+        destroyOnClose
+      >
+        <div className="py-2 space-y-3">
+          <p className="text-sm text-gray-700">
+            Bạn có chắc chắn muốn hủy đơn hàng <strong>#{order.id}</strong> không?
+          </p>
+          <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
+            ⚠️ Lưu ý: Khi hủy đơn hàng, số lượng tồn kho của sản phẩm và mã giảm giá Voucher đã dùng (nếu có) sẽ được khôi phục tự động.
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
