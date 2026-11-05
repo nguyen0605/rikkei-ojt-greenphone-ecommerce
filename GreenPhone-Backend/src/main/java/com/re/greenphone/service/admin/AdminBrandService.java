@@ -11,6 +11,7 @@ import com.re.greenphone.repository.BrandRepository;
 import com.re.greenphone.repository.PhoneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -46,6 +47,7 @@ public class AdminBrandService {
                 page.getTotalElements(), page.getTotalPages(), page.isLast());
     }
 
+    @CacheEvict(value = "brands", allEntries = true)
     public BrandDTO createBrand(BrandRequest request) {
         Brand brand = Brand.builder()
                 .name(request.getName())
@@ -56,6 +58,7 @@ public class AdminBrandService {
         return brandMapper.toDto(brand);
     }
 
+    @CacheEvict(value = "brands", allEntries = true)
     public BrandDTO updateBrand(Long id, BrandRequest request) {
         Brand brand = brandRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", id));
@@ -70,6 +73,7 @@ public class AdminBrandService {
      * phones keep the FK alive, so the brand cannot be removed. Use the status
      * toggle (INACTIVE) to hide such brands from the store instead.
      */
+    @CacheEvict(value = "brands", allEntries = true)
     public void deleteBrand(Long id) {
         Brand brand = brandRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", id));
@@ -80,6 +84,7 @@ public class AdminBrandService {
         brandRepository.delete(brand);
     }
 
+    @CacheEvict(value = "brands", allEntries = true)
     public BrandDTO updateStatus(Long id, String status) {
         if (!List.of("ACTIVE", "INACTIVE").contains(status)) {
             throw new BadRequestException("Invalid status: " + status);

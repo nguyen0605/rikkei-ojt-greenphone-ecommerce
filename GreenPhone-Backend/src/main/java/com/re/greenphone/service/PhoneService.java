@@ -14,6 +14,7 @@ import com.re.greenphone.mapper.PhoneVariantMapper;
 import com.re.greenphone.repository.PhoneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -56,6 +57,7 @@ public class PhoneService {
                 page.getTotalElements(), page.getTotalPages(), page.isLast());
     }
 
+    @Cacheable(value = "phones", key = "#id")
     public PhoneDetailDTO getPhoneDetail(Long id) {
         // Chỉ hiển thị sản phẩm ACTIVE trong store; INACTIVE (admin tắt) → 404
         Phone phone = phoneRepository.findByIdAndStatus(id, "ACTIVE")
