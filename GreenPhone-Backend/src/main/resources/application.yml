@@ -39,3 +39,8 @@ jwt:
 logging:
   level:
     com.re.greenphone: ${LOG_LEVEL:DEBUG}
+
+app:
+  order:
+    timeout-minutes: ${ORDER_TIMEOUT_MINUTES:15}
+

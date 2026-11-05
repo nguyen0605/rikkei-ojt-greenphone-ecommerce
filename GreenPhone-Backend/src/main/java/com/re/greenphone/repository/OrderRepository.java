@@ -48,5 +48,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     long countByOrderStatusAndCreatedAtBetween(String orderStatus, LocalDateTime from, LocalDateTime to);
 
-    List<Order> findByOrderStatusAndPaymentStatusAndCreatedAtBefore(String orderStatus, String paymentStatus, LocalDateTime dateTime);
+    List<Order> findByOrderStatusAndPaymentStatusAndPaymentMethodInAndCreatedAtBefore(
+            String orderStatus, String paymentStatus, List<String> paymentMethods, LocalDateTime dateTime);
 }
