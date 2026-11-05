@@ -261,6 +261,8 @@ export interface PromotionDTO {
   maxDiscountAmount: number;
   minOrderValue: number;
   quantity: number;
+  claimedQuantity?: number;
+  usedQuantity?: number;
   startDate: string;
   endDate: string;
   status: string;
