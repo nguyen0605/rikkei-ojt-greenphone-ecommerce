@@ -10,6 +10,7 @@ import com.re.greenphone.entity.*;
 import com.re.greenphone.mapper.OrderMapper;
 import com.re.greenphone.repository.*;
 import com.re.greenphone.security.SecurityUtils;
+import com.re.greenphone.service.admin.InventoryStockHistoryService;
 import jakarta.persistence.OptimisticLockException;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +36,7 @@ class OrderServiceTest {
     @Mock private OrderMapper orderMapper;
     @Mock private EmailService emailService;
     @Mock private SettingsService settingsService;
+    @Mock private InventoryStockHistoryService inventoryStockHistoryService;
 
     @InjectMocks
     private OrderService orderService;
@@ -87,6 +89,7 @@ class OrderServiceTest {
         orderService.createOrder(req);
 
         assertEquals(8, v.getStockQuantity());
+        verify(inventoryStockHistoryService).record(eq(v), eq(10), eq(-2), eq("EXPORT"), anyString());
         verify(orderRepository).save(any());
         verify(emailService).sendOrderConfirmation(eq(USER_EMAIL), anyString());
     }
@@ -182,6 +185,7 @@ class OrderServiceTest {
         orderService.cancelOrder(1L);
 
         assertEquals(7, v.getStockQuantity());
+        verify(inventoryStockHistoryService).record(eq(v), eq(5), eq(2), eq("IMPORT"), anyString());
         assertEquals("CANCELLED", order.getOrderStatus());
     }
 }

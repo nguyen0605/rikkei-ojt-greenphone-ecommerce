@@ -5,6 +5,7 @@ import com.re.greenphone.dto.request.InventoryStockMovementRequest;
 import com.re.greenphone.mapper.PhoneVariantMapper;
 import com.re.greenphone.service.admin.InventoryStockHistoryService;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +26,7 @@ public class AdminInventoryController {
     private final PhoneVariantMapper phoneVariantMapper;
 
     @PostMapping("/variants/{variantId}/movements")
+    @Operation(summary = "Thực hiện nhập kho hoặc xuất kho cho biến thể điện thoại")
     public ResponseEntity<ApiResponse<?>> applyMovement(
             @PathVariable Long variantId,
             @Valid @RequestBody InventoryStockMovementRequest request) {
@@ -33,6 +35,7 @@ public class AdminInventoryController {
     }
 
     @GetMapping("/variants/{variantId}/history")
+    @Operation(summary = "Lấy dòng thời gian lịch sử biến động kho của biến thể điện thoại")
     public ResponseEntity<ApiResponse<?>> getVariantHistory(@PathVariable Long variantId) {
         return ResponseEntity.ok(ApiResponse.success(historyService.getHistory(variantId)));
     }
