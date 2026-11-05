@@ -1,5 +1,6 @@
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingCart } from 'lucide-react';
+import { LoaderCircle, ShoppingCart } from 'lucide-react';
 import { App } from 'antd';
 import type { PhoneDTO, PhoneDetailDTO, PhoneVariantDTO } from '@/types/api';
 import type { Product } from '@/types';
@@ -37,11 +38,16 @@ export default function ProductCard({ product, className }: Props) {
   const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const { message } = App.useApp();
+  const [isAdding, setIsAdding] = useState(false);
+  const addingRef = useRef(false);
   const imgUrl = getOptimizedImageUrl(product.mainImageUrl || '', { width: 400, height: 400 });
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (addingRef.current) return;
+    addingRef.current = true;
+    setIsAdding(true);
     try {
       const detail = await phoneService.detail(product.id);
       const variant = detail.variants?.find((item) => item.stockQuantity > 0);
@@ -65,6 +71,9 @@ export default function ProductCard({ product, className }: Props) {
       message.success(`Đã thêm ${product.name} vào giỏ hàng`);
     } catch (error) {
       message.error(error instanceof Error ? error.message : 'Không thể thêm vào giỏ hàng');
+    } finally {
+      addingRef.current = false;
+      setIsAdding(false);
     }
   };
 
@@ -94,10 +103,12 @@ export default function ProductCard({ product, className }: Props) {
       <div className="px-3 pb-3">
         <button
           onClick={handleAddToCart}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-green-600 py-2 text-xs font-medium text-white opacity-0 transition-all hover:bg-green-700 group-hover:opacity-100"
+          disabled={isAdding}
+          aria-busy={isAdding}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-green-600 py-2 text-xs font-medium text-white opacity-0 transition-all hover:bg-green-700 group-hover:opacity-100 disabled:cursor-wait disabled:opacity-70"
         >
-          <ShoppingCart className="h-3.5 w-3.5" />
-          Thêm vào giỏ
+          {isAdding ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <ShoppingCart className="h-3.5 w-3.5" />}
+          {isAdding ? 'Đang thêm...' : 'Thêm vào giỏ'}
         </button>
       </div>
     </div>
