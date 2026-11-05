@@ -12,8 +12,9 @@ import lombok.*;
 @Builder
 public class ReviewRequest {
 
-    @NotNull(message = "Order detail ID is required")
     private Long orderDetailId;
+
+    private Long phoneId;
 
     @NotNull(message = "Rating is required")
     @Min(value = 1, message = "Rating must be 1-5")

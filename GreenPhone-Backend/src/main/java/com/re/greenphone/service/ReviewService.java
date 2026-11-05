@@ -14,9 +14,9 @@ import com.re.greenphone.entity.Review;
 import com.re.greenphone.entity.User;
 import com.re.greenphone.mapper.OrderMapper;
 import com.re.greenphone.mapper.ReviewMapper;
+import com.re.greenphone.repository.OrderDetailRepository;
 import com.re.greenphone.repository.OrderRepository;
 import com.re.greenphone.repository.PhoneRepository;
-import com.re.greenphone.repository.OrderDetailRepository;
 import com.re.greenphone.repository.ReviewRepository;
 import com.re.greenphone.repository.UserRepository;
 import com.re.greenphone.security.SecurityUtils;
@@ -28,6 +28,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -36,6 +37,8 @@ import java.util.Map;
 @Slf4j
 @Transactional
 public class ReviewService {
+
+    private static final List<String> PUBLIC_STATUSES = List.of("APPROVED", "SHOW");
 
     private final OrderDetailRepository orderDetailRepository;
     private final ReviewRepository reviewRepository;
@@ -50,7 +53,7 @@ public class ReviewService {
                 pageRequest.getPage(), pageRequest.getSize(),
                 Sort.by(Sort.Direction.DESC, "createdAt"));
 
-        Page<Review> page = reviewRepository.findByPhoneId(phoneId, pageable);
+        Page<Review> page = reviewRepository.findByPhoneIdAndStatusIn(phoneId, PUBLIC_STATUSES, pageable);
         List<ReviewDTO> dtos = reviewMapper.toDtoList(page.getContent());
 
         return new PageResponse<>(dtos, page.getNumber(), page.getSize(),
@@ -58,18 +61,23 @@ public class ReviewService {
     }
 
     public Map<String, Object> getReviewSummary(Long phoneId) {
-        List<Review> reviews = reviewRepository.findByPhoneId(phoneId);
-        double avg = reviews.stream()
+        List<Review> reviews = reviewRepository.findByPhoneIdAndStatusIn(phoneId, PUBLIC_STATUSES);
+        double avg = reviews.isEmpty() ? 0.0 : reviews.stream()
                 .mapToInt(r -> r.getRating() != null ? r.getRating() : 0)
                 .average().orElse(0.0);
 
-        Map<Integer, Long> distribution = reviews.stream()
-                .collect(java.util.stream.Collectors.groupingBy(
-                        r -> r.getRating() != null ? r.getRating() : 0,
-                        java.util.stream.Collectors.counting()));
+        Map<Integer, Long> distribution = new LinkedHashMap<>();
+        for (int i = 1; i <= 5; i++) {
+            distribution.put(i, 0L);
+        }
+        for (Review r : reviews) {
+            if (r.getRating() != null && r.getRating() >= 1 && r.getRating() <= 5) {
+                distribution.put(r.getRating(), distribution.get(r.getRating()) + 1L);
+            }
+        }
 
         return Map.of(
-                "averageRating", Math.round(avg * 10) / 10.0,
+                "averageRating", Math.round(avg * 10.0) / 10.0,
                 "totalReviews", reviews.size(),
                 "distribution", distribution
         );
@@ -80,13 +88,73 @@ public class ReviewService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
-        OrderDetail orderDetail = orderDetailRepository.findById(request.getOrderDetailId())
-                .orElseThrow(() -> new ResourceNotFoundException("OrderDetail", "id", request.getOrderDetailId()));
-        Phone phone = orderDetail.getPhoneVariant().getPhone();
+        OrderDetail orderDetail;
+        if (request.getOrderDetailId() != null) {
+            orderDetail = orderDetailRepository.findById(request.getOrderDetailId())
+                    .orElseThrow(() -> new ResourceNotFoundException("OrderDetail", "id", request.getOrderDetailId()));
 
-        // Check if user already reviewed this phone
-        if (reviewRepository.existsByUserIdAndPhoneId(userId, phone.getId())) {
-            throw new BadRequestException("You have already reviewed this product");
+            Order order = orderDetail.getOrder();
+            if (order == null || order.getUser() == null || !order.getUser().getId().equals(userId)
+                    || !"DELIVERED".equalsIgnoreCase(order.getOrderStatus())) {
+                throw new BadRequestException("Chỉ được đánh giá sản phẩm sau khi đã nhận hàng thành công.");
+            }
+
+            if (request.getPhoneId() != null) {
+                Phone phone = (orderDetail.getPhoneVariant() != null) ? orderDetail.getPhoneVariant().getPhone() : null;
+                if (phone == null || !phone.getId().equals(request.getPhoneId())) {
+                    throw new BadRequestException("Chi tiết đơn hàng không khớp với sản phẩm.");
+                }
+            }
+        } else if (request.getPhoneId() != null) {
+            phoneRepository.findById(request.getPhoneId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Phone", "id", request.getPhoneId()));
+
+            List<Order> deliveredOrders = orderRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+                    .filter(o -> "DELIVERED".equalsIgnoreCase(o.getOrderStatus()))
+                    .toList();
+
+            OrderDetail eligibleDetail = null;
+            for (Order o : deliveredOrders) {
+                if (reviewRepository.existsByOrderIdAndPhoneId(o.getId(), request.getPhoneId())) {
+                    continue;
+                }
+                if (o.getOrderDetails() != null) {
+                    for (OrderDetail od : o.getOrderDetails()) {
+                        if (od.getPhoneVariant() != null && od.getPhoneVariant().getPhone() != null
+                                && od.getPhoneVariant().getPhone().getId().equals(request.getPhoneId())) {
+                            if (!reviewRepository.existsByOrderDetailId(od.getId())) {
+                                eligibleDetail = od;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (eligibleDetail != null) {
+                    break;
+                }
+            }
+
+            if (eligibleDetail == null) {
+                throw new BadRequestException("Chỉ được đánh giá sản phẩm sau khi đã nhận hàng thành công.");
+            }
+            orderDetail = eligibleDetail;
+        } else {
+            throw new BadRequestException("Chỉ được đánh giá sản phẩm sau khi đã nhận hàng thành công.");
+        }
+
+        Phone phone = orderDetail.getPhoneVariant() != null ? orderDetail.getPhoneVariant().getPhone() : null;
+        if (phone == null) {
+            throw new BadRequestException("Sản phẩm không hợp lệ.");
+        }
+
+        // Anti-duplicate / Anti-spam checks
+        if (reviewRepository.existsByOrderDetailId(orderDetail.getId())) {
+            throw new BadRequestException("Chi tiết đơn hàng này đã được đánh giá.");
+        }
+
+        Order order = orderDetail.getOrder();
+        if (order != null && reviewRepository.existsByOrderIdAndPhoneId(order.getId(), phone.getId())) {
+            throw new BadRequestException("Đơn hàng này đã được đánh giá cho sản phẩm này.");
         }
 
         Review review = Review.builder()
@@ -95,7 +163,7 @@ public class ReviewService {
                 .orderDetail(orderDetail)
                 .rating(request.getRating())
                 .content(request.getContent())
-                .status("SHOW")
+                .status("APPROVED")
                 .build();
 
         review = reviewRepository.save(review);
@@ -160,10 +228,7 @@ public class ReviewService {
 
         Page<Order> page = orderRepository.findByUserIdAndOrderStatus(userId, "DELIVERED", pageable);
 
-        // IMPORTANT: do NOT mutate order.getOrderDetails() — Order.orderDetails has
-        // orphanRemoval=true, so removing an element triggers a DELETE on the row
-        // (which fails on FK_REVIEW_ORDER_DETAIL when a review exists).
-        // Filter at DTO level instead.
+        // Filter at DTO level instead of mutating entity collection
         List<OrderDTO> dtos = orderMapper.toDtoList(page.getContent()).stream()
                 .map(orderDto -> {
                     if (orderDto.getOrderDetails() != null) {
@@ -176,8 +241,6 @@ public class ReviewService {
                 .filter(o -> !o.getOrderDetails().isEmpty())
                 .toList();
 
-        // totalElements must reflect the *filtered* count, not the raw
-        // DELIVERED-orders count — otherwise the client sees "1" with empty content.
         long total = dtos.size();
         return new PageResponse<>(dtos, page.getNumber(), page.getSize(),
                 total, (int) Math.ceil((double) total / page.getSize()), page.isLast());
