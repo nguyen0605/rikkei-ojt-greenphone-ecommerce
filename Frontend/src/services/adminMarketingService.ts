@@ -22,3 +22,4 @@ export const adminMarketingService = {
 };
 
 export default adminMarketingService;
+

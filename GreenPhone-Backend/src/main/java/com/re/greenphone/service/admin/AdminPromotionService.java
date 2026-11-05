@@ -85,6 +85,9 @@ public class AdminPromotionService {
         promo.setMaxDiscountAmount(request.getMaxDiscountAmount());
         promo.setStartDate(request.getStartDate());
         promo.setEndDate(request.getEndDate());
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            promo.setStatus(request.getStatus());
+        }
 
         promo = promotionRepository.save(promo);
         return promotionMapper.toDto(promo);

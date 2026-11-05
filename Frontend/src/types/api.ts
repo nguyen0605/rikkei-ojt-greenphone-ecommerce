@@ -429,6 +429,7 @@ export interface PromotionRequest {
   quantity: number;
   startDate: string;
   endDate: string;
+  status?: string;
 }
 
 // Settings
