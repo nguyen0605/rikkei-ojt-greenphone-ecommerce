@@ -43,6 +43,8 @@ import java.util.Map;
 @Transactional
 public class AdminPhoneService {
 
+    public static final int LOW_STOCK_THRESHOLD = 5;
+
     private final PhoneRepository phoneRepository;
     private final BrandRepository brandRepository;
     private final PhoneVariantRepository phoneVariantRepository;
@@ -55,8 +57,10 @@ public class AdminPhoneService {
     private final PhoneVariantMapper phoneVariantMapper;
     private final PhoneImageMapper phoneImageMapper;
     private final CloudinaryService cloudinaryService;
+    private final InventoryStockHistoryService inventoryStockHistoryService;
 
     public PageResponse<PhoneDTO> getPhones(String keyword, Long brandId, String status,
+                                            boolean lowStock,
                                             com.re.greenphone.common.pagination.PageRequest pageRequest) {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(
                 pageRequest.getPage(), pageRequest.getSize(),
@@ -73,6 +77,11 @@ public class AdminPhoneService {
             }
             if (status != null && !status.isBlank()) {
                 predicates.add(cb.equal(root.get("status"), status));
+            }
+            if (lowStock) {
+                var variants = root.join("variants");
+                predicates.add(cb.lessThanOrEqualTo(variants.get("stockQuantity"), LOW_STOCK_THRESHOLD));
+                cq.distinct(true);
             }
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
         };
@@ -200,7 +209,7 @@ public class AdminPhoneService {
                 .colorItem(requireItem(request.getColorItemId(), "COLOR"))
                 .price(request.getPrice())
                 .discountPrice(request.getDiscountPrice())
-                .stockQuantity(request.getStockQuantity())
+                .stockQuantity(0)
                 .status("ACTIVE")
                 .build();
 
@@ -217,7 +226,20 @@ public class AdminPhoneService {
         if (request.getColorItemId() != null) variant.setColorItem(requireItem(request.getColorItemId(), "COLOR"));
         variant.setPrice(request.getPrice());
         variant.setDiscountPrice(request.getDiscountPrice());
-        variant.setStockQuantity(request.getStockQuantity());
+        if (request.getStockQuantity() != null) {
+            int quantityBefore = variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
+            variant.setStockQuantity(request.getStockQuantity());
+            int quantityAfter = variant.getStockQuantity();
+            int quantityChange = quantityAfter - quantityBefore;
+            if (quantityChange != 0) {
+                inventoryStockHistoryService.record(
+                        variant,
+                        quantityBefore,
+                        quantityChange,
+                        "ADJUSTMENT",
+                        "Admin cập nhật tồn kho");
+            }
+        }
 
         variant = phoneVariantRepository.save(variant);
         return phoneVariantMapper.toDto(variant);
@@ -347,6 +369,7 @@ public class AdminPhoneService {
     private PhoneDTO toAdminListingDto(Phone phone) {
         PhoneDTO dto = phoneMapper.toDto(phone);
         dto.setMainImageUrl(getMainImageUrl(phone));
+        dto.setVariantCount((long) phone.getVariants().size());
         return dto;
     }
 

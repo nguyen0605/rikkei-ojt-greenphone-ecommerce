@@ -5,6 +5,7 @@ import com.re.greenphone.entity.OrderDetail;
 import com.re.greenphone.entity.PhoneVariant;
 import com.re.greenphone.repository.OrderRepository;
 import com.re.greenphone.repository.PhoneVariantRepository;
+import com.re.greenphone.service.admin.InventoryStockHistoryService;
 import jakarta.persistence.OptimisticLockException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +26,7 @@ public class OrderTimeoutScheduler {
 
     private final OrderRepository orderRepository;
     private final PhoneVariantRepository phoneVariantRepository;
+    private final InventoryStockHistoryService inventoryStockHistoryService;
 
     /**
      * Runs every 60 seconds. Cancels orders that are PENDING + UNPAID for > 10 minutes.
@@ -65,7 +67,9 @@ public class OrderTimeoutScheduler {
         for (OrderDetail detail : fresh.getOrderDetails()) {
             PhoneVariant variant = detail.getPhoneVariant();
             if (variant != null && variant.getStockQuantity() != null) {
-                variant.setStockQuantity(variant.getStockQuantity() + detail.getQuantity());
+                int quantityBefore = variant.getStockQuantity();
+                variant.setStockQuantity(quantityBefore + detail.getQuantity());
+                inventoryStockHistoryService.record(variant, quantityBefore, detail.getQuantity(), "IMPORT", "Hoàn kho do đơn hết hạn");
                 phoneVariantRepository.save(variant);
             }
         }

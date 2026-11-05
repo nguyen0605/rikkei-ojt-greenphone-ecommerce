@@ -5,10 +5,11 @@ import type {
   PaymentDTO, PaymentQRInfo, PromotionDTO, UserPromotionDTO, AvailablePromotionDTO, ReviewDTO,
   ReviewSummary, PageResponse, PhoneDTO, PhoneDetailDTO,
   PhoneVariantDTO, PhoneImageDTO, BrandDTO, BannerDTO,
-  PhoneRequest, PhoneVariantRequest, BrandRequest,
+  PhoneRequest, PhoneVariantRequest, BrandRequest, InventoryStockMovementRequest,
   BannerRequest, PromotionRequest, RevenueStats,
   OrderStats, TopSellingPhone, UserDTO, SettingsDTO,
   OptionDTO, OptionRequest, OptionItemDTO, OptionItemRequest, OptionTreeDTO,
+  InventoryHistoryDTO,
 } from '@/types/api';
 
 // Phone
@@ -90,6 +91,11 @@ export const adminPhoneService = {
   removeImage: (phoneId: number, imageId: number) => del<void>('/admin/phones/' + phoneId + '/images/' + imageId),
   updateImage: (phoneId: number, imageId: number, data: { isMain?: boolean }) => put<PhoneImageDTO>('/admin/phones/' + phoneId + '/images/' + imageId, data),
   reorderImages: (phoneId: number, imageIds: number[]) => put<PhoneImageDTO[]>('/admin/phones/' + phoneId + '/images/reorder', { imageIds }),
+};
+
+export const adminInventoryService = {
+  history: (variantId: number) => get<InventoryHistoryDTO>('/admin/inventory/variants/' + variantId + '/history'),
+  movement: (variantId: number, data: InventoryStockMovementRequest) => post<PhoneVariantDTO>('/admin/inventory/variants/' + variantId + '/movements', data),
 };
 
 // Option catalog — categories (tree) + items
