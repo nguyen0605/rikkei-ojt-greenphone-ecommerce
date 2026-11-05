@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingCart } from 'lucide-react';
+import { ShoppingCart, Loader2 } from 'lucide-react';
 import { App } from 'antd';
 import type { PhoneDTO, PhoneDetailDTO, PhoneVariantDTO } from '@/types/api';
 import type { Product } from '@/types';
@@ -37,12 +38,16 @@ export default function ProductCard({ product, className }: Props) {
   const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const { message } = App.useApp();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const imgUrl = getOptimizedImageUrl(product.mainImageUrl || '', { width: 400, height: 400 });
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isSubmitting) return;
+
     try {
+      setIsSubmitting(true);
       const detail = await phoneService.detail(product.id);
       const variant = detail.variants?.find((item) => item.stockQuantity > 0);
       if (!variant) {
@@ -65,6 +70,8 @@ export default function ProductCard({ product, className }: Props) {
       message.success(`Đã thêm ${product.name} vào giỏ hàng`);
     } catch (error) {
       message.error(error instanceof Error ? error.message : 'Không thể thêm vào giỏ hàng');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -94,10 +101,25 @@ export default function ProductCard({ product, className }: Props) {
       <div className="px-3 pb-3">
         <button
           onClick={handleAddToCart}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-green-600 py-2 text-xs font-medium text-white opacity-0 transition-all hover:bg-green-700 group-hover:opacity-100"
+          disabled={isSubmitting}
+          className={cn(
+            'flex w-full items-center justify-center gap-1.5 rounded-lg bg-green-600 py-2 text-xs font-medium text-white transition-all',
+            isSubmitting
+              ? 'cursor-not-allowed opacity-90'
+              : 'opacity-0 hover:bg-green-700 group-hover:opacity-100'
+          )}
         >
-          <ShoppingCart className="h-3.5 w-3.5" />
-          Thêm vào giỏ
+          {isSubmitting ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Đang thêm...
+            </>
+          ) : (
+            <>
+              <ShoppingCart className="h-3.5 w-3.5" />
+              Thêm vào giỏ
+            </>
+          )}
         </button>
       </div>
     </div>
