@@ -27,6 +27,19 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: greenphone-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --save "" --appendonly no
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build: ./GreenPhone-Backend
     container_name: greenphone-backend
@@ -38,8 +51,12 @@ services:
       DB_URL: ${DB_URL:-jdbc:mysql://mysql:3306/greenphone?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true}
       DB_USERNAME: ${DB_USERNAME:-root}
       DB_PASSWORD: ${DB_PASSWORD:-root}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
     depends_on:
       mysql:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:

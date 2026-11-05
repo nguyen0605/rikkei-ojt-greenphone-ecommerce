@@ -4,6 +4,8 @@ import com.re.greenphone.entity.Settings;
 import com.re.greenphone.repository.SettingsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +31,7 @@ public class SettingsService {
 
     private final SettingsRepository settingsRepository;
 
+    @Cacheable(value = "settings", key = "'public'")
     @Transactional(readOnly = true)
     public Map<String, String> getPublicSettings() {
         return settingsRepository.findAll().stream()
@@ -46,6 +49,7 @@ public class SettingsService {
     }
 
     /** Admin: bulk upsert settings. */
+    @CacheEvict(value = "settings", allEntries = true)
     public Map<String, String> updateSettings(Map<String, String> values) {
         if (values == null || values.isEmpty()) {
             return getPublicSettings();

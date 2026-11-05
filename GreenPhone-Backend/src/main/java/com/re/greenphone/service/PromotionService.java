@@ -13,6 +13,7 @@ import com.re.greenphone.repository.UserRepository;
 import com.re.greenphone.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -103,5 +104,31 @@ public class PromotionService {
 
         up = userPromotionRepository.save(up);
         return userPromotionMapper.toDto(up);
+    }
+
+    @Cacheable(value = "promotions", key = "'public'")
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getPublicPromotions() {
+        LocalDateTime now = LocalDateTime.now();
+        return promotionRepository.findAll().stream()
+                .filter(p -> "ACTIVE".equals(p.getStatus())
+                        && p.getStartDate().isBefore(now)
+                        && p.getEndDate().isAfter(now))
+                .sorted(Comparator.comparing(Promotion::getEndDate).reversed())
+                .map(p -> {
+                    Map<String, Object> m = new java.util.HashMap<>();
+                    m.put("id", p.getId());
+                    m.put("code", p.getCode());
+                    m.put("name", p.getName());
+                    m.put("description", p.getDescription());
+                    m.put("discountType", p.getDiscountType());
+                    m.put("discountValue", p.getDiscountValue());
+                    m.put("maxDiscountAmount", p.getMaxDiscountAmount());
+                    m.put("minOrderValue", p.getMinOrderValue());
+                    m.put("startDate", p.getStartDate() != null ? p.getStartDate().toString() : null);
+                    m.put("endDate", p.getEndDate() != null ? p.getEndDate().toString() : null);
+                    return m;
+                })
+                .toList();
     }
 }
