@@ -5,6 +5,7 @@ import com.re.greenphone.mapper.BannerMapper;
 import com.re.greenphone.repository.BannerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,7 @@ public class BannerService {
     private final BannerRepository bannerRepository;
     private final BannerMapper bannerMapper;
 
+    @Cacheable(value = "banners", key = "'active'")
     public List<BannerDTO> getActiveBanners() {
         return bannerMapper.toDtoList(bannerRepository.findByStatus("ACTIVE"));
     }
