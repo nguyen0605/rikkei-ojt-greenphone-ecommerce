@@ -42,18 +42,31 @@ public class AuthController {
 
     @PostMapping("/verify-otp")
     public ResponseEntity<ApiResponse<?>> verifyOTP(@RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(ApiResponse.success(authService.verifyOTP(body.get("email"), body.get("otp"))));
+        String email = body != null ? body.get("email") : null;
+        String otp = body != null ? body.get("otp") : null;
+        return ResponseEntity.ok(ApiResponse.success(authService.verifyOTP(email, otp)));
+    }
+
+    @PostMapping("/resend-otp")
+    public ResponseEntity<ApiResponse<?>> resendOTP(@RequestBody Map<String, String> body) {
+        String email = body != null ? body.get("email") : null;
+        authService.resendOTP(email);
+        return ResponseEntity.ok(ApiResponse.success("OTP sent to email"));
     }
 
     @PostMapping("/forgot-password")
     public ResponseEntity<ApiResponse<?>> forgotPassword(@RequestBody Map<String, String> body) {
-        authService.forgotPassword(body.get("email"));
+        String email = body != null ? body.get("email") : null;
+        authService.forgotPassword(email);
         return ResponseEntity.ok(ApiResponse.success("OTP sent to email"));
     }
 
     @PostMapping("/reset-password")
     public ResponseEntity<ApiResponse<?>> resetPassword(@RequestBody Map<String, String> body) {
-        authService.resetPassword(body.get("email"), body.get("otp"), body.get("newPassword"));
+        String email = body != null ? body.get("email") : null;
+        String otp = body != null ? body.get("otp") : null;
+        String newPassword = body != null ? body.get("newPassword") : null;
+        authService.resetPassword(email, otp, newPassword);
         return ResponseEntity.ok(ApiResponse.success("Password reset successfully"));
     }
 }
