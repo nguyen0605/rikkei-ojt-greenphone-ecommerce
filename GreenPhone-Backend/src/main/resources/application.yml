@@ -6,6 +6,11 @@ spring:
     baseline-on-migrate: true
     baseline-version: 0
     locations: classpath:db/migration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 3000ms
   datasource:
     # connectionTimeZone=UTC: JVM runs UTC and writes LocalDateTime (UTC wall clock)
     # into datetime columns; pin the MySQL session tz to UTC so comparisons (e.g.
@@ -47,3 +52,4 @@ jwt:
 logging:
   level:
     com.re.greenphone: ${LOG_LEVEL:DEBUG}
+
