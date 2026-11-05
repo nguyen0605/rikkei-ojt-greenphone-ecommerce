@@ -97,7 +97,9 @@ export default function AppRoutes() {
         <Route path={ROUTES.ADMIN_PRODUCTS} element={withSuspense(AdminProductsPage)} />
         <Route path={ROUTES.ADMIN_INVENTORY} element={withSuspense(AdminInventoryPage)} />
         <Route path={ROUTES.ADMIN_BRANDS} element={withSuspense(AdminBrandsPage)} />
+        <Route path={ROUTES.ADMIN_BRANDS_EN} element={withSuspense(AdminBrandsPage)} />
         <Route path={ROUTES.ADMIN_OPTIONS} element={withSuspense(AdminOptionsPage)} />
+        <Route path={ROUTES.ADMIN_OPTIONS_EN} element={withSuspense(AdminOptionsPage)} />
         <Route path={ROUTES.ADMIN_ORDERS} element={withSuspense(AdminOrdersPage)} />
         <Route path={ROUTES.ADMIN_CUSTOMERS} element={withSuspense(AdminUsersPage)} />
         <Route path={ROUTES.ADMIN_REVIEWS} element={withSuspense(AdminReviewsPage)} />

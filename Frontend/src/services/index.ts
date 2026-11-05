@@ -1,3 +1,4 @@
+export { adminCatalogService } from './adminCatalogService';
 export { authService, userService } from "./authService";
 import { get, post, put, del } from './api';
 import type {

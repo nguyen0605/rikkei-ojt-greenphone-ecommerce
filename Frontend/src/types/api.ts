@@ -118,6 +118,7 @@ export interface BrandDTO {
   name: string;
   logoUrl: string;
   status: string;
+  productCount?: number;
 }
 
 // Banner
@@ -407,7 +408,7 @@ export interface PhoneVariantRequest {
 
 export interface BrandRequest {
   name: string;
-  logoUrl: string;
+  logoUrl?: string;
 }
 
 export interface BannerRequest {
