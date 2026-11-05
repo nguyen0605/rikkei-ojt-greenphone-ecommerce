@@ -20,8 +20,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ApiResponse<Void>> handleAppException(AppException ex) {
-        log.error("AppException: {} - {}", ex.getStatus(), ex.getMessage());
-        ApiResponse<Void> response = ApiResponse.error(ex.getStatus().value(), ex.getMessage());
+        log.error("AppException: {} - {} (errorCode: {})", ex.getStatus(), ex.getMessage(), ex.getErrorCode());
+        ApiResponse<Void> response = ApiResponse.error(ex.getStatus().value(), ex.getMessage(), ex.getErrorCode());
         return new ResponseEntity<>(response, ex.getStatus());
     }
 
