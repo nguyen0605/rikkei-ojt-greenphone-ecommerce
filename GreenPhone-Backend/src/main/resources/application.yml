@@ -60,5 +60,6 @@ logging:
 
 app:
   order:
-    timeout-minutes: ${ORDER_TIMEOUT_MINUTES:15}
+    timeout-minutes: ${ORDER_TIMEOUT_MINUTES:10}
+
 

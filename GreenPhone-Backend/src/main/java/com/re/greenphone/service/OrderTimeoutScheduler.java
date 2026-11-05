@@ -3,8 +3,10 @@ package com.re.greenphone.service;
 import com.re.greenphone.entity.Order;
 import com.re.greenphone.entity.OrderDetail;
 import com.re.greenphone.entity.PhoneVariant;
+import com.re.greenphone.entity.UserPromotion;
 import com.re.greenphone.repository.OrderRepository;
 import com.re.greenphone.repository.PhoneVariantRepository;
+import com.re.greenphone.repository.UserPromotionRepository;
 import com.re.greenphone.service.admin.InventoryStockHistoryService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
@@ -20,7 +22,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * Auto-cancels PENDING orders that have been unpaid for more than configured timeout minutes (default 15).
+ * Auto-cancels PENDING orders that have been unpaid for more than configured timeout minutes (default 10).
  */
 @Slf4j
 @Component
@@ -32,10 +34,11 @@ public class OrderTimeoutScheduler {
     private final OrderRepository orderRepository;
     private final PhoneVariantRepository phoneVariantRepository;
     private final InventoryStockHistoryService inventoryStockHistoryService;
+    private final UserPromotionRepository userPromotionRepository;
     private final EntityManager entityManager;
 
-    @Value("${app.order.timeout-minutes:15}")
-    private int timeoutMinutes = 15;
+    @Value("${app.order.timeout-minutes:10}")
+    private int timeoutMinutes = 10;
 
     /**
      * Runs every 60 seconds. Cancels orders that are PENDING + UNPAID for > timeoutMinutes
@@ -93,6 +96,15 @@ public class OrderTimeoutScheduler {
                 phoneVariantRepository.save(locked);
             }
         }
+
+        // Restore voucher/promotion if applied
+        UserPromotion up = fresh.getUserPromotion();
+        if (up != null) {
+            up.setStatus("AVAILABLE");
+            up.setUsedAt(null);
+            userPromotionRepository.save(up);
+        }
+
         fresh.setOrderStatus("CANCELLED");
         fresh.setPaymentStatus("UNPAID");
         fresh.setNote("Quá hạn thanh toán " + timeoutMinutes + " phút");
