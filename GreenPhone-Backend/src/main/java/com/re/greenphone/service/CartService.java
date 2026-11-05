@@ -3,6 +3,7 @@ package com.re.greenphone.service;
 import com.re.greenphone.common.exception.BadRequestException;
 import com.re.greenphone.common.exception.ResourceNotFoundException;
 import com.re.greenphone.dto.request.CartItemRequest;
+import com.re.greenphone.dto.request.CartSyncRequest;
 import com.re.greenphone.dto.response.CartDTO;
 import com.re.greenphone.entity.Cart;
 import com.re.greenphone.entity.CartItem;
@@ -34,6 +35,67 @@ public class CartService {
         Cart cart = cartRepository.findByUserId(user.getId())
                 .orElseGet(() -> createCart(user));
         return cartMapper.toDto(cart);
+    }
+
+    /**
+     * BE2-01: Sync and merge client guest cart with the authenticated user's database cart.
+     * Rule: Never exceed available stockQuantity, never drop existing user items, and accumulate quantities.
+     */
+    public CartDTO syncCart(CartSyncRequest request) {
+        User user = getUser();
+        Cart cart = cartRepository.findByUserId(user.getId())
+                .orElseGet(() -> createCart(user));
+
+        if (request == null || request.getItems() == null || request.getItems().isEmpty()) {
+            return cartMapper.toDto(cart);
+        }
+
+        for (CartItemRequest itemReq : request.getItems()) {
+            if (itemReq.getPhoneVariantId() == null) {
+                continue;
+            }
+            int incomingQty = itemReq.getQuantity() != null && itemReq.getQuantity() > 0 ? itemReq.getQuantity() : 1;
+
+            PhoneVariant variant = phoneVariantRepository.findById(itemReq.getPhoneVariantId())
+                    .orElse(null);
+            if (variant == null || !"ACTIVE".equalsIgnoreCase(variant.getStatus())) {
+                log.warn("Variant {} not found or inactive, skipping sync", itemReq.getPhoneVariantId());
+                continue;
+            }
+
+            int stock = variant.getStockQuantity() != null ? variant.getStockQuantity() : 0;
+            if (stock <= 0) {
+                log.warn("Variant {} is out of stock (stock={}), skipping sync", variant.getId(), stock);
+                continue;
+            }
+
+            var existingItemOpt = cart.getCartItems().stream()
+                    .filter(i -> i.getPhoneVariant().getId().equals(variant.getId()))
+                    .findFirst();
+
+            if (existingItemOpt.isPresent()) {
+                CartItem existingItem = existingItemOpt.get();
+                int combinedQty = existingItem.getQuantity() + incomingQty;
+                // Cap at available stock to strictly prevent overselling while preserving items
+                int finalQty = Math.min(combinedQty, stock);
+                if (finalQty > 0) {
+                    existingItem.setQuantity(finalQty);
+                }
+            } else {
+                int finalQty = Math.min(incomingQty, stock);
+                if (finalQty > 0) {
+                    CartItem newItem = CartItem.builder()
+                            .cart(cart)
+                            .phoneVariant(variant)
+                            .quantity(finalQty)
+                            .build();
+                    cart.getCartItems().add(newItem);
+                }
+            }
+        }
+
+        Cart savedCart = cartRepository.save(cart);
+        return cartMapper.toDto(savedCart);
     }
 
     public CartDTO addItem(CartItemRequest request) {
