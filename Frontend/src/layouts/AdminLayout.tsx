@@ -4,7 +4,7 @@ import {
   DashboardOutlined, PhoneOutlined, TagOutlined, ShoppingCartOutlined,
   UserOutlined, StarOutlined, GiftOutlined, PictureOutlined,
   LogoutOutlined, MenuFoldOutlined, MenuUnfoldOutlined, SettingOutlined,
-  MenuOutlined, TagsOutlined,
+  MenuOutlined, TagsOutlined, DatabaseOutlined,
 } from '@ant-design/icons';
 import { Button } from 'antd';
 import RequireAuth from '@/components/auth/RequireAuth';
@@ -20,6 +20,7 @@ const menu = [
   { to: '/admin', label: 'Tổng quan', icon: <DashboardOutlined />, end: true },
   { to: '/admin/don-hang', label: 'Đơn hàng', icon: <ShoppingCartOutlined /> },
   { to: '/admin/san-pham', label: 'Sản phẩm', icon: <PhoneOutlined /> },
+  { to: '/admin/ton-kho', label: 'Tồn kho', icon: <DatabaseOutlined /> },
   { to: '/admin/hang', label: 'Hãng', icon: <TagOutlined /> },
   { to: '/admin/tuy-chon', label: 'Tùy chọn', icon: <TagsOutlined /> },
   { to: '/admin/khach-hang', label: 'Khách hàng', icon: <UserOutlined /> },
@@ -30,9 +31,9 @@ const menu = [
 ];
 
 const MAIN_GROUP = menu.slice(0, 1);
-const CATALOG_GROUP = menu.slice(1, 6);
-const PROMO_GROUP = menu.slice(6, 9);
-const SYSTEM_GROUP = menu.slice(9);
+const CATALOG_GROUP = menu.slice(1, 7);
+const PROMO_GROUP = menu.slice(7, 10);
+const SYSTEM_GROUP = menu.slice(10);
 
 function NavItem({ m, collapsed, onNavigate }: { m: (typeof menu)[number]; collapsed: boolean; onNavigate: (path: string) => void }) {
   return (

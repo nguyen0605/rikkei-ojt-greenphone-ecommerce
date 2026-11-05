@@ -5,7 +5,6 @@ import com.re.greenphone.entity.OptionItem;
 import com.re.greenphone.entity.PhoneVariant;
 import com.re.greenphone.repository.PhoneVariantRepository;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -166,9 +165,5 @@ public class ConcurrencyTest {
         // In a real scenario with proper idempotency, only one order should be created
     }
 
-    @Test
-    @Disabled("Requires MySQL integration container — see controller/OrderConcurrencyIT")
-    void concurrentOrderCreationWithLastItem_RequiresMySQLIntegration() {
-        // This test is documented for completeness, actual test in OrderConcurrencyIT
-    }
+    // Database-backed stock contention is covered by InventoryStockConcurrencyIT.
 }

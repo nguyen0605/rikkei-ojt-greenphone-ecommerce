@@ -12,11 +12,16 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.client.RestTemplate;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Transactional
 public abstract class BaseIntegrationTest extends MySQLTestContainer {
+
+    // Each integration test supplies its own fixtures, independent of demo seed data.
+    @MockitoBean
+    protected DataInitializer dataInitializer;
 
     @LocalServerPort
     protected int port;

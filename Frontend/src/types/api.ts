@@ -80,6 +80,30 @@ export interface PhoneVariantDTO {
   status: string;
 }
 
+export interface InventoryHistoryItemDTO {
+  id: number;
+  changeType: 'IMPORT' | 'EXPORT' | 'ADJUSTMENT';
+  quantityBefore: number;
+  quantityChange: number;
+  quantityAfter: number;
+  reason: string;
+  changedByUserId: number | null;
+  changedByName: string;
+  createdAt: string;
+}
+
+export interface InventoryHistoryDTO {
+  variantId: number;
+  currentStock: number;
+  entries: InventoryHistoryItemDTO[];
+}
+
+export interface InventoryStockMovementRequest {
+  changeType: 'IMPORT' | 'EXPORT';
+  quantity: number;
+  reason: string;
+}
+
 export interface PhoneImageDTO {
   id: number;
   phoneId: number;
