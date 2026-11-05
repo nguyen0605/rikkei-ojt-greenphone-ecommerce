@@ -25,6 +25,7 @@ export const ROUTES = {
   // Customer account
   ACCOUNT: '/tai-khoan',
   ACCOUNT_PROFILE: '/tai-khoan/thong-tin',
+  ACCOUNT_ADDRESSES: '/tai-khoan/dia-chi',
   ACCOUNT_ORDERS: '/tai-khoan/don-hang',
   ACCOUNT_REVIEWS: '/tai-khoan/danh-gia',
   ACCOUNT_WISHLIST: '/tai-khoan/yeu-thich',
