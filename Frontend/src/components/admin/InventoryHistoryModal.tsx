@@ -49,7 +49,7 @@ export default function InventoryHistoryModal({ variant, open, onClose }: Invent
       footer={null}
       width={1050}
     >
-      {isError && <Alert type="error" showIcon message="Không thể tải lịch sử tồn kho" className="mb-4" />}
+      {isError && <Alert type="error" showIcon title="Không thể tải lịch sử tồn kho" className="mb-4" />}
       <div className="mb-4 rounded-xl bg-bg-soft px-4 py-3 text-sm">
         Tồn kho hiện tại: <strong className="text-primary-600">{data?.currentStock ?? '—'}</strong> máy
       </div>
