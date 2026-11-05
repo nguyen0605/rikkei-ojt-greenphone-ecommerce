@@ -8,6 +8,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { updateShipping } from '@/store/slices/checkoutSlice';
+import { userService, formatFullAddress } from '@/services';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 
@@ -34,6 +35,35 @@ export default function ShippingForm() {
   useEffect(() => {
     if (userEmail) {
       dispatch(updateShipping({ email: userEmail }));
+    }
+    // Tự động đồng bộ địa chỉ giao hàng mặc định từ Sổ địa chỉ nếu chưa điền
+    if (!shipping.address && !shipping.fullName) {
+      userService.getAddresses().then((addresses) => {
+        const defaultAddr = addresses.find((a) => a.isDefault) || addresses[0];
+        if (defaultAddr) {
+          const fullAddr = formatFullAddress(defaultAddr);
+          dispatch(
+            updateShipping({
+              fullName: defaultAddr.receiverName,
+              phone: defaultAddr.receiverPhone,
+              address: fullAddr,
+              province: defaultAddr.province,
+              district: defaultAddr.district || '',
+              ward: defaultAddr.ward || '',
+            })
+          );
+        }
+      }).catch(() => {
+        if (authUser && !shipping.fullName) {
+          dispatch(
+            updateShipping({
+              fullName: authUser.fullName,
+              phone: authUser.phone || '',
+              address: authUser.address || '',
+            })
+          );
+        }
+      });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

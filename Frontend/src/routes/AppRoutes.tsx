@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactElement } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Spin } from 'antd';
 import DefaultLayout from '@/layouts/DefaultLayout';
 import CheckoutLayout from '@/layouts/CheckoutLayout';
@@ -25,6 +25,7 @@ const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage'));
 const ForgotPasswordPage = lazy(() => import('@/pages/auth/ForgotPasswordPage'));
 const VerifyOTPPage = lazy(() => import('@/pages/auth/VerifyOTPPage'));
 const AccountProfilePage = lazy(() => import('@/pages/account/AccountProfilePage'));
+const AddressBookPage = lazy(() => import('@/pages/account/AddressBookPage'));
 const AccountOrdersPage = lazy(() => import('@/pages/account/AccountOrdersPage'));
 const AccountOrderDetailPage = lazy(() => import('@/pages/account/AccountOrderDetailPage'));
 const AccountReviewsPage = lazy(() => import('@/pages/account/AccountReviewsPage'));
@@ -84,11 +85,19 @@ export default function AppRoutes() {
 
       {/* Account Layout */}
       <Route element={<AccountLayout />}>
+        <Route path={ROUTES.ACCOUNT} element={<Navigate to={ROUTES.ACCOUNT_PROFILE} replace />} />
         <Route path={ROUTES.ACCOUNT_PROFILE} element={withSuspense(AccountProfilePage)} />
+        <Route path={ROUTES.ACCOUNT_ADDRESSES} element={withSuspense(AddressBookPage)} />
         <Route path={ROUTES.ACCOUNT_ORDERS} element={withSuspense(AccountOrdersPage)} />
         <Route path="/tai-khoan/don-hang/:id" element={withSuspense(AccountOrderDetailPage)} />
         <Route path={ROUTES.ACCOUNT_REVIEWS} element={withSuspense(AccountReviewsPage)} />
         <Route path={ROUTES.ACCOUNT_CHANGE_PASSWORD} element={withSuspense(AccountPasswordPage)} />
+        {/* Aliases for English /account routes */}
+        <Route path="/account" element={<Navigate to={ROUTES.ACCOUNT_PROFILE} replace />} />
+        <Route path="/account/profile" element={<Navigate to={ROUTES.ACCOUNT_PROFILE} replace />} />
+        <Route path="/account/addresses" element={<Navigate to={ROUTES.ACCOUNT_ADDRESSES} replace />} />
+        <Route path="/account/orders" element={<Navigate to={ROUTES.ACCOUNT_ORDERS} replace />} />
+        <Route path="/account/change-password" element={<Navigate to={ROUTES.ACCOUNT_CHANGE_PASSWORD} replace />} />
       </Route>
 
       {/* Admin Layout */}

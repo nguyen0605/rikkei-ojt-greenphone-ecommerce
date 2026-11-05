@@ -5,7 +5,7 @@ import { isTokenValid } from '@/utils/jwt';
 import type { LoginRequest, RegisterRequest } from '@/types/api';
 
 interface AuthState {
-  user: { id: number; email: string; fullName: string; role: string } | null;
+  user: { id: number; email: string; fullName: string; role: string; avatar?: string; phone?: string; address?: string } | null;
   token: string | null;
   isAuthenticated: boolean;
   loading: boolean;
@@ -51,7 +51,7 @@ export const loginThunk = createAsyncThunk('auth/login', async (data: LoginReque
 });
 
 export const registerThunk = createAsyncThunk('auth/register', async (data: RegisterRequest) => {
-  const res = await authService.register(data);
+  await authService.register(data);
   return { email: data.email };
 });
 
@@ -70,6 +70,12 @@ const authSlice = createSlice({
   reducers: {
     clearError(state) {
       state.error = null;
+    },
+    updateUserProfile(state, action: PayloadAction<{ fullName?: string; phone?: string; address?: string; avatar?: string }>) {
+      if (state.user) {
+        state.user = { ...state.user, ...action.payload };
+        localStorage.setItem('greenphone.user', JSON.stringify(state.user));
+      }
     },
     logout(state) {
       state.user = null;
@@ -90,7 +96,7 @@ const authSlice = createSlice({
         localStorage.setItem('greenphone.token', action.payload.token);
         localStorage.setItem('greenphone.user', JSON.stringify(state.user));
         if (action.payload.remember) {
-          state.rememberedEmail = action.meta.arg.email || (action.meta.arg as any).emailOrPhone;
+          state.rememberedEmail = action.meta.arg.email || (action.meta.arg as { email?: string; emailOrPhone?: string }).emailOrPhone || null;
           localStorage.setItem('greenphone.rememberedEmail', state.rememberedEmail || '');
         }
       })
@@ -118,5 +124,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError, logout } = authSlice.actions;
+export const { clearError, logout, updateUserProfile } = authSlice.actions;
 export default authSlice.reducer;
