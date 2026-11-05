@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, App, Alert } from 'antd';
-import { ShieldCheck, KeyRound, ArrowLeft, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { KeyRound, ArrowLeft, RefreshCw, CheckCircle2 } from 'lucide-react';
 import authHeroImg from '@/assets/auth_img.jpg';
 import { useAuthLayout } from './AuthLayout';
 import { cn } from '@/utils';
@@ -18,11 +18,11 @@ export default function VerifyOTPpage() {
   const { message } = App.useApp();
   const [searchParams] = useSearchParams();
   const email = searchParams.get('email') || '';
-  const { loading, error, isAuthenticated } = useAppSelector((s) => s.auth);
+  const { loading, error, errorCode, isAuthenticated } = useAppSelector((s) => s.auth);
 
   const { setConfig } = useAuthLayout();
   useEffect(() => {
-    setConfig({ title: 'Xác thực tài khoản', subtitle: 'Nhập mã OTP 6 số được gỽi đến email của bạn.', heroImage: authHeroImg });
+    setConfig({ title: 'Xác thực tài khoản', subtitle: 'Nhập mã OTP 6 số được gửi đến email của bạn.', heroImage: authHeroImg });
   }, [setConfig]);
 
   useEffect(() => {
@@ -36,9 +36,7 @@ export default function VerifyOTPpage() {
   const [resendCooldown, setResendCooldown] = useState(0);
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
 
-  const isLocked = Boolean(
-    error && (error.includes('quá số lần quy định') || error.includes('tạm khóa') || error.includes('hủy'))
-  );
+  const isLocked = errorCode === 'ACCOUNT_LOCKED';
 
   useEffect(() => {
     if (isLocked) {
@@ -75,7 +73,7 @@ export default function VerifyOTPpage() {
   const handleResend = async () => {
     if (resendCooldown > 0) return;
     setResendCooldown(60);
-    try { await post('/auth/resend-otp', { email }); message.success('Đã gỽi lại mã OTP'); } catch { message.error('Không thể gửi lại mã'); }
+    try { await post('/auth/resend-otp', { email }); message.success('Đã gửi lại mã OTP'); } catch { message.error('Không thể gửi lại mã'); }
   };
 
   return (
@@ -144,4 +142,3 @@ export default function VerifyOTPpage() {
     </>
   );
 }
-

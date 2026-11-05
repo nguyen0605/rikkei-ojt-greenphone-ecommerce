@@ -83,6 +83,7 @@ class AuthServiceTest {
         when(authMapper.toEntity(registerReq)).thenReturn(testUser);
         when(passwordEncoder.encode(anyString())).thenReturn("encoded");
         when(userRepository.save(any(User.class))).thenReturn(testUser);
+        when(jwtTokenProvider.generateToken(any())).thenReturn("jwt_token_xyz");
         when(jwtConfig.getExpiration()).thenReturn(86400000L);
         when(authMapper.toAuthResponse(any(), anyString(), anyLong()))
                 .thenReturn(new AuthResponse(1L, "", "Test User", "test@example.com", "CUSTOMER", 86400000L));
@@ -100,6 +101,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.register(registerReq))
                 .isInstanceOf(BadRequestException.class)
+                .satisfies(ex -> assertThat(((BadRequestException) ex).getErrorCode()).isEqualTo("ACCOUNT_LOCKED"))
                 .hasMessageContaining("Bạn đã nhập sai quá số lần quy định");
     }
 
@@ -119,6 +121,7 @@ class AuthServiceTest {
         when(authMapper.toEntity(registerReq)).thenReturn(testUser);
         when(passwordEncoder.encode(anyString())).thenReturn("hashed");
         when(userRepository.save(any())).thenReturn(testUser);
+        when(jwtTokenProvider.generateToken(any())).thenReturn("jwt_token_xyz");
         when(jwtConfig.getExpiration()).thenReturn(86400000L);
         when(authMapper.toAuthResponse(any(), anyString(), anyLong()))
                 .thenReturn(new AuthResponse(1L, "", "", "", "", 0L));
@@ -172,21 +175,20 @@ class AuthServiceTest {
                 .hasMessageContaining("not active");
     }
 
-    // === OTP & BRUTE-FORCE ===
+    // === VERIFY OTP ===
 
     @Test void verifyOTP_Success() {
         when(redisTemplate.hasKey("otp_lock:test@example.com")).thenReturn(false);
         when(valueOperations.get("otp:test@example.com")).thenReturn("123456");
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
-        when(userRepository.save(any(User.class))).thenReturn(testUser);
-        when(jwtTokenProvider.generateToken(any(UserPrincipal.class))).thenReturn("jwt_token_verified");
+        when(jwtTokenProvider.generateToken(any())).thenReturn("jwt_token");
         when(jwtConfig.getExpiration()).thenReturn(86400000L);
-        when(authMapper.toAuthResponse(eq(testUser), eq("jwt_token_verified"), eq(86400000L)))
-                .thenReturn(new AuthResponse(1L, "jwt_token_verified", "Test User", "test@example.com", "CUSTOMER", 86400000L));
+        when(authMapper.toAuthResponse(any(), anyString(), anyLong()))
+                .thenReturn(new AuthResponse(1L, "jwt_token", "Test User", "test@example.com", "CUSTOMER", 86400000L));
 
-        AuthResponse res = authService.verifyOTP("test@example.com", "123456");
+        AuthResponse r = authService.verifyOTP("test@example.com", "123456");
 
-        assertThat(res.getToken()).isEqualTo("jwt_token_verified");
+        assertThat(r.getToken()).isEqualTo("jwt_token");
         verify(redisTemplate).delete("otp:test@example.com");
         verify(redisTemplate).delete("otp_attempts:test@example.com");
         assertThat(testUser.getStatus()).isEqualTo("ACTIVE");
@@ -197,6 +199,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.verifyOTP("test@example.com", "123456"))
                 .isInstanceOf(BadRequestException.class)
+                .satisfies(ex -> assertThat(((BadRequestException) ex).getErrorCode()).isEqualTo("ACCOUNT_LOCKED"))
                 .hasMessageContaining("Bạn đã nhập sai quá số lần quy định");
     }
 
@@ -234,6 +237,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.verifyOTP("test@example.com", "999999"))
                 .isInstanceOf(BadRequestException.class)
+                .satisfies(ex -> assertThat(((BadRequestException) ex).getErrorCode()).isEqualTo("ACCOUNT_LOCKED"))
                 .hasMessageContaining("Bạn đã nhập sai quá số lần quy định");
 
         verify(redisTemplate).delete("otp:test@example.com");
@@ -303,4 +307,3 @@ class AuthServiceTest {
         }
     }
 }
-

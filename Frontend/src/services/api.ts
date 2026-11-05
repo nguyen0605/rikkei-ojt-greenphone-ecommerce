@@ -35,6 +35,9 @@ api.interceptors.response.use(
     if (error.response?.data?.message) {
       error.message = error.response.data.message;
     }
+    if (error.response?.data?.errorCode) {
+      error.errorCode = error.response.data.errorCode;
+    }
     return Promise.reject(error);
   },
 );

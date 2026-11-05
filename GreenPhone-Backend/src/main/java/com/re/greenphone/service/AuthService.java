@@ -8,6 +8,7 @@ import com.re.greenphone.config.JwtConfig;
 import com.re.greenphone.dto.request.LoginRequest;
 import com.re.greenphone.dto.request.RegisterRequest;
 import com.re.greenphone.dto.response.AuthResponse;
+import com.re.greenphone.dto.response.UserDTO;
 import com.re.greenphone.entity.Role;
 import com.re.greenphone.entity.User;
 import com.re.greenphone.enums.RoleName;
@@ -34,6 +35,8 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Transactional
 public class AuthService {
+
+    public static final String ERROR_CODE_ACCOUNT_LOCKED = "ACCOUNT_LOCKED";
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -63,25 +66,29 @@ public class AuthService {
             throw new ConflictException("Email already registered");
         }
 
+        // Customer self-registration is ALWAYS CUSTOMER role
         Role customerRole = roleRepository.findByName(RoleName.CUSTOMER.name())
-                .orElseThrow(() -> new ResourceNotFoundException("Role not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + RoleName.CUSTOMER.name()));
 
         User user = authMapper.toEntity(request);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setStatus("UNVERIFIED");
         user.setRole(customerRole);
-        user = userRepository.save(user);
+        user.setStatus("ACTIVE"); // simplified flow
 
+        User saved = userRepository.save(user);
+
+        // Generate 6-digit OTP and cache in Redis with 5-minute TTL
         String otp = generateOTP();
-        redisTemplate.opsForValue().set(OTP_PREFIX + request.getEmail(), otp, OTP_TTL);
-        redisTemplate.delete(OTP_ATTEMPTS_PREFIX + request.getEmail());
-        log.info("[OTP] Verification code for {}: {}", request.getEmail(), otp);
-        emailService.sendOTP(request.getEmail(), otp);
+        redisTemplate.opsForValue().set(OTP_PREFIX + saved.getEmail(), otp, OTP_TTL);
+        redisTemplate.delete(OTP_ATTEMPTS_PREFIX + saved.getEmail());
+        log.info("[OTP] Generated verification code for {}: {}", saved.getEmail(), otp);
+        emailService.sendOTP(saved.getEmail(), otp);
 
-        return authMapper.toAuthResponse(user, "", jwtConfig.getExpiration());
+        String token = jwtTokenProvider.generateToken(UserPrincipal.create(saved));
+        return authMapper.toAuthResponse(saved, token, jwtConfig.getExpiration());
     }
 
-    // ===== LOGIN — manual verification, no AuthenticationManager =====
+    // ===== LOGIN =====
 
     public AuthResponse login(LoginRequest request) {
         // Don't reveal whether email exists → use same error message for both cases
@@ -101,16 +108,20 @@ public class AuthService {
         return authMapper.toAuthResponse(user, token, jwtConfig.getExpiration());
     }
 
-    // ===== CURRENT USER =====
+    // ===== ME =====
 
-    public com.re.greenphone.dto.response.UserDTO getCurrentUser() {
+    @Transactional(readOnly = true)
+    public UserDTO getCurrentUser() {
         UserPrincipal principal = SecurityUtils.getCurrentUser();
+        if (principal == null) {
+            throw new UnauthorizedException("Not authenticated");
+        }
         User user = userRepository.findByEmail(principal.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return userMapper.toDto(user);
     }
 
-    // ===== OTP VERIFICATION & BRUTE-FORCE PROTECTION =====
+    // ===== OTP VERIFICATION =====
 
     public AuthResponse verifyOTP(String email, String otp) {
         validateAndConsumeOTP(email, otp);
@@ -169,7 +180,7 @@ public class AuthService {
                 long minutes = (ttlSeconds + 59) / 60;
                 waitTime = minutes > 1 ? minutes + " phút" : ttlSeconds + " giây";
             }
-            throw new BadRequestException("Bạn đã nhập sai quá số lần quy định. Tài khoản đang tạm khóa bảo mật, vui lòng yêu cầu mã mới sau " + waitTime + ".");
+            throw new BadRequestException("Bạn đã nhập sai quá số lần quy định. Tài khoản đang tạm khóa bảo mật, vui lòng yêu cầu mã mới sau " + waitTime + ".", ERROR_CODE_ACCOUNT_LOCKED);
         }
     }
 
@@ -197,7 +208,7 @@ public class AuthService {
                 redisTemplate.delete(OTP_ATTEMPTS_PREFIX + email);
                 redisTemplate.opsForValue().set(OTP_LOCK_PREFIX + email, "LOCKED", LOCK_TTL);
                 log.warn("Tài khoản {} đã nhập sai OTP quá {} lần. Mã OTP đã bị hủy và khóa 15 phút.", email, MAX_ATTEMPTS);
-                throw new BadRequestException("Bạn đã nhập sai quá số lần quy định. Mã xác thực đã bị hủy để bảo vệ tài khoản, vui lòng yêu cầu mã mới sau 15 phút.");
+                throw new BadRequestException("Bạn đã nhập sai quá số lần quy định. Mã xác thực đã bị hủy để bảo vệ tài khoản, vui lòng yêu cầu mã mới sau 15 phút.", ERROR_CODE_ACCOUNT_LOCKED);
             } else {
                 long remaining = MAX_ATTEMPTS - currentAttempts;
                 throw new BadRequestException("Mã OTP không chính xác. Bạn còn " + remaining + " lần thử.");
@@ -214,5 +225,3 @@ public class AuthService {
         return String.valueOf(otp);
     }
 }
-
-

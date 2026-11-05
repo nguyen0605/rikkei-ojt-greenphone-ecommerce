@@ -1,16 +1,19 @@
 package com.re.greenphone.controller;
 
 import com.re.greenphone.common.dto.ApiResponse;
-import com.re.greenphone.dto.request.RegisterRequest;
+import com.re.greenphone.dto.request.ForgotPasswordRequest;
 import com.re.greenphone.dto.request.LoginRequest;
+import com.re.greenphone.dto.request.RegisterRequest;
+import com.re.greenphone.dto.request.ResendOtpRequest;
+import com.re.greenphone.dto.request.ResetPasswordRequest;
+import com.re.greenphone.dto.request.VerifyOtpRequest;
+import com.re.greenphone.dto.response.AuthResponse;
 import com.re.greenphone.service.AuthService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -41,32 +44,25 @@ public class AuthController {
     }
 
     @PostMapping("/verify-otp")
-    public ResponseEntity<ApiResponse<?>> verifyOTP(@RequestBody Map<String, String> body) {
-        String email = body != null ? body.get("email") : null;
-        String otp = body != null ? body.get("otp") : null;
-        return ResponseEntity.ok(ApiResponse.success(authService.verifyOTP(email, otp)));
+    public ResponseEntity<ApiResponse<AuthResponse>> verifyOTP(@Valid @RequestBody VerifyOtpRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(authService.verifyOTP(request.getEmail(), request.getOtp())));
     }
 
     @PostMapping("/resend-otp")
-    public ResponseEntity<ApiResponse<?>> resendOTP(@RequestBody Map<String, String> body) {
-        String email = body != null ? body.get("email") : null;
-        authService.resendOTP(email);
+    public ResponseEntity<ApiResponse<String>> resendOTP(@Valid @RequestBody ResendOtpRequest request) {
+        authService.resendOTP(request.getEmail());
         return ResponseEntity.ok(ApiResponse.success("OTP sent to email"));
     }
 
     @PostMapping("/forgot-password")
-    public ResponseEntity<ApiResponse<?>> forgotPassword(@RequestBody Map<String, String> body) {
-        String email = body != null ? body.get("email") : null;
-        authService.forgotPassword(email);
+    public ResponseEntity<ApiResponse<String>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request.getEmail());
         return ResponseEntity.ok(ApiResponse.success("OTP sent to email"));
     }
 
     @PostMapping("/reset-password")
-    public ResponseEntity<ApiResponse<?>> resetPassword(@RequestBody Map<String, String> body) {
-        String email = body != null ? body.get("email") : null;
-        String otp = body != null ? body.get("otp") : null;
-        String newPassword = body != null ? body.get("newPassword") : null;
-        authService.resetPassword(email, otp, newPassword);
+    public ResponseEntity<ApiResponse<String>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request.getEmail(), request.getOtp(), request.getNewPassword());
         return ResponseEntity.ok(ApiResponse.success("Password reset successfully"));
     }
 }
