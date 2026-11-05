@@ -7,8 +7,10 @@ import com.re.greenphone.common.pagination.PageResponse;
 import com.re.greenphone.dto.request.ReviewRequest;
 import com.re.greenphone.dto.response.ReviewDTO;
 import com.re.greenphone.entity.*;
+import com.re.greenphone.mapper.OrderMapper;
 import com.re.greenphone.mapper.ReviewMapper;
 import com.re.greenphone.repository.OrderDetailRepository;
+import com.re.greenphone.repository.OrderRepository;
 import com.re.greenphone.repository.PhoneRepository;
 import com.re.greenphone.repository.ReviewRepository;
 import com.re.greenphone.repository.UserRepository;
@@ -22,7 +24,9 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -30,6 +34,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,6 +44,8 @@ class ReviewServiceTest {
     @Mock private ReviewRepository reviewRepository;
     @Mock private PhoneRepository phoneRepository;
     @Mock private UserRepository userRepository;
+    @Mock private OrderRepository orderRepository;
+    @Mock private OrderMapper orderMapper;
     @Mock private ReviewMapper reviewMapper;
 
     @InjectMocks
@@ -48,6 +55,7 @@ class ReviewServiceTest {
     private User otherUser;
     private Phone testPhone;
     private PhoneVariant testVariant;
+    private Order testOrder;
     private OrderDetail testOrderDetail;
     private Review testReview;
     private ReviewRequest validReviewReq;
@@ -82,12 +90,22 @@ class ReviewServiceTest {
                 .build();
         testVariant.setId(20L);
 
+        testOrder = Order.builder()
+                .user(testUser)
+                .orderStatus("DELIVERED")
+                .orderDetails(new ArrayList<>())
+                .build();
+        testOrder.setId(100L);
+
         testOrderDetail = OrderDetail.builder()
+                .order(testOrder)
                 .phoneVariant(testVariant)
                 .quantity(1)
                 .unitPrice(new java.math.BigDecimal("25000000"))
                 .build();
         testOrderDetail.setId(30L);
+
+        testOrder.getOrderDetails().add(testOrderDetail);
 
         testReview = Review.builder()
                 .user(testUser)
@@ -95,7 +113,7 @@ class ReviewServiceTest {
                 .orderDetail(testOrderDetail)
                 .rating(5)
                 .content("Great phone!")
-                .status("SHOW")
+                .status("APPROVED")
                 .build();
         testReview.setId(40L);
 
@@ -108,16 +126,19 @@ class ReviewServiceTest {
     // === CREATE REVIEW ===
 
     @Test
-    void createReview_Success() {
+    void createReview_Success_WithOrderDetailId() {
         try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
             mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
             when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
             when(orderDetailRepository.findById(30L)).thenReturn(Optional.of(testOrderDetail));
-            when(reviewRepository.existsByUserIdAndPhoneId(1L, 10L)).thenReturn(false);
+            when(reviewRepository.existsByOrderDetailId(30L)).thenReturn(false);
+            when(reviewRepository.existsByOrderIdAndPhoneId(100L, 10L)).thenReturn(false);
             when(reviewRepository.save(any(Review.class))).thenReturn(testReview);
 
             ReviewDTO dto = new ReviewDTO();
             dto.setId(40L);
+            dto.setOrderDetailId(30L);
+            dto.setStatus("APPROVED");
             dto.setContent("Great phone!");
             when(reviewMapper.toDto(testReview)).thenReturn(dto);
 
@@ -125,21 +146,94 @@ class ReviewServiceTest {
 
             assertThat(result).isNotNull();
             assertThat(result.getId()).isEqualTo(40L);
+            assertThat(result.getStatus()).isEqualTo("APPROVED");
             verify(reviewRepository).save(any(Review.class));
         }
     }
 
     @Test
-    void createReview_DuplicateReview() {
+    void createReview_Success_WithPhoneIdOnly() {
+        try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
+            mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+            when(phoneRepository.findById(10L)).thenReturn(Optional.of(testPhone));
+            when(orderRepository.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(testOrder));
+            when(reviewRepository.existsByOrderIdAndPhoneId(100L, 10L)).thenReturn(false);
+            when(reviewRepository.existsByOrderDetailId(30L)).thenReturn(false);
+            when(reviewRepository.save(any(Review.class))).thenReturn(testReview);
+
+            ReviewRequest phoneOnlyReq = ReviewRequest.builder()
+                    .phoneId(10L)
+                    .rating(5)
+                    .content("Phone only review")
+                    .build();
+
+            ReviewDTO dto = new ReviewDTO();
+            dto.setId(40L);
+            dto.setStatus("APPROVED");
+            when(reviewMapper.toDto(testReview)).thenReturn(dto);
+
+            ReviewDTO result = reviewService.createReview(phoneOnlyReq);
+
+            assertThat(result).isNotNull();
+            verify(reviewRepository).save(any(Review.class));
+        }
+    }
+
+    @Test
+    void createReview_OrderNotDelivered_ThrowsBadRequest() {
+        try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
+            mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            testOrder.setOrderStatus("SHIPPING");
+            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+            when(orderDetailRepository.findById(30L)).thenReturn(Optional.of(testOrderDetail));
+
+            assertThatThrownBy(() -> reviewService.createReview(validReviewReq))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("Chỉ được đánh giá sản phẩm sau khi đã nhận hàng thành công.");
+        }
+    }
+
+    @Test
+    void createReview_NotOwnerOfOrder_ThrowsBadRequest() {
+        try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
+            mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            testOrder.setUser(otherUser);
+            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+            when(orderDetailRepository.findById(30L)).thenReturn(Optional.of(testOrderDetail));
+
+            assertThatThrownBy(() -> reviewService.createReview(validReviewReq))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("Chỉ được đánh giá sản phẩm sau khi đã nhận hàng thành công.");
+        }
+    }
+
+    @Test
+    void createReview_DuplicateOrderDetail_ThrowsBadRequest() {
         try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
             mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
             when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
             when(orderDetailRepository.findById(30L)).thenReturn(Optional.of(testOrderDetail));
-            when(reviewRepository.existsByUserIdAndPhoneId(1L, 10L)).thenReturn(true);
+            when(reviewRepository.existsByOrderDetailId(30L)).thenReturn(true);
 
             assertThatThrownBy(() -> reviewService.createReview(validReviewReq))
                     .isInstanceOf(BadRequestException.class)
-                    .hasMessageContaining("already reviewed");
+                    .hasMessageContaining("Chi tiết đơn hàng này đã được đánh giá.");
+        }
+    }
+
+    @Test
+    void createReview_DuplicateOrderForSamePhone_ThrowsBadRequest() {
+        try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
+            mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+            when(orderDetailRepository.findById(30L)).thenReturn(Optional.of(testOrderDetail));
+            when(reviewRepository.existsByOrderDetailId(30L)).thenReturn(false);
+            when(reviewRepository.existsByOrderIdAndPhoneId(100L, 10L)).thenReturn(true);
+
+            assertThatThrownBy(() -> reviewService.createReview(validReviewReq))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("Đơn hàng này đã được đánh giá cho sản phẩm này.");
         }
     }
 
@@ -154,6 +248,26 @@ class ReviewServiceTest {
 
             assertThatThrownBy(() -> reviewService.createReview(validReviewReq))
                     .isInstanceOf(ResourceNotFoundException.class);
+        }
+    }
+
+    @Test
+    void createReview_ByPhoneId_NoDeliveredOrder_ThrowsBadRequest() {
+        try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
+            mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+            when(phoneRepository.findById(10L)).thenReturn(Optional.of(testPhone));
+            when(orderRepository.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of());
+
+            ReviewRequest phoneOnlyReq = ReviewRequest.builder()
+                    .phoneId(10L)
+                    .rating(5)
+                    .content("Phone only review")
+                    .build();
+
+            assertThatThrownBy(() -> reviewService.createReview(phoneOnlyReq))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("Chỉ được đánh giá sản phẩm sau khi đã nhận hàng thành công.");
         }
     }
 
@@ -205,30 +319,63 @@ class ReviewServiceTest {
         }
     }
 
+    // === GET REVIEWS BY PHONE ID ===
+
+    @Test
+    void getReviewsByPhoneId_FiltersApprovedAndShow() {
+        Page<Review> page = new PageImpl<>(List.of(testReview));
+        when(reviewRepository.findByPhoneIdAndStatusIn(eq(10L), eq(List.of("APPROVED", "SHOW")), any(Pageable.class)))
+                .thenReturn(page);
+        when(reviewMapper.toDtoList(any())).thenReturn(List.of(new ReviewDTO()));
+
+        PageResponse<ReviewDTO> result = reviewService.getReviewsByPhoneId(10L, new PageRequest(0, 10, "id", "desc"));
+
+        assertThat(result.getContent()).hasSize(1);
+        verify(reviewRepository).findByPhoneIdAndStatusIn(eq(10L), eq(List.of("APPROVED", "SHOW")), any(Pageable.class));
+    }
+
     // === GET REVIEW SUMMARY ===
 
     @Test
-    void getReviewSummary_CalculatesAverage() {
+    void getReviewSummary_CalculatesAverageAndAllDistributionLevels() {
         Review r1 = Review.builder().rating(5).build();
         r1.setId(1L);
-        Review r2 = Review.builder().rating(3).build();
+        Review r2 = Review.builder().rating(4).build();
         r2.setId(2L);
 
-        when(reviewRepository.findByPhoneId(10L)).thenReturn(List.of(r1, r2));
+        when(reviewRepository.findByPhoneIdAndStatusIn(10L, List.of("APPROVED", "SHOW"))).thenReturn(List.of(r1, r2));
 
         Map<String, Object> summary = reviewService.getReviewSummary(10L);
 
         assertThat(summary).containsEntry("totalReviews", 2);
-        assertThat((Double) summary.get("averageRating")).isEqualTo(4.0);
+        assertThat((Double) summary.get("averageRating")).isEqualTo(4.5);
+
+        @SuppressWarnings("unchecked")
+        Map<Integer, Long> distribution = (Map<Integer, Long>) summary.get("distribution");
+        assertThat(distribution).isNotNull();
+        assertThat(distribution.get(1)).isEqualTo(0L);
+        assertThat(distribution.get(2)).isEqualTo(0L);
+        assertThat(distribution.get(3)).isEqualTo(0L);
+        assertThat(distribution.get(4)).isEqualTo(1L);
+        assertThat(distribution.get(5)).isEqualTo(1L);
     }
 
     @Test
     void getReviewSummary_NoReviews() {
-        when(reviewRepository.findByPhoneId(10L)).thenReturn(List.of());
+        when(reviewRepository.findByPhoneIdAndStatusIn(10L, List.of("APPROVED", "SHOW"))).thenReturn(List.of());
 
         Map<String, Object> summary = reviewService.getReviewSummary(10L);
 
         assertThat(summary).containsEntry("totalReviews", 0);
         assertThat((Double) summary.get("averageRating")).isEqualTo(0.0);
+
+        @SuppressWarnings("unchecked")
+        Map<Integer, Long> distribution = (Map<Integer, Long>) summary.get("distribution");
+        assertThat(distribution).isNotNull();
+        assertThat(distribution.get(1)).isEqualTo(0L);
+        assertThat(distribution.get(2)).isEqualTo(0L);
+        assertThat(distribution.get(3)).isEqualTo(0L);
+        assertThat(distribution.get(4)).isEqualTo(0L);
+        assertThat(distribution.get(5)).isEqualTo(0L);
     }
 }
