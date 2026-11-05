@@ -1,4 +1,4 @@
-import { Button, Tag } from 'antd';
+import { Button, Tag, message } from 'antd';
 import { Star, Truck, ShieldCheck, Gift, ShoppingCart } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -6,8 +6,7 @@ import type { Product } from '@/types';
 import { formatVND, formatSold } from '@/utils';
 import { QuantitySelector } from '@/components/common';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { addCartItem } from '@/store/slices/cartSlice';
-import { message } from 'antd';
+import { addCartItem, addToCart } from '@/store/slices/cartSlice';
 
 interface ProductInfoProps {
   product: Product;
@@ -26,39 +25,57 @@ export default function ProductInfo({ product }: ProductInfoProps) {
     product.price + (selectedStorage?.priceModifier || 0);
 
   const handleAddToCart = async () => {
-    if (!isAuthenticated) {
-      navigate('/dang-nhap', { state: { from: window.location.pathname + window.location.search } });
-      return;
-    }
     const variantId = Number(selectedColor?.id || selectedStorage?.id);
     if (!Number.isFinite(variantId) || variantId <= 0) {
-      messageApi.error('Vui lÃ²ng chá»n phiÃªn báº£n sáº£n pháº©m há»£p lá»‡');
+      messageApi.error('Vui lòng chọn phiên bản sản phẩm hợp lệ');
+      return;
+    }
+    if (!isAuthenticated) {
+      dispatch(
+        addToCart({
+          product,
+          variantId,
+          quantity,
+          color: selectedColor?.name,
+          storage: selectedStorage?.capacity,
+        }),
+      );
+      messageApi.success('Đã thêm sản phẩm vào giỏ hàng');
       return;
     }
     try {
       await dispatch(addCartItem({ phoneVariantId: variantId, quantity })).unwrap();
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : 'KhÃ´ng thá»ƒ thÃªm vÃ o giá» hÃ ng');
+      messageApi.error(error instanceof Error ? error.message : 'Không thể thêm vào giỏ hàng');
       return;
     }
     messageApi.success('Đã thêm sản phẩm vào giỏ hàng');
   };
 
   const handleBuyNow = async () => {
-    if (!isAuthenticated) {
-      navigate('/dang-nhap', { state: { from: window.location.pathname + window.location.search } });
-      return;
-    }
     const variantId = Number(selectedColor?.id || selectedStorage?.id);
     if (!Number.isFinite(variantId) || variantId <= 0) {
-      messageApi.error('Vui lÃ²ng chá»n phiÃªn báº£n sáº£n pháº©m há»£p lá»‡');
+      messageApi.error('Vui lòng chọn phiên bản sản phẩm hợp lệ');
+      return;
+    }
+    if (!isAuthenticated) {
+      dispatch(
+        addToCart({
+          product,
+          variantId,
+          quantity,
+          color: selectedColor?.name,
+          storage: selectedStorage?.capacity,
+        }),
+      );
+      navigate('/thanh-toan');
       return;
     }
     try {
       await dispatch(addCartItem({ phoneVariantId: variantId, quantity })).unwrap();
       navigate('/thanh-toan');
     } catch (error) {
-      messageApi.error(error instanceof Error ? error.message : 'KhÃ´ng thá»ƒ thÃªm vÃ o giá» hÃ ng');
+      messageApi.error(error instanceof Error ? error.message : 'Không thể thêm vào giỏ hàng');
     }
   };
 
