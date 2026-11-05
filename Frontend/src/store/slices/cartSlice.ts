@@ -78,7 +78,15 @@ async function fetchCartState(): Promise<CartState> {
   return mapCart(await cartService.get());
 }
 
-export const loadCart = createAsyncThunk('cart/load', fetchCartState);
+export const loadCart = createAsyncThunk('cart/load', async (_, thunkAPI) => {
+  const getAuth = () => (thunkAPI.getState() as { auth?: { user?: { id: number } | null; token?: string | null } }).auth;
+  const auth = getAuth();
+  const cart = await fetchCartState();
+  if (getAuth()?.user?.id !== auth?.user?.id || getAuth()?.token !== auth?.token) {
+    return thunkAPI.rejectWithValue('Cart session changed');
+  }
+  return cart;
+});
 
 export const addCartItem = createAsyncThunk(
   'cart/addItem',
@@ -90,7 +98,14 @@ export const addCartItem = createAsyncThunk(
 
 export const updateCartItem = createAsyncThunk(
   'cart/updateItem',
-  async (data: { id: string; quantity: number }) => {
+  async (data: { id: string; quantity: number }, thunkAPI) => {
+    const state = thunkAPI.getState() as { auth?: { isAuthenticated: boolean }; cart: CartState };
+    if (!state.auth?.isAuthenticated || !Number.isInteger(Number(data.id))) {
+      const items = state.cart.items.map((i) =>
+        i.id === data.id ? { ...i, quantity: Math.max(1, data.quantity) } : i,
+      );
+      return { items, appliedVoucher: state.cart.appliedVoucher };
+    }
     await cartService.updateItem(Number(data.id), data.quantity);
     return fetchCartState();
   },
@@ -98,13 +113,22 @@ export const updateCartItem = createAsyncThunk(
 
 export const removeCartItem = createAsyncThunk(
   'cart/removeItem',
-  async (id: string) => {
+  async (id: string, thunkAPI) => {
+    const state = thunkAPI.getState() as { auth?: { isAuthenticated: boolean }; cart: CartState };
+    if (!state.auth?.isAuthenticated || !Number.isInteger(Number(id))) {
+      const items = state.cart.items.filter((i) => i.id !== id);
+      return { items, appliedVoucher: state.cart.appliedVoucher };
+    }
     await cartService.removeItem(Number(id));
     return fetchCartState();
   },
 );
 
-export const clearCartRemote = createAsyncThunk('cart/clearRemote', async () => {
+export const clearCartRemote = createAsyncThunk('cart/clearRemote', async (_, thunkAPI) => {
+  const state = thunkAPI.getState() as { auth?: { isAuthenticated: boolean } };
+  if (!state.auth?.isAuthenticated) {
+    return initialState;
+  }
   await cartService.clear();
   return initialState;
 });

@@ -1,18 +1,40 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ShoppingCart } from 'lucide-react';
 import { App } from 'antd';
-import type { PhoneDTO } from '@/types/api';
+import type { PhoneDTO, PhoneDetailDTO, PhoneVariantDTO } from '@/types/api';
+import type { Product } from '@/types';
 import { cn, getOptimizedImageUrl, formatVND } from '@/utils';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { addCartItem } from '@/store/slices/cartSlice';
+import { addCartItem, addToCart } from '@/store/slices/cartSlice';
 import { phoneService } from '@/services';
 
 interface Props { product: PhoneDTO; className?: string; }
 
+function toProduct(phone: PhoneDetailDTO, variant: PhoneVariantDTO): Product {
+  return {
+    id: String(phone.id),
+    slug: phone.name.toLowerCase().replace(/\s+/g, '-'),
+    name: phone.name,
+    brand: (phone.brandName || '').toLowerCase() as Product['brand'],
+    category: 'smartphone',
+    price: variant.discountPrice ?? variant.price,
+    originalPrice: variant.discountPrice ? variant.price : undefined,
+    rating: phone.avgRating || 0,
+    reviewCount: phone.reviewCount || 0,
+    sold: 0,
+    images: phone.images?.map((i) => i.imageUrl) || [phone.mainImageUrl || ''],
+    thumbnail: phone.images?.[0]?.imageUrl || phone.mainImageUrl || '',
+    colors: phone.variants?.map((v) => ({ id: String(v.id), name: v.color, hex: '#000' })) || [],
+    storage: phone.variants?.map((v) => ({ id: String(v.id), capacity: v.storage })) || [],
+    description: phone.description || '',
+    specifications: [],
+    features: [],
+    inStock: variant.stockQuantity > 0,
+  };
+}
+
 export default function ProductCard({ product, className }: Props) {
   const dispatch = useAppDispatch();
-  const navigate = useNavigate();
-  const location = useLocation();
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const { message } = App.useApp();
   const imgUrl = getOptimizedImageUrl(product.mainImageUrl || '', { width: 400, height: 400 });
@@ -20,23 +42,30 @@ export default function ProductCard({ product, className }: Props) {
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!isAuthenticated) {
-      navigate('/dang-nhap', { state: { from: location.pathname + location.search } });
-      return;
-    }
     try {
       const detail = await phoneService.detail(product.id);
       const variant = detail.variants?.find((item) => item.stockQuantity > 0);
       if (!variant) {
-        message.warning('Sáº£n pháº©m nÃ y hiá»‡n Ä‘Ã£ háº¿t hÃ ng');
+        message.warning('Sản phẩm này hiện đã hết hàng');
         return;
       }
-      await dispatch(addCartItem({ phoneVariantId: variant.id, quantity: 1 })).unwrap();
+      if (!isAuthenticated) {
+        dispatch(
+          addToCart({
+            product: toProduct(detail, variant),
+            variantId: variant.id,
+            quantity: 1,
+            color: variant.color,
+            storage: variant.storage,
+          }),
+        );
+      } else {
+        await dispatch(addCartItem({ phoneVariantId: variant.id, quantity: 1 })).unwrap();
+      }
+      message.success(`Đã thêm ${product.name} vào giỏ hàng`);
     } catch (error) {
-      message.error(error instanceof Error ? error.message : 'KhÃ´ng thá»ƒ thÃªm vÃ o giá» hÃ ng');
-      return;
+      message.error(error instanceof Error ? error.message : 'Không thể thêm vào giỏ hàng');
     }
-    message.success(`Đã thêm ${product.name} vào giỏ hàng`);
   };
 
   return (

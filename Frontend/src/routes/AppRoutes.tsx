@@ -6,7 +6,6 @@ import CheckoutLayout from '@/layouts/CheckoutLayout';
 import AccountLayout from '@/layouts/AccountLayout';
 import AdminLayout from '@/layouts/AdminLayout';
 import AuthLayout from '@/pages/auth/AuthLayout';
-import RequireAuth from '@/components/auth/RequireAuth';
 import { ROUTES } from './routePaths';
 
 const HomePage = lazy(() => import('@/pages/HomePage'));
@@ -61,7 +60,7 @@ export default function AppRoutes() {
         <Route path={ROUTES.PRODUCTS} element={withSuspense(ProductsPage)} />
         <Route path={ROUTES.PRODUCT_DETAIL()} element={withSuspense(ProductDetailPage)} />
         <Route path={ROUTES.VOUCHERS} element={withSuspense(VouchersPage)} />
-        <Route path={ROUTES.CART} element={<RequireAuth>{withSuspense(CartPage)}</RequireAuth>} />
+        <Route path={ROUTES.CART} element={withSuspense(CartPage)} />
         <Route path={ROUTES.DIEU_KHOAN} element={withSuspense(TermsPage)} />
         <Route path={ROUTES.CHINH_SACH_BAO_MAT} element={withSuspense(PrivacyPage)} />
         <Route path="*" element={withSuspense(NotFoundPage)} />

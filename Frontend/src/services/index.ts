@@ -1,7 +1,7 @@
 export { authService, userService } from "./authService";
 import { get, post, put, del } from './api';
 import type {
-  CartDTO, CartItemRequest, OrderDTO, OrderRequest,
+  CartDTO, CartItemRequest, CartSyncRequest, OrderDTO, OrderRequest,
   PaymentDTO, PaymentQRInfo, PromotionDTO, UserPromotionDTO, AvailablePromotionDTO, ReviewDTO,
   ReviewSummary, PageResponse, PhoneDTO, PhoneDetailDTO,
   PhoneVariantDTO, PhoneImageDTO, BrandDTO, BannerDTO,
@@ -43,6 +43,7 @@ export const reviewService = {
 // Cart
 export const cartService = {
   get: () => get<CartDTO>('/cart'),
+  sync: (data: CartSyncRequest) => post<CartDTO>('/cart/sync', data),
   addItem: (data: CartItemRequest) => post<CartDTO>('/cart/items', data),
   updateItem: (id: number, quantity: number) => put<CartDTO>('/cart/items/' + id, { quantity }),
   removeItem: (id: number) => del<CartDTO>('/cart/items/' + id),

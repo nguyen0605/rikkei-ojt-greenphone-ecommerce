@@ -152,6 +152,10 @@ export interface CartItemRequest {
   quantity: number;
 }
 
+export interface CartSyncRequest {
+  items: CartItemRequest[];
+}
+
 // Order
 export interface OrderItemRequest {
   phoneVariantId: number;

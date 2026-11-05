@@ -6,7 +6,7 @@ import { ShoppingCart, Truck, ShieldCheck, RefreshCw, Headphones, CheckCircle, S
 import { Breadcrumb, ProductCard } from '@/components/common';
 import { phoneService, reviewService } from '@/services';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { addCartItem } from '@/store/slices/cartSlice';
+import { addCartItem, addToCart } from '@/store/slices/cartSlice';
 import { formatVND } from '@/utils';
 import type { PhoneDetailDTO, PhoneVariantDTO, PhoneImageDTO, ReviewDTO, ReviewSummary } from '@/types/api';
 import type { Product } from '@/types';
@@ -95,19 +95,26 @@ export default function ProductDetailPage() {
   const activeImage = images[Math.min(activeImageIndex, images.length - 1)]?.imageUrl || phone.mainImageUrl;
 
   const handleAddToCart = async () => {
-    if (!isAuthenticated) {
-      navigate('/dang-nhap', { state: { from: location.pathname + location.search } });
-      return;
-    }
     if (!selectedVariant) return;
     if (selectedVariant.stockQuantity <= 0) {
       message.warning('Sản phẩm này đã hết hàng');
       return;
     }
+    if (!isAuthenticated) {
+      dispatch(addToCart({
+        product: toProduct(phone, selectedVariant),
+        variantId: selectedVariant.id,
+        quantity: 1,
+        color: selectedVariant.color,
+        storage: selectedVariant.storage,
+      }));
+      message.success(`Đã thêm ${phone.name} vào giỏ hàng`);
+      return;
+    }
     try {
       await dispatch(addCartItem({ phoneVariantId: selectedVariant.id, quantity: 1 })).unwrap();
     } catch (error) {
-      message.error(error instanceof Error ? error.message : 'KhÃ´ng thá»ƒ thÃªm vÃ o giá» hÃ ng');
+      message.error(error instanceof Error ? error.message : 'Không thể thêm vào giỏ hàng');
       return;
     }
     message.success(`Đã thêm ${phone.name} vào giỏ hàng`);
