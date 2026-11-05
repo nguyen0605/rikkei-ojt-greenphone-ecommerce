@@ -5,6 +5,9 @@ import com.re.greenphone.entity.OrderDetail;
 import com.re.greenphone.entity.PhoneVariant;
 import com.re.greenphone.repository.OrderRepository;
 import com.re.greenphone.repository.PhoneVariantRepository;
+import com.re.greenphone.service.admin.InventoryStockHistoryService;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import jakarta.persistence.OptimisticLockException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +31,8 @@ public class OrderTimeoutScheduler {
 
     private final OrderRepository orderRepository;
     private final PhoneVariantRepository phoneVariantRepository;
+    private final InventoryStockHistoryService inventoryStockHistoryService;
+    private final EntityManager entityManager;
 
     @Value("${app.order.timeout-minutes:15}")
     private int timeoutMinutes = 15;
@@ -78,8 +83,13 @@ public class OrderTimeoutScheduler {
             PhoneVariant variant = detail.getPhoneVariant();
             if (variant != null && variant.getStockQuantity() != null) {
                 PhoneVariant locked = phoneVariantRepository.findByIdWithLock(variant.getId())
-                        .orElse(variant);
-                locked.setStockQuantity(locked.getStockQuantity() + detail.getQuantity());
+                        .orElseThrow(() -> new IllegalStateException("Inventory variant not found: " + variant.getId()));
+                // OrderDetail eagerly loads variants; reload stock after acquiring the lock
+                // rather than reusing a possibly stale entity from the persistence context.
+                entityManager.refresh(locked, LockModeType.PESSIMISTIC_WRITE);
+                int quantityBefore = locked.getStockQuantity();
+                locked.setStockQuantity(quantityBefore + detail.getQuantity());
+                inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Hoàn kho do đơn hết hạn");
                 phoneVariantRepository.save(locked);
             }
         }

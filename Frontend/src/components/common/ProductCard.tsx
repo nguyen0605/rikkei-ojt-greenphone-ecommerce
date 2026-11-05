@@ -1,48 +1,78 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingCart } from 'lucide-react';
+import { ShoppingCart, Loader2 } from 'lucide-react';
 import { App } from 'antd';
-import type { PhoneDTO } from '@/types/api';
+import type { PhoneDTO, PhoneDetailDTO, PhoneVariantDTO } from '@/types/api';
 import type { Product } from '@/types';
 import { cn, getOptimizedImageUrl, formatVND } from '@/utils';
-import { useAppDispatch } from '@/store/hooks';
-import { addToCart } from '@/store/slices/cartSlice';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { addCartItem, addToCart } from '@/store/slices/cartSlice';
+import { phoneService } from '@/services';
 
 interface Props { product: PhoneDTO; className?: string; }
 
-function phoneToProduct(p: PhoneDTO): Product {
-  const mainUrl = getOptimizedImageUrl(p.mainImageUrl || '', { width: 400, height: 400 });
+function toProduct(phone: PhoneDetailDTO, variant: PhoneVariantDTO): Product {
   return {
-    id: String(p.id),
-    slug: p.name.toLowerCase().replace(/\s+/g, '-'),
-    name: p.name,
-    brand: (p.brandName || '').toLowerCase() as Product['brand'],
+    id: String(phone.id),
+    slug: phone.name.toLowerCase().replace(/\s+/g, '-'),
+    name: phone.name,
+    brand: (phone.brandName || '').toLowerCase() as Product['brand'],
     category: 'smartphone',
-    price: p.lowestPrice || 0,
-    rating: 0,
-    reviewCount: 0,
+    price: variant.discountPrice ?? variant.price,
+    originalPrice: variant.discountPrice ? variant.price : undefined,
+    rating: phone.avgRating || 0,
+    reviewCount: phone.reviewCount || 0,
     sold: 0,
-    images: [mainUrl],
-    thumbnail: mainUrl,
-    colors: [],
-    storage: [],
-    description: '',
+    images: phone.images?.map((i) => i.imageUrl) || [phone.mainImageUrl || ''],
+    thumbnail: phone.images?.[0]?.imageUrl || phone.mainImageUrl || '',
+    colors: phone.variants?.map((v) => ({ id: String(v.id), name: v.color, hex: '#000' })) || [],
+    storage: phone.variants?.map((v) => ({ id: String(v.id), capacity: v.storage })) || [],
+    description: phone.description || '',
     specifications: [],
     features: [],
-    inStock: true,
+    inStock: variant.stockQuantity > 0,
   };
 }
 
 export default function ProductCard({ product, className }: Props) {
   const dispatch = useAppDispatch();
+  const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const { message } = App.useApp();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const imgUrl = getOptimizedImageUrl(product.mainImageUrl || '', { width: 400, height: 400 });
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const prod = phoneToProduct(product);
-    dispatch(addToCart({ product: prod, quantity: 1 }));
-    message.success(`Đã thêm ${product.name} vào giỏ hàng`);
+    if (isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      const detail = await phoneService.detail(product.id);
+      const variant = detail.variants?.find((item) => item.stockQuantity > 0);
+      if (!variant) {
+        message.warning('Sản phẩm này hiện đã hết hàng');
+        return;
+      }
+      if (!isAuthenticated) {
+        dispatch(
+          addToCart({
+            product: toProduct(detail, variant),
+            variantId: variant.id,
+            quantity: 1,
+            color: variant.color,
+            storage: variant.storage,
+          }),
+        );
+      } else {
+        await dispatch(addCartItem({ phoneVariantId: variant.id, quantity: 1 })).unwrap();
+      }
+      message.success(`Đã thêm ${product.name} vào giỏ hàng`);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : 'Không thể thêm vào giỏ hàng');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -71,10 +101,25 @@ export default function ProductCard({ product, className }: Props) {
       <div className="px-3 pb-3">
         <button
           onClick={handleAddToCart}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-green-600 py-2 text-xs font-medium text-white opacity-0 transition-all hover:bg-green-700 group-hover:opacity-100"
+          disabled={isSubmitting}
+          className={cn(
+            'flex w-full items-center justify-center gap-1.5 rounded-lg bg-green-600 py-2 text-xs font-medium text-white transition-all',
+            isSubmitting
+              ? 'cursor-not-allowed opacity-90'
+              : 'opacity-0 hover:bg-green-700 group-hover:opacity-100'
+          )}
         >
-          <ShoppingCart className="h-3.5 w-3.5" />
-          Thêm vào giỏ
+          {isSubmitting ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Đang thêm...
+            </>
+          ) : (
+            <>
+              <ShoppingCart className="h-3.5 w-3.5" />
+              Thêm vào giỏ
+            </>
+          )}
         </button>
       </div>
     </div>

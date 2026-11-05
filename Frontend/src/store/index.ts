@@ -10,6 +10,7 @@ import {
   REGISTER,
 } from 'redux-persist';
 import rootReducer from './rootReducer';
+import { persistGuestCart, readGuestCart } from './guestCartStorage';
 
 // Build a web storage adapter using localStorage directly — avoids CJS/ESM
 // interop issues with redux-persist/lib/storage in Vite.
@@ -19,9 +20,9 @@ const createLocalStorage = () => {
 
   if (!isBrowser) {
     return {
-      getItem: (_key: string) => Promise.resolve(null as string | null),
+      getItem: () => Promise.resolve(null as string | null),
       setItem: (_key: string, value: string) => Promise.resolve(value),
-      removeItem: (_key: string) => Promise.resolve(),
+      removeItem: () => Promise.resolve(),
     };
   }
 
@@ -61,10 +62,16 @@ const persistConfig = {
   key: 'greenphone-root',
   version: 1,
   storage,
-  whitelist: ['cart', 'wishlist', 'checkout'], // persist cart, wishlist, và checkout (shipping info)
+  // Cart and checkout are user/session scoped. Cart is hydrated from the
+  // authenticated user's backend cart, while checkout must start at step 1
+  // for every new order.
+  whitelist: ['wishlist'],
 };
 
-const persistedReducer = persistReducer(persistConfig, rootReducer);
+const initialState = { ...rootReducer(undefined, { type: '@@INIT' }), cart: readGuestCart() };
+const persistedReducer = persistReducer(persistConfig,
+  (state: ReturnType<typeof rootReducer> | undefined, action: Parameters<typeof rootReducer>[1]) =>
+    rootReducer(state ?? initialState, action));
 
 export const store = configureStore({
   reducer: persistedReducer,
@@ -76,6 +83,7 @@ export const store = configureStore({
     }),
 });
 
+persistGuestCart(store);
 export const persistor = persistStore(store);
 
 export type AppDispatch = typeof store.dispatch;

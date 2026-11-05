@@ -2,27 +2,26 @@ package com.re.greenphone.controller;
 
 import com.re.greenphone.config.BaseIntegrationTest;
 import com.re.greenphone.entity.*;
-import com.re.greenphone.repository.PhoneVariantRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
-import java.util.List;
-import java.util.Map;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
  * Integration test for the /api/phones endpoints.
  * Requires Docker for Testcontainers MySQL.
  */
+@AutoConfigureMockMvc
 class PhoneControllerIT extends BaseIntegrationTest {
 
     @Autowired
-    private PhoneVariantRepository phoneVariantRepository;
+    private MockMvc mvc;
 
     private Phone testPhone;
     private PhoneVariant testVariant;
@@ -80,31 +79,30 @@ class PhoneControllerIT extends BaseIntegrationTest {
                 .status("ACTIVE")
                 .build();
         em.persist(testVariant);
+        testPhone.getVariants().add(testVariant);
 
         em.flush();
     }
 
     @Test
-    void getPhones_Returns200_NoAuthRequired() {
-        ResponseEntity<Map> response = doGet("/phones", null, Map.class);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isNotNull();
+    void getPhones_Returns200_NoAuthRequired() throws Exception {
+        mvc.perform(get("/api/phones"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").exists());
     }
 
     @Test
-    void getPhoneDetail_ReturnsPhoneWithVariants() {
-        ResponseEntity<Map> response = doGet("/phones/" + testPhone.getId(), null, Map.class);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().get("data")).isNotNull();
+    void getPhoneDetail_ReturnsPhoneWithVariants() throws Exception {
+        // MockMvc uses the test transaction, so fixtures remain visible and roll back.
+        mvc.perform(get("/api/phones/" + testPhone.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(testPhone.getId()))
+                .andExpect(jsonPath("$.data.variants[0].id").value(testVariant.getId()));
     }
 
     @Test
-    void getPhoneDetail_NotFound() {
-        ResponseEntity<Map> response = doGet("/phones/99999", null, Map.class);
-
-        assertThat(response.getStatusCode().is4xxClientError()).isTrue();
+    void getPhoneDetail_NotFound() throws Exception {
+        mvc.perform(get("/api/phones/99999"))
+                .andExpect(status().isNotFound());
     }
 }

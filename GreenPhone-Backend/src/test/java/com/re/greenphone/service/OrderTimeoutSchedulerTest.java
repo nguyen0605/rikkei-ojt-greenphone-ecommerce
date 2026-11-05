@@ -5,6 +5,9 @@ import com.re.greenphone.entity.OrderDetail;
 import com.re.greenphone.entity.PhoneVariant;
 import com.re.greenphone.repository.OrderRepository;
 import com.re.greenphone.repository.PhoneVariantRepository;
+import com.re.greenphone.service.admin.InventoryStockHistoryService;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import jakarta.persistence.OptimisticLockException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,9 +23,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,13 +37,19 @@ class OrderTimeoutSchedulerTest {
     @Mock
     private PhoneVariantRepository phoneVariantRepository;
 
+    @Mock
+    private InventoryStockHistoryService historyService;
+
+    @Mock
+    private EntityManager entityManager;
+
     @InjectMocks
-    private OrderTimeoutScheduler orderTimeoutScheduler;
+    private OrderTimeoutScheduler scheduler;
 
     @Test
-    @DisplayName("Case 1: Quá hạn 15 phút - Hủy đơn VietQR/Sepay và hoàn trả tồn kho đúng số lượng")
+    @DisplayName("Case 1: Quá hạn 15 phút - Hủy đơn VietQR/Sepay, hoàn trả tồn kho và ghi log lịch sử kho")
     void cancelExpiredPendingOrders_ShouldCancelAndRestoreStock() {
-        ReflectionTestUtils.setField(orderTimeoutScheduler, "timeoutMinutes", 15);
+        ReflectionTestUtils.setField(scheduler, "timeoutMinutes", 15);
 
         PhoneVariant variant = PhoneVariant.builder()
                 .price(new BigDecimal("10000000"))
@@ -72,21 +81,26 @@ class OrderTimeoutSchedulerTest {
         when(phoneVariantRepository.save(any(PhoneVariant.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        orderTimeoutScheduler.cancelExpiredPendingOrders();
+        scheduler.cancelExpiredPendingOrders();
 
         assertEquals("CANCELLED", order.getOrderStatus());
         assertEquals("UNPAID", order.getPaymentStatus());
         assertEquals("Quá hạn thanh toán 15 phút", order.getNote());
         assertEquals(10, variant.getStockQuantity()); // 8 + 2
 
-        verify(phoneVariantRepository).save(variant);
+        var inOrder = inOrder(phoneVariantRepository, entityManager, historyService);
+        inOrder.verify(phoneVariantRepository).findByIdWithLock(100L);
+        inOrder.verify(entityManager).refresh(variant, LockModeType.PESSIMISTIC_WRITE);
+        inOrder.verify(historyService).record(eq(variant), eq(8), eq(2), eq("IMPORT"), anyString());
+        inOrder.verify(phoneVariantRepository).save(variant);
+
         verify(orderRepository).save(order);
     }
 
     @Test
     @DisplayName("Case 2: Đơn đã thanh toán (PAID) - Không bao giờ bị hủy")
     void cancelExpiredPendingOrders_WhenPaid_ShouldNotCancel() {
-        ReflectionTestUtils.setField(orderTimeoutScheduler, "timeoutMinutes", 15);
+        ReflectionTestUtils.setField(scheduler, "timeoutMinutes", 15);
 
         Order paidOrder = Order.builder()
                 .orderStatus("CONFIRMED")
@@ -95,7 +109,6 @@ class OrderTimeoutSchedulerTest {
                 .build();
         paidOrder.setId(10L);
 
-        // Giả sử query ban đầu thấy order nhưng khi vào cancelOne đọc fresh thì đã được webhook thanh toán thành PAID
         Order staleOrder = Order.builder()
                 .orderStatus("PENDING")
                 .paymentStatus("UNPAID")
@@ -109,17 +122,16 @@ class OrderTimeoutSchedulerTest {
 
         when(orderRepository.findById(10L)).thenReturn(Optional.of(paidOrder));
 
-        orderTimeoutScheduler.cancelExpiredPendingOrders();
+        scheduler.cancelExpiredPendingOrders();
 
-        // Không lưu hoặc hủy order đã PAID
+        verifyNoInteractions(phoneVariantRepository, historyService);
         verify(orderRepository, never()).save(paidOrder);
-        verify(phoneVariantRepository, never()).save(any());
     }
 
     @Test
     @DisplayName("Case 3: Đơn thanh toán khi nhận hàng (COD) - Tuyệt đối không hủy")
     void cancelExpiredPendingOrders_CODOrder_ShouldNotCancel() {
-        ReflectionTestUtils.setField(orderTimeoutScheduler, "timeoutMinutes", 15);
+        ReflectionTestUtils.setField(scheduler, "timeoutMinutes", 15);
 
         Order codOrder = Order.builder()
                 .orderStatus("PENDING")
@@ -134,16 +146,17 @@ class OrderTimeoutSchedulerTest {
 
         when(orderRepository.findById(20L)).thenReturn(Optional.of(codOrder));
 
-        orderTimeoutScheduler.cancelExpiredPendingOrders();
+        scheduler.cancelExpiredPendingOrders();
 
         verify(orderRepository, never()).save(codOrder);
         verify(phoneVariantRepository, never()).save(any());
+        verifyNoInteractions(historyService);
     }
 
     @Test
     @DisplayName("Case 4: Xung đột OptimisticLockException - Không crash tiến trình, bỏ qua để round sau xử lý")
     void cancelExpiredPendingOrders_ConcurrentModification_ShouldCatchAndNotThrow() {
-        ReflectionTestUtils.setField(orderTimeoutScheduler, "timeoutMinutes", 15);
+        ReflectionTestUtils.setField(scheduler, "timeoutMinutes", 15);
 
         Order order = Order.builder()
                 .orderStatus("PENDING")
@@ -158,8 +171,7 @@ class OrderTimeoutSchedulerTest {
 
         when(orderRepository.findById(30L)).thenThrow(new OptimisticLockException("Row modified concurrently"));
 
-        // Phải không bị ném exception ra ngoài làm chết Scheduler
-        orderTimeoutScheduler.cancelExpiredPendingOrders();
+        scheduler.cancelExpiredPendingOrders();
 
         verify(orderRepository).findById(30L);
     }

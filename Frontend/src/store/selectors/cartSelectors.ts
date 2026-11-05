@@ -3,7 +3,7 @@ import type { RootState } from '../index';
 
 const selectCartItems = (state: RootState) => state.cart.items;
 const selectAppliedVoucher = (state: RootState) => state.cart.appliedVoucher;
-const selectCheckoutVoucherDiscount = (state: RootState) => state.checkout.voucherDiscount;
+const selectCheckoutVoucherDiscount = (state: RootState) => state.checkout?.voucherDiscount ?? 0;
 const selectSettings = (state: RootState) => state.settings;
 
 export const selectCartItemsList = createSelector(
@@ -39,7 +39,7 @@ export const selectCartSummary = createSelector(
       ? settings.shippingFee
       : toNumber(settings?.values?.SHIPPING_FEE, DEFAULT_SHIPPING_FEE);
     const freeThreshold = toNumber(settings?.values?.FREE_SHIPPING_THRESHOLD, DEFAULT_FREE_SHIPPING_THRESHOLD);
-    const shippingFee = subtotal === 0 || subtotal >= freeThreshold ? 0 : shippingFeeRaw;
+    const shippingFee = subtotal === 0 || subtotal > freeThreshold ? 0 : shippingFeeRaw;
     // Use checkout voucher discount if present, otherwise fall back to cart voucher
     const discount = checkoutDiscount || voucher?.discountAmount || 0;
     const total = Math.max(0, subtotal + shippingFee - discount);

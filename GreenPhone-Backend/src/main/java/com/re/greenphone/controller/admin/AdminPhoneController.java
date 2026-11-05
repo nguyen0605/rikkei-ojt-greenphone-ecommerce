@@ -29,9 +29,10 @@ public class AdminPhoneController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Long brandId,
             @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "false") boolean lowStock,
             PageRequest pageRequest) {
         return ResponseEntity.ok(ApiResponse.success(
-                adminPhoneService.getPhones(keyword, brandId, status, pageRequest)));
+                adminPhoneService.getPhones(keyword, brandId, status, lowStock, pageRequest)));
     }
 
     @GetMapping("/{id}")

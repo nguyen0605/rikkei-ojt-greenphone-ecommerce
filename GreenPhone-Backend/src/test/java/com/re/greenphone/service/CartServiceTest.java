@@ -3,6 +3,7 @@ package com.re.greenphone.service;
 import com.re.greenphone.common.exception.BadRequestException;
 import com.re.greenphone.common.exception.ResourceNotFoundException;
 import com.re.greenphone.dto.request.CartItemRequest;
+import com.re.greenphone.dto.request.CartSyncRequest;
 import com.re.greenphone.dto.response.CartDTO;
 import com.re.greenphone.entity.Cart;
 import com.re.greenphone.entity.CartItem;
@@ -24,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.Optional;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -90,6 +92,104 @@ class CartServiceTest {
                 .build();
         item.setId(id);
         return item;
+    }
+
+    @Test
+    void syncCart_ShouldMergeQuantities_WhenItemAlreadyExistsInCart() {
+        User user = createUser();
+        stubCurrentUser(user);
+        Cart cart = Cart.builder().user(user).build();
+        PhoneVariant variant = createVariant(100L, 10);
+        variant.setStatus("ACTIVE");
+        CartItem existing = createCartItem(1L, cart, variant, 2);
+        cart.getCartItems().add(existing);
+        when(cartRepository.findByUserId(USER_ID)).thenReturn(Optional.of(cart));
+        when(phoneVariantRepository.findById(100L)).thenReturn(Optional.of(variant));
+        when(cartRepository.save(cart)).thenReturn(cart);
+        CartDTO expected = CartDTO.builder().userId(USER_ID).build();
+        when(cartMapper.toDto(cart)).thenReturn(expected);
+
+        assertSame(expected, cartService.syncCart(new CartSyncRequest(List.of(
+                new CartItemRequest(100L, 3)))));
+
+        assertEquals(1, cart.getCartItems().size());
+        assertEquals(5, existing.getQuantity());
+        verify(cartRepository).save(cart);
+    }
+
+    @Test
+    void syncCart_ShouldCapAtAvailableStock_WhenRequestedExceedsStock() {
+        User user = createUser();
+        stubCurrentUser(user);
+        Cart cart = Cart.builder().user(user).build();
+        PhoneVariant variant = createVariant(100L, 4);
+        variant.setStatus("ACTIVE");
+        cart.getCartItems().add(createCartItem(1L, cart, variant, 3));
+        when(cartRepository.findByUserId(USER_ID)).thenReturn(Optional.of(cart));
+        when(phoneVariantRepository.findById(100L)).thenReturn(Optional.of(variant));
+        when(cartRepository.save(cart)).thenReturn(cart);
+
+        cartService.syncCart(new CartSyncRequest(List.of(new CartItemRequest(100L, 8))));
+
+        assertEquals(4, cart.getCartItems().get(0).getQuantity());
+        assertEquals(4, variant.getStockQuantity()); // Sync does not reserve inventory.
+    }
+
+    @Test
+    void syncCart_ShouldSkipInactiveOrOutOfStockVariants() {
+        User user = createUser();
+        stubCurrentUser(user);
+        Cart cart = Cart.builder().user(user).build();
+        PhoneVariant inactive = createVariant(100L, 5);
+        inactive.setStatus("INACTIVE");
+        PhoneVariant soldOut = createVariant(101L, 0);
+        soldOut.setStatus("ACTIVE");
+        when(cartRepository.findByUserId(USER_ID)).thenReturn(Optional.of(cart));
+        when(phoneVariantRepository.findById(100L)).thenReturn(Optional.of(inactive));
+        when(phoneVariantRepository.findById(101L)).thenReturn(Optional.of(soldOut));
+        when(phoneVariantRepository.findById(999L)).thenReturn(Optional.empty());
+        when(cartRepository.save(cart)).thenReturn(cart);
+
+        cartService.syncCart(new CartSyncRequest(List.of(new CartItemRequest(100L, 1),
+                new CartItemRequest(101L, 1), new CartItemRequest(999L, 1))));
+
+        assertTrue(cart.getCartItems().isEmpty());
+    }
+
+    @Test
+    void syncCart_ShouldAddNewItems_WhenCartIsEmpty() {
+        User user = createUser();
+        stubCurrentUser(user);
+        Cart cart = Cart.builder().user(user).build();
+        PhoneVariant variant = createVariant(100L, 3);
+        variant.setStatus("ACTIVE");
+        when(cartRepository.findByUserId(USER_ID)).thenReturn(Optional.empty());
+        when(cartRepository.save(any(Cart.class))).thenReturn(cart);
+        when(phoneVariantRepository.findById(100L)).thenReturn(Optional.of(variant));
+
+        cartService.syncCart(new CartSyncRequest(List.of(new CartItemRequest(100L, 8))));
+
+        assertEquals(1, cart.getCartItems().size());
+        CartItem item = cart.getCartItems().get(0);
+        assertSame(cart, item.getCart());
+        assertSame(variant, item.getPhoneVariant());
+        assertEquals(3, item.getQuantity());
+    }
+
+    @Test
+    void syncCart_EmptyGuestCartPreservesExistingItems() {
+        User user = createUser();
+        stubCurrentUser(user);
+        Cart cart = Cart.builder().user(user).build();
+        CartItem item = createCartItem(1L, cart, createVariant(100L, 5), 2);
+        cart.getCartItems().add(item);
+        when(cartRepository.findByUserId(USER_ID)).thenReturn(Optional.of(cart));
+
+        cartService.syncCart(new CartSyncRequest(List.of()));
+
+        assertEquals(List.of(item), cart.getCartItems());
+        verifyNoInteractions(phoneVariantRepository);
+        verify(cartRepository, never()).save(any());
     }
 
     private void stubCurrentUser(User user) {
