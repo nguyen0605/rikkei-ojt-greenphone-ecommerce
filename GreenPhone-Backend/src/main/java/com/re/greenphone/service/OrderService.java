@@ -10,6 +10,7 @@ import com.re.greenphone.entity.*;
 import com.re.greenphone.mapper.OrderMapper;
 import com.re.greenphone.repository.*;
 import com.re.greenphone.security.SecurityUtils;
+import com.re.greenphone.service.admin.InventoryStockHistoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -35,6 +36,7 @@ public class OrderService {
     private final OrderMapper orderMapper;
     private final EmailService emailService;
     private final SettingsService settingsService;
+    private final InventoryStockHistoryService inventoryStockHistoryService;
 
     public OrderDTO createOrder(OrderRequest request) {
         Long userId = SecurityUtils.getCurrentUserId();
@@ -67,7 +69,9 @@ public class OrderService {
 
             // Reduce stock
             if (variant.getStockQuantity() != null) {
-                variant.setStockQuantity(variant.getStockQuantity() - itemReq.getQuantity());
+                int quantityBefore = variant.getStockQuantity();
+                variant.setStockQuantity(quantityBefore - itemReq.getQuantity());
+                inventoryStockHistoryService.record(variant, quantityBefore, -itemReq.getQuantity(), "EXPORT", "Đặt hàng");
             }
 
             BigDecimal price = variant.getDiscountPrice() != null ? variant.getDiscountPrice() : variant.getPrice();
@@ -194,7 +198,9 @@ public class OrderService {
             if (variant.getStockQuantity() != null) {
                 PhoneVariant locked = phoneVariantRepository.findByIdWithLock(variant.getId())
                         .orElse(variant);
-                locked.setStockQuantity(locked.getStockQuantity() + detail.getQuantity());
+                int quantityBefore = locked.getStockQuantity();
+                locked.setStockQuantity(quantityBefore + detail.getQuantity());
+                inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Hủy đơn hàng");
                 phoneVariantRepository.save(locked);
             }
         }

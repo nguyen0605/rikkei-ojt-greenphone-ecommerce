@@ -1,13 +1,12 @@
-import { Button, Tag } from 'antd';
+import { Button, Tag, message } from 'antd';
 import { Star, Truck, ShieldCheck, Gift, ShoppingCart } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Product } from '@/types';
 import { formatVND, formatSold } from '@/utils';
 import { QuantitySelector } from '@/components/common';
-import { useAppDispatch } from '@/store/hooks';
-import { addToCart } from '@/store/slices/cartSlice';
-import { message } from 'antd';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { addCartItem, addToCart } from '@/store/slices/cartSlice';
 
 interface ProductInfoProps {
   product: Product;
@@ -16,6 +15,7 @@ interface ProductInfoProps {
 export default function ProductInfo({ product }: ProductInfoProps) {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const [messageApi, contextHolder] = message.useMessage();
   const [selectedColor, setSelectedColor] = useState(product.colors[0]);
   const [selectedStorage, setSelectedStorage] = useState(product.storage[0]);
@@ -24,28 +24,59 @@ export default function ProductInfo({ product }: ProductInfoProps) {
   const finalPrice =
     product.price + (selectedStorage?.priceModifier || 0);
 
-  const handleAddToCart = () => {
-    dispatch(
-      addToCart({
-        product,
-        quantity,
-        color: selectedColor?.name,
-        storage: selectedStorage?.capacity,
-      }),
-    );
+  const handleAddToCart = async () => {
+    const variantId = Number(selectedColor?.id || selectedStorage?.id);
+    if (!Number.isFinite(variantId) || variantId <= 0) {
+      messageApi.error('Vui lòng chọn phiên bản sản phẩm hợp lệ');
+      return;
+    }
+    if (!isAuthenticated) {
+      dispatch(
+        addToCart({
+          product,
+          variantId,
+          quantity,
+          color: selectedColor?.name,
+          storage: selectedStorage?.capacity,
+        }),
+      );
+      messageApi.success('Đã thêm sản phẩm vào giỏ hàng');
+      return;
+    }
+    try {
+      await dispatch(addCartItem({ phoneVariantId: variantId, quantity })).unwrap();
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : 'Không thể thêm vào giỏ hàng');
+      return;
+    }
     messageApi.success('Đã thêm sản phẩm vào giỏ hàng');
   };
 
-  const handleBuyNow = () => {
-    dispatch(
-      addToCart({
-        product,
-        quantity,
-        color: selectedColor?.name,
-        storage: selectedStorage?.capacity,
-      }),
-    );
-    navigate('/thanh-toan');
+  const handleBuyNow = async () => {
+    const variantId = Number(selectedColor?.id || selectedStorage?.id);
+    if (!Number.isFinite(variantId) || variantId <= 0) {
+      messageApi.error('Vui lòng chọn phiên bản sản phẩm hợp lệ');
+      return;
+    }
+    if (!isAuthenticated) {
+      dispatch(
+        addToCart({
+          product,
+          variantId,
+          quantity,
+          color: selectedColor?.name,
+          storage: selectedStorage?.capacity,
+        }),
+      );
+      navigate('/thanh-toan');
+      return;
+    }
+    try {
+      await dispatch(addCartItem({ phoneVariantId: variantId, quantity })).unwrap();
+      navigate('/thanh-toan');
+    } catch (error) {
+      messageApi.error(error instanceof Error ? error.message : 'Không thể thêm vào giỏ hàng');
+    }
   };
 
   return (

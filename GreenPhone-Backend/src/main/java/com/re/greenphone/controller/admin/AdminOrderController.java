@@ -33,7 +33,7 @@ public class AdminOrderController {
 
     @PutMapping("/{id}/status")
     public ResponseEntity<ApiResponse<?>> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(ApiResponse.success(adminOrderService.updateStatus(id, body.get("status"))));
+        return ResponseEntity.ok(ApiResponse.success(adminOrderService.updateStatus(id, body.get("status"), body.get("reason"))));
     }
 
     @PutMapping("/{id}/payment-status")

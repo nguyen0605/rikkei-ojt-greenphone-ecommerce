@@ -64,6 +64,7 @@ public class AuthService {
 
         String otp = generateOTP();
         otpCache.put(request.getEmail(), otp);
+        log.info("[OTP] Verification code for {}: {}", request.getEmail(), otp);
         emailService.sendOTP(request.getEmail(), otp);
 
         return authMapper.toAuthResponse(user, "", jwtConfig.getExpiration());
@@ -122,6 +123,7 @@ public class AuthService {
         userRepository.findByEmail(email).ifPresent(user -> {
             String otp = generateOTP();
             otpCache.put(email, otp);
+            log.info("[OTP] Forgot password code for {}: {}", email, otp);
             emailService.sendOTP(email, otp);
         });
     }
@@ -143,6 +145,7 @@ public class AuthService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         String otp = generateOTP();
         otpCache.put(email, otp);
+        log.info("[OTP] Resent verification code for {}: {}", email, otp);
         emailService.sendOTP(email, otp);
     }
 

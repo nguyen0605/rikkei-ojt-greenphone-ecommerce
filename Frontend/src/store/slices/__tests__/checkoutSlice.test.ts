@@ -118,4 +118,17 @@ describe('checkoutSlice', () => {
     const state2 = checkoutReducer(state1, resetCheckout());
     expect(state2).toEqual(initialState);
   });
+
+  it('should reset a completed checkout before the next order', () => {
+    const completed = checkoutReducer(
+      initialState,
+      completeOrder({ orderId: '100' }),
+    );
+
+    const nextOrder = checkoutReducer(completed, resetCheckout());
+
+    expect(nextOrder.currentStep).toBe(1);
+    expect(nextOrder.orderId).toBeUndefined();
+    expect(nextOrder.completedAt).toBeUndefined();
+  });
 });

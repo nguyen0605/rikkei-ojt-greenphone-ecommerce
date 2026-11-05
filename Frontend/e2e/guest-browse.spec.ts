@@ -23,6 +23,11 @@ test.describe('E2E-01: Guest browsing', () => {
     expect(url).toMatch(/dang-nhap|login/i);
   });
 
+  test('guest should be able to view the cart without login', async ({ page }) => {
+    await page.goto('/gio-hang');
+    await expect(page).toHaveURL(/gio-hang/i);
+  });
+
   test('guest should not access admin routes', async ({ page }) => {
     await page.goto('/admin');
     await page.waitForTimeout(2000);

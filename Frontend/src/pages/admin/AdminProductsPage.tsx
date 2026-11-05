@@ -3,12 +3,14 @@ import {
   Table, Button, Modal, Form, Input, InputNumber, Select, message, Space,
   Upload, Image, Popconfirm, Progress, Divider, Switch, type TableColumnsType,
 } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, PictureOutlined, AppstoreOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
-import { useState } from 'react';
-import { adminPhoneService, brandService, adminOptionService, optionService } from '@/services';
-import type { PhoneDTO, PhoneRequest, PhoneVariantDTO, PhoneVariantRequest, PhoneImageDTO, OptionTreeDTO, OptionItemDTO } from '@/types/api';
+import { PlusOutlined, EditOutlined, DeleteOutlined, PictureOutlined, AppstoreOutlined, ArrowUpOutlined, ArrowDownOutlined, HistoryOutlined, RightOutlined } from '@ant-design/icons';
+import { useState, type Key } from 'react';
+import { adminPhoneService, adminInventoryService, brandService, adminOptionService, optionService } from '@/services';
+import type { PhoneDTO, PhoneRequest, PhoneVariantDTO, PhoneVariantRequest, InventoryStockMovementRequest, PhoneImageDTO, OptionTreeDTO, OptionItemDTO } from '@/types/api';
 import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import AdminCard from '@/components/admin/AdminCard';
+import LowStockAlertBadge from '@/components/admin/LowStockAlertBadge';
+import InventoryHistoryModal from '@/components/admin/InventoryHistoryModal';
 
 /* Hallmark · Workbench (design.md): page header + pill CTA, table card, modal form, tab-managed variants/images. */
 
@@ -80,18 +82,20 @@ function QuickAddSelect({
   );
 }
 
-export default function AdminProductsPage() {
+export default function AdminProductsPage({ inventoryMode = false }: { inventoryMode?: boolean }) {
   const qc = useQueryClient();
   // ── Search + filter + server paging ──
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState('');
   const [brandFilter, setBrandFilter] = useState<string | undefined>();
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
+  const [lowStockOnly, setLowStockOnly] = useState(false);
 
   const params: Record<string, string> = { page: String(page - 1), size: '15' };
   if (keyword) params.keyword = keyword;
   if (brandFilter) params.brandId = brandFilter;
   if (statusFilter) params.status = statusFilter;
+  if (inventoryMode && lowStockOnly) params.lowStock = 'true';
 
   const { data: phones, isLoading } = useQuery({
     queryKey: ['admin-phones', params],
@@ -119,6 +123,13 @@ export default function AdminProductsPage() {
   const [varLoading, setVarLoading] = useState(false);
   const [varEdit, setVarEdit] = useState<PhoneVariantDTO | null>(null);
   const [varForm] = Form.useForm<PhoneVariantRequest>();
+  const [historyVariant, setHistoryVariant] = useState<PhoneVariantDTO | null>(null);
+  const [movementVariant, setMovementVariant] = useState<PhoneVariantDTO | null>(null);
+  const [movementType, setMovementType] = useState<'IMPORT' | 'EXPORT'>('IMPORT');
+  const [movementForm] = Form.useForm<InventoryStockMovementRequest>();
+  const [expandedInventoryRows, setExpandedInventoryRows] = useState<Key[]>([]);
+  const [inventoryVariants, setInventoryVariants] = useState<Record<number, PhoneVariantDTO[]>>({});
+  const [inventoryVariantLoading, setInventoryVariantLoading] = useState<Record<number, boolean>>({});
 
   // ── Modal hình ảnh ──
   const [imgOpen, setImgOpen] = useState(false);
@@ -160,7 +171,21 @@ export default function AdminProductsPage() {
   // ── Variants ──
   const openVariantModal = async (p: PhoneDTO) => {
     setVariantPhone(p); setVarEdit(null); varForm.resetFields(); setVariantOpen(true); setVarLoading(true);
-    try { setVariants(await adminPhoneService.variants(p.id)); } finally { setVarLoading(false); }
+    try {
+      const loadedVariants = await adminPhoneService.variants(p.id);
+      setVariants(loadedVariants);
+    } finally { setVarLoading(false); }
+  };
+  const handleInventoryExpand = async (expanded: boolean, phone: PhoneDTO) => {
+    setExpandedInventoryRows((current) => expanded ? [...current, phone.id] : current.filter((id) => id !== phone.id));
+    if (!expanded || inventoryVariants[phone.id]) return;
+    setInventoryVariantLoading((current) => ({ ...current, [phone.id]: true }));
+    try {
+      const loadedVariants = await adminPhoneService.variants(phone.id);
+      setInventoryVariants((current) => ({ ...current, [phone.id]: loadedVariants }));
+    } finally {
+      setInventoryVariantLoading((current) => ({ ...current, [phone.id]: false }));
+    }
   };
   const varMut = useMutation({
     mutationFn: (v: PhoneVariantRequest) => {
@@ -172,6 +197,26 @@ export default function AdminProductsPage() {
       setVarEdit(null); varForm.resetFields();
       if (variantPhone) setVariants(await adminPhoneService.variants(variantPhone.id));
     },
+  });
+
+  const movementMut = useMutation({
+    mutationFn: ({ variantId, data }: { variantId: number; data: InventoryStockMovementRequest }) =>
+      adminInventoryService.movement(variantId, data),
+    onSuccess: (updated) => {
+      setVariants((current) => current.map((variant) => variant.id === updated.id ? updated : variant));
+      setInventoryVariants((current) => Object.fromEntries(
+        Object.entries(current).map(([phoneId, currentVariants]) => [
+          phoneId,
+          currentVariants.map((variant) => variant.id === updated.id ? updated : variant),
+        ]),
+      ));
+      qc.invalidateQueries({ queryKey: ['admin-phones'] });
+      qc.invalidateQueries({ queryKey: ['admin-inventory-history', updated.id] });
+      setMovementVariant(null);
+      movementForm.resetFields();
+      message.success(movementType === 'IMPORT' ? 'Đã nhập kho thành công' : 'Đã xuất kho thành công');
+    },
+    onError: (error) => message.error(error instanceof Error ? error.message : 'Cập nhật biến động kho thất bại'),
   });
   const varDelMut = useMutation({
     mutationFn: (vid: number) => adminPhoneService.removeVariant(variantPhone!.id, vid),
@@ -224,6 +269,21 @@ export default function AdminProductsPage() {
     }
   };
 
+  const inventoryColumns: TableColumnsType<PhoneDTO> = [
+    { title: 'STT', width: 60, render: (_: unknown, __: PhoneDTO, index?: number) => <span className="text-ink-2">{(index ?? 0) + 1}</span> },
+    {
+      title: 'Sản phẩm', dataIndex: 'name',
+      render: (v: string, r) => (
+        <div className="flex items-center gap-2.5">
+          {r.mainImageUrl ? <Image src={r.mainImageUrl} width={40} height={40} className="!rounded-lg !object-cover" preview={false} /> : <div className="h-10 w-10 rounded-lg bg-bg-muted" />}
+          <span className="font-medium text-ink">{v}</span>
+        </div>
+      ),
+    },
+    { title: 'Hãng', dataIndex: 'brandName', width: 130, render: (v: string) => <span className="rounded-full bg-bg-muted px-2.5 py-0.5 text-xs font-medium text-ink-2">{v}</span> },
+    { title: 'Số biến thể', dataIndex: 'variantCount', width: 120, align: 'right' as const },
+  ];
+
   const columns: TableColumnsType<PhoneDTO> = [
     { title: 'STT', width: 60, render: (_: unknown, __: PhoneDTO, index?: number) => <span className="text-ink-2">{(index ?? 0) + 1}</span> },
     {
@@ -253,7 +313,7 @@ export default function AdminProductsPage() {
       render: (_, r) => (
         <Space>
           <Button size="small" icon={<EditOutlined />} onClick={() => openForm(r)} className="!rounded-full">Sửa</Button>
-          <Button size="small" icon={<AppstoreOutlined />} onClick={() => openVariantModal(r)} className="!rounded-full">Giá</Button>
+          <Button size="small" icon={<AppstoreOutlined />} onClick={() => openVariantModal(r)} className="!rounded-full">{inventoryMode ? 'Tồn kho' : 'Giá'}</Button>
           <Button size="small" icon={<PictureOutlined />} onClick={() => openImageModal(r)} className="!rounded-full">Ảnh</Button>
           <Popconfirm
             title="Xóa vĩnh viễn sản phẩm này?"
@@ -275,29 +335,77 @@ export default function AdminProductsPage() {
     { title: 'Màu', dataIndex: 'color', width: 110, render: (v: string) => <span className="text-ink-2">{v}</span> },
     { title: 'Giá', dataIndex: 'price', width: 120, render: (v: number) => <span className="font-semibold text-ink">{v?.toLocaleString('vi-VN')}₫</span> },
     { title: 'Giá KM', dataIndex: 'discountPrice', width: 120, render: (v: number | null) => v ? <span className="font-medium text-primary-600">{v.toLocaleString('vi-VN')}₫</span> : <span className="text-gray-400">—</span> },
-    { title: 'Kho', dataIndex: 'stockQuantity', width: 70, align: 'right' as const },
+    { title: 'SKU', dataIndex: 'sku', width: 140, render: (value: string) => <span className="font-mono text-xs text-ink-2">{value}</span> },
+    ...(inventoryMode ? [{
+      title: 'Kho', dataIndex: 'stockQuantity', width: 150, align: 'right' as const, render: (value: number) => <Space size={6}><span>{value}</span><LowStockAlertBadge stockQuantity={value} /></Space>
+    }] : []),
     {
-      title: '', width: 90,
+      title: '', width: inventoryMode ? 260 : 90,
       render: (_, r) => (
         <Space>
-          <Button size="small" icon={<EditOutlined />} onClick={() => { setVarEdit(r); varForm.setFieldsValue({ ramItemId: r.ramItemId, storageItemId: r.storageItemId, colorItemId: r.colorItemId, price: r.price, discountPrice: r.discountPrice, stockQuantity: r.stockQuantity }); }} className="!rounded-full" />
-          <Popconfirm title="Xóa biến thể?" onConfirm={() => varDelMut.mutate(r.id)}>
-            <Button size="small" danger icon={<DeleteOutlined />} className="!rounded-full" />
-          </Popconfirm>
+          {inventoryMode && <>
+            <Button size="small" icon={<HistoryOutlined />} onClick={() => setHistoryVariant(r)} className="!rounded-full">Lịch sử kho</Button>
+            <Button size="small" type="primary" onClick={() => { setMovementVariant(r); setMovementType('IMPORT'); movementForm.resetFields(); movementForm.setFieldsValue({ changeType: 'IMPORT' }); }} className="!rounded-full">Nhập</Button>
+            <Button size="small" danger onClick={() => { setMovementVariant(r); setMovementType('EXPORT'); movementForm.resetFields(); movementForm.setFieldsValue({ changeType: 'EXPORT' }); }} className="!rounded-full">Xuất</Button>
+          </>}
+          {!inventoryMode && <>
+            <Button size="small" icon={<EditOutlined />} onClick={() => { setVarEdit(r); varForm.setFieldsValue({ ramItemId: r.ramItemId, storageItemId: r.storageItemId, colorItemId: r.colorItemId, price: r.price, discountPrice: r.discountPrice }); }} className="!rounded-full" />
+            <Popconfirm title="Xóa biến thể?" onConfirm={() => varDelMut.mutate(r.id)}>
+              <Button size="small" danger icon={<DeleteOutlined />} className="!rounded-full" />
+            </Popconfirm>
+          </>}
         </Space>
       ),
     },
   ];
 
+  const inventoryVariantColumns: TableColumnsType<PhoneVariantDTO> = [
+    { title: 'RAM', dataIndex: 'ram', width: 80 },
+    { title: 'ROM', dataIndex: 'storage', width: 90 },
+    { title: 'Màu', dataIndex: 'color', width: 130, render: (value: string) => <span className="text-ink-2">{value}</span> },
+    { title: 'SKU', dataIndex: 'sku', width: 150, render: (value: string) => <span className="font-mono text-xs text-ink-2">{value}</span> },
+    { title: 'Giá', dataIndex: 'price', width: 120, render: (value: number) => <span className="font-semibold text-ink">{value?.toLocaleString('vi-VN')}₫</span> },
+    { title: 'Giá KM', dataIndex: 'discountPrice', width: 120, render: (value: number | null) => value ? <span className="font-medium text-primary-600">{value.toLocaleString('vi-VN')}₫</span> : <span className="text-gray-400">—</span> },
+    { title: 'Tồn', dataIndex: 'stockQuantity', width: 130, align: 'right' as const, render: (value: number) => <Space size={6}><span className="font-semibold">{value}</span><LowStockAlertBadge stockQuantity={value} /></Space> },
+    {
+      title: 'Thao tác', width: 250,
+      render: (_, variant) => (
+        <Space>
+          <Button size="small" type="primary" onClick={() => { setMovementVariant(variant); setMovementType('IMPORT'); movementForm.resetFields(); }} className="!rounded-full">Nhập</Button>
+          <Button size="small" danger onClick={() => { setMovementVariant(variant); setMovementType('EXPORT'); movementForm.resetFields(); }} className="!rounded-full">Xuất</Button>
+          <Button size="small" icon={<HistoryOutlined />} onClick={() => setHistoryVariant(variant)} className="!rounded-full">Lịch sử</Button>
+        </Space>
+      ),
+    },
+  ];
+
+  const renderInventoryExpandedRow = (phone: PhoneDTO) => (
+    <div className="rounded-xl border border-primary-100 bg-primary-50/30 p-3">
+      <div className="mb-3 text-sm font-semibold text-ink">Các biến thể của {phone.name}</div>
+      <Table<PhoneVariantDTO>
+        columns={inventoryVariantColumns}
+        dataSource={inventoryVariants[phone.id] || []}
+        rowKey="id"
+        loading={inventoryVariantLoading[phone.id]}
+        pagination={false}
+        size="small"
+        scroll={{ x: 1050 }}
+        locale={{ emptyText: 'Sản phẩm chưa có biến thể' }}
+      />
+    </div>
+  );
+
   return (
     <div>
       <AdminPageHeader
-        title="Sản phẩm"
-        subtitle="Quản lý danh mục điện thoại, biến thể giá và hình ảnh"
+        title={inventoryMode ? 'Tồn kho' : 'Sản phẩm'}
+        subtitle={inventoryMode ? 'Theo dõi số lượng tồn kho và lịch sử biến động' : 'Quản lý danh mục điện thoại, biến thể giá và hình ảnh'}
         actions={
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => openForm()} className="!rounded-full !bg-primary-600 hover:!bg-primary-700">
-            Thêm sản phẩm
-          </Button>
+          !inventoryMode && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => openForm()} className="!rounded-full !bg-primary-600 hover:!bg-primary-700">
+              Thêm sản phẩm
+            </Button>
+          )
         }
       />
       <AdminCard>
@@ -328,13 +436,39 @@ export default function AdminProductsPage() {
               { value: 'INACTIVE', label: 'INACTIVE' },
             ]}
           />
+          {inventoryMode && (
+            <Button
+              danger={lowStockOnly}
+              type={lowStockOnly ? 'primary' : 'default'}
+              onClick={() => { setLowStockOnly((current) => !current); setPage(1); }}
+              className="!rounded-full"
+            >
+              Sắp hết hàng
+            </Button>
+          )}
         </div>
         <Table<PhoneDTO>
-          columns={columns}
+          columns={inventoryMode ? inventoryColumns : columns}
           dataSource={phones?.content || []}
           rowKey="id"
           loading={isLoading}
           size="middle"
+          expandable={inventoryMode ? {
+            expandedRowKeys: expandedInventoryRows,
+            expandedRowRender: renderInventoryExpandedRow,
+            onExpand: handleInventoryExpand,
+            expandIconColumnIndex: inventoryColumns.length,
+            expandIcon: ({ expanded, onExpand, record }) => (
+              <Button
+                type="text"
+                size="small"
+                aria-label={`${expanded ? 'Thu gọn' : 'Mở rộng'} biến thể ${record.name}`}
+                icon={<RightOutlined rotate={expanded ? 90 : 0} />}
+                onClick={(event) => onExpand(record, event)}
+                className="!text-ink-2 hover:!text-primary-600"
+              />
+            ),
+          } : undefined}
           pagination={{
             current: page,
             pageSize: 15,
@@ -381,14 +515,14 @@ export default function AdminProductsPage() {
 
       {/* Modal biến thể giá */}
       <Modal
-        title={<span className="text-base font-bold text-ink">Biến thể & Giá — {variantPhone?.name}</span>}
+        title={<span className="text-base font-bold text-ink">{inventoryMode ? 'Tồn kho' : 'Biến thể & Giá'} — {variantPhone?.name}</span>}
         open={variantOpen}
         onCancel={() => setVariantOpen(false)}
         footer={null}
         width={760}
       >
         <Table<PhoneVariantDTO> columns={variantColumns} dataSource={variants} rowKey="id" loading={varLoading} size="small" pagination={false} className="mb-4" />
-        <div className="rounded-xl border border-dashed border-gray-200 bg-bg-soft p-4">
+        {!inventoryMode && <div className="rounded-xl border border-dashed border-gray-200 bg-bg-soft p-4">
           <div className="mb-3 text-sm font-semibold text-ink">{varEdit ? 'Sửa biến thể' : 'Thêm biến thể mới'}</div>
           <Form form={varForm} layout="inline" onFinish={(v) => varMut.mutate(v)}>
             <Form.Item name="ramItemId" rules={[{ required: true, message: 'RAM' }]}>
@@ -410,7 +544,6 @@ export default function AdminProductsPage() {
                 formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
                 parser={parseVariantNumber} />
             </Form.Item>
-            <Form.Item name="stockQuantity" rules={[{ required: true, message: 'Kho' }]}><InputNumber placeholder="SL" style={{ width: 70 }} min={0} /></Form.Item>
             <Form.Item>
               <Space>
                 <Button type="primary" htmlType="submit" loading={varMut.isPending} className="!rounded-full !bg-primary-600">{varEdit ? 'Lưu' : 'Thêm'}</Button>
@@ -418,8 +551,44 @@ export default function AdminProductsPage() {
               </Space>
             </Form.Item>
           </Form>
-        </div>
+        </div>}
       </Modal>
+
+      <Modal
+        title={`${movementType === 'IMPORT' ? 'Nhập kho' : 'Xuất kho'} — ${movementVariant?.sku || ''}`}
+        open={movementVariant !== null}
+        onCancel={() => { setMovementVariant(null); movementForm.resetFields(); }}
+        onOk={() => movementForm.submit()}
+        confirmLoading={movementMut.isPending}
+        okButtonProps={{ danger: movementType === 'EXPORT', className: movementType === 'IMPORT' ? '!rounded-full !bg-primary-600' : '!rounded-full' }}
+        cancelButtonProps={{ className: '!rounded-full' }}
+      >
+        <div className="mb-4 rounded-xl bg-bg-soft p-3 text-sm text-ink-2">
+          {movementVariant?.ram} · {movementVariant?.storage} · {movementVariant?.color}
+          <span className="ml-3 font-semibold text-ink">Tồn hiện tại: {movementVariant?.stockQuantity}</span>
+        </div>
+        <Form
+          form={movementForm}
+          layout="vertical"
+          onFinish={(values) => movementVariant && movementMut.mutate({
+            variantId: movementVariant.id,
+            data: { changeType: movementType, quantity: values.quantity, reason: values.reason },
+          })}
+        >
+          <Form.Item name="quantity" label="Số lượng" rules={[{ required: true, message: 'Nhập số lượng' }, { type: 'number', min: 1, message: 'Số lượng phải lớn hơn 0' }]}>
+            <InputNumber min={1} max={100000} className="!w-full" placeholder="Nhập số lượng" />
+          </Form.Item>
+          <Form.Item name="reason" label="Lý do" rules={[{ required: true, message: 'Nhập lý do' }, { max: 255, message: 'Lý do tối đa 255 ký tự' }]}>
+            <Input.TextArea rows={3} placeholder={movementType === 'IMPORT' ? 'Ví dụ: Nhập hàng từ nhà cung cấp' : 'Ví dụ: Xuất kho điều chuyển'} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <InventoryHistoryModal
+        variant={historyVariant}
+        open={historyVariant !== null}
+        onClose={() => setHistoryVariant(null)}
+      />
 
       {/* Modal hình ảnh */}
       <Modal

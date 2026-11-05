@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Radio, App, Rate, Progress } from 'antd';
 import { ShoppingCart, Truck, ShieldCheck, RefreshCw, Headphones, CheckCircle, Star } from 'lucide-react';
 import { Breadcrumb, ProductCard } from '@/components/common';
 import { phoneService, reviewService } from '@/services';
-import { useAppDispatch } from '@/store/hooks';
-import { addToCart } from '@/store/slices/cartSlice';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { addCartItem, addToCart } from '@/store/slices/cartSlice';
 import { formatVND } from '@/utils';
 import type { PhoneDetailDTO, PhoneVariantDTO, PhoneImageDTO, ReviewDTO, ReviewSummary } from '@/types/api';
 import type { Product } from '@/types';
@@ -45,6 +45,9 @@ function toProduct(phone: PhoneDetailDTO, variant: PhoneVariantDTO): Product {
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const { message } = App.useApp();
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
   // Ảnh lớn đang hiển thị — bấm ảnh nhỏ để đổi
@@ -91,20 +94,29 @@ export default function ProductDetailPage() {
   const images = phone.images?.length ? phone.images : phone.mainImageUrl ? [{ id: 0, phoneId: phone.id, imageUrl: phone.mainImageUrl, isMain: true } as PhoneImageDTO] : [];
   const activeImage = images[Math.min(activeImageIndex, images.length - 1)]?.imageUrl || phone.mainImageUrl;
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!selectedVariant) return;
     if (selectedVariant.stockQuantity <= 0) {
       message.warning('Sản phẩm này đã hết hàng');
       return;
     }
-    const prod = toProduct(phone, selectedVariant);
-    dispatch(addToCart({
-      product: prod,
-      variantId: selectedVariant.id,
-      quantity: 1,
-      color: selectedVariant.color,
-      storage: selectedVariant.storage,
-    }));
+    if (!isAuthenticated) {
+      dispatch(addToCart({
+        product: toProduct(phone, selectedVariant),
+        variantId: selectedVariant.id,
+        quantity: 1,
+        color: selectedVariant.color,
+        storage: selectedVariant.storage,
+      }));
+      message.success(`Đã thêm ${phone.name} vào giỏ hàng`);
+      return;
+    }
+    try {
+      await dispatch(addCartItem({ phoneVariantId: selectedVariant.id, quantity: 1 })).unwrap();
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : 'Không thể thêm vào giỏ hàng');
+      return;
+    }
     message.success(`Đã thêm ${phone.name} vào giỏ hàng`);
   };
 

@@ -14,6 +14,7 @@ import com.re.greenphone.repository.PaymentRepository;
 import com.re.greenphone.repository.PhoneVariantRepository;
 import com.re.greenphone.repository.UserPromotionRepository;
 import com.re.greenphone.service.EmailService;
+import com.re.greenphone.service.admin.InventoryStockHistoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -36,6 +37,7 @@ public class AdminOrderService {
     private final UserPromotionRepository userPromotionRepository;
     private final OrderMapper orderMapper;
     private final EmailService emailService;
+    private final InventoryStockHistoryService inventoryStockHistoryService;
 
     public PageResponse<OrderDTO> getOrders(String status, String search, PageRequest pageRequest) {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(
@@ -63,6 +65,10 @@ public class AdminOrderService {
     }
 
     public OrderDTO updateStatus(Long id, String status) {
+        return updateStatus(id, status, null);
+    }
+
+    public OrderDTO updateStatus(Long id, String status, String reason) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
 
@@ -77,7 +83,9 @@ public class AdminOrderService {
                 if (variant.getStockQuantity() != null) {
                     PhoneVariant locked = phoneVariantRepository.findByIdWithLock(variant.getId())
                             .orElse(variant);
-                    locked.setStockQuantity(locked.getStockQuantity() + detail.getQuantity());
+                    int quantityBefore = locked.getStockQuantity();
+                    locked.setStockQuantity(quantityBefore + detail.getQuantity());
+                    inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Admin hủy đơn hàng");
                     phoneVariantRepository.save(locked);
                 }
             }
@@ -90,6 +98,15 @@ public class AdminOrderService {
             // Money state: order.paymentStatus is the single source of truth
             if ("PAID".equals(order.getPaymentStatus())) {
                 order.setPaymentStatus("REFUNDED");
+            }
+            if (reason != null && !reason.isBlank()) {
+                String existingNote = order.getNote() != null ? order.getNote().trim() : "";
+                String prefix = "[Lý do hủy: " + reason.trim() + "]";
+                if (existingNote.isEmpty()) {
+                    order.setNote(prefix);
+                } else if (!existingNote.contains("[Lý do hủy:")) {
+                    order.setNote(prefix + " " + existingNote);
+                }
             }
         }
 

@@ -7,6 +7,7 @@ import { selectCartSummary } from '@/store/selectors/cartSelectors';
 import { formatVND } from '@/utils';
 import { useEffect } from 'react';
 import { clearCart } from '@/store/slices/cartSlice';
+import { resetCheckout } from '@/store/slices/checkoutSlice';
 import { useAppDispatch } from '@/store/hooks';
 import { useQuery } from '@tanstack/react-query';
 import { orderService } from '@/services';
@@ -33,6 +34,7 @@ export default function CheckoutSuccessPage() {
   });
 
   useEffect(() => {
+    dispatch(resetCheckout());
     // Sau 5s clear cart để tránh mất state ngay lập tức
     const t = setTimeout(() => dispatch(clearCart()), 5000);
     return () => clearTimeout(t);
