@@ -42,4 +42,6 @@ public class PromotionRequest {
 
     @NotNull(message = "End date is required")
     private LocalDateTime endDate;
+
+    private String status;
 }

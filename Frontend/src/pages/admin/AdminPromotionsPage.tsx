@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Table, Button, Modal, Form, Input, InputNumber, Select, DatePicker, message, Space, type TableColumnsType } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, GiftOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, GiftOutlined, CopyOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { adminPromotionService } from '@/services';
 import type { PromotionDTO, PromotionRequest } from '@/types/api';
@@ -47,8 +47,30 @@ export default function AdminPromotionsPage() {
   // Keep form values numeric — the thousand-separator display is only visual.
   const parseNumber = (s: string | undefined) => Number((s ?? '').replace(/[^\d]/g, ''));
 
+  const copyCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    message.success(`Đã sao chép mã: ${code}`);
+  };
+
   const columns: TableColumnsType<PromotionDTO> = [
-    { title: 'Mã', dataIndex: 'code', width: 120, render: (v: string) => <span className="rounded bg-primary-50 px-2 py-0.5 font-mono text-xs font-semibold text-primary-700">{v}</span> },
+    {
+      title: 'Mã',
+      dataIndex: 'code',
+      width: 150,
+      render: (v: string) => (
+        <Space orientation="horizontal" size={4}>
+          <span className="rounded bg-primary-50 px-2 py-0.5 font-mono text-xs font-semibold text-primary-700">{v}</span>
+          <Button
+            size="small"
+            type="text"
+            icon={<CopyOutlined />}
+            onClick={() => copyCode(v)}
+            title="Sao chép mã"
+            className="!text-ink-2 hover:!text-primary-600"
+          />
+        </Space>
+      ),
+    },
     { title: 'Tên', dataIndex: 'name', render: (v: string) => <span className="font-medium text-ink">{v}</span> },
     { title: 'Loại', dataIndex: 'discountType', width: 200, render: (v: string) => <span className="rounded-full bg-bg-muted px-2.5 py-0.5 text-xs font-medium text-ink-2">{v === 'PERCENT' ? 'Phần trăm' : 'Cố định'}</span> },
     { title: 'Giá trị', dataIndex: 'discountValue', width: 110, render: (v: number, r) => <span className="font-semibold text-ink">{r.discountType === 'PERCENT' ? `${v}%` : formatNumber(v)}</span> },
@@ -157,8 +179,44 @@ export default function AdminPromotionsPage() {
             <Form.Item name="quantity" label="Số lượng mã">
               <InputNumber className="w-full" min={0} placeholder="VD: 100" />
             </Form.Item>
-            <Form.Item name="startDate" label="Bắt đầu" rules={[{ required: true, message: 'Chọn ngày' }]}><DatePicker showTime className="w-full" /></Form.Item>
-            <Form.Item name="endDate" label="Kết thúc" rules={[{ required: true, message: 'Chọn ngày' }]}><DatePicker showTime className="w-full" /></Form.Item>
+            <Form.Item
+              name="startDate"
+              label="Bắt đầu"
+              rules={[{ required: true, message: 'Chọn ngày' }]}
+            >
+              <DatePicker
+                showTime
+                className="w-full"
+                disabledDate={(current) => current && current < dayjs().startOf('day')}
+              />
+            </Form.Item>
+            <Form.Item
+              name="endDate"
+              label="Kết thúc"
+              dependencies={['startDate']}
+              rules={[
+                { required: true, message: 'Chọn ngày' },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    const start = getFieldValue('startDate');
+                    if (!value) return Promise.resolve();
+                    if (value.isBefore(dayjs().startOf('day'))) {
+                      return Promise.reject(new Error('Ngày hết hạn không được ở quá khứ'));
+                    }
+                    if (start && !value.isAfter(start)) {
+                      return Promise.reject(new Error('Ngày kết thúc phải sau ngày bắt đầu'));
+                    }
+                    return Promise.resolve();
+                  },
+                }),
+              ]}
+            >
+              <DatePicker
+                showTime
+                className="w-full"
+                disabledDate={(current) => current && current < dayjs().startOf('day')}
+              />
+            </Form.Item>
           </div>
         </Form>
       </Modal>

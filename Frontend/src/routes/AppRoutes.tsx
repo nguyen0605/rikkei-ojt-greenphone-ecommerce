@@ -36,8 +36,8 @@ const AdminOptionsPage = lazy(() => import('@/pages/admin/AdminOptionsPage'));
 const AdminOrdersPage = lazy(() => import('@/pages/admin/AdminOrdersPage'));
 const AdminUsersPage = lazy(() => import('@/pages/admin/AdminUsersPage'));
 const AdminReviewsPage = lazy(() => import('@/pages/admin/AdminReviewsPage'));
-const AdminPromotionsPage = lazy(() => import('@/pages/admin/AdminPromotionsPage'));
-const AdminBannersPage = lazy(() => import('@/pages/admin/AdminBannersPage'));
+const AdminPromotionsPage = lazy(() => import('@/pages/admin/marketing/AdminVoucherPage'));
+const AdminBannersPage = lazy(() => import('@/pages/admin/marketing/AdminBannerPage'));
 const AdminSettingsPage = lazy(() => import('@/pages/admin/AdminSettingsPage'));
 
 const PageLoader = () => (
@@ -77,6 +77,7 @@ export default function AppRoutes() {
       {/* Auth Layout */}
       <Route element={<AuthLayout />}>
         <Route path={ROUTES.LOGIN} element={withSuspense(LoginPage)} />
+        <Route path={ROUTES.ADMIN_LOGIN} element={withSuspense(LoginPage)} />
         <Route path={ROUTES.REGISTER} element={withSuspense(RegisterPage)} />
         <Route path={ROUTES.FORGOT_PASSWORD} element={withSuspense(ForgotPasswordPage)} />
         <Route path={ROUTES.VERIFY_OTP} element={withSuspense(VerifyOTPPage)} />
@@ -102,7 +103,9 @@ export default function AppRoutes() {
         <Route path={ROUTES.ADMIN_CUSTOMERS} element={withSuspense(AdminUsersPage)} />
         <Route path={ROUTES.ADMIN_REVIEWS} element={withSuspense(AdminReviewsPage)} />
         <Route path={ROUTES.ADMIN_PROMOTIONS} element={withSuspense(AdminPromotionsPage)} />
+        <Route path={ROUTES.ADMIN_VOUCHERS} element={withSuspense(AdminPromotionsPage)} />
         <Route path={ROUTES.ADMIN_BANNERS} element={withSuspense(AdminBannersPage)} />
+        <Route path={ROUTES.ADMIN_BANNERS_ALT} element={withSuspense(AdminBannersPage)} />
         <Route path={ROUTES.ADMIN_SETTINGS} element={withSuspense(AdminSettingsPage)} />
       </Route>
     </Routes>
