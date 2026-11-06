@@ -1,0 +1,838 @@
+{
+  "info": {
+    "_postman_id": "a82df310-91bf-4b95-a4b8-be201filter01",
+    "name": "GreenPhone - [BE2-01] Smartphone Filter & Dynamic Query Test Suite",
+    "description": "Bộ kịch bản kiểm thử toàn diện cho Task [BE2-01]: API truy vấn danh mục smartphone lọc đa tiêu chí linh hoạt (Brand, RAM, ROM, Color, Price Range), sắp xếp đa chiều (price-asc/desc, newest, bestseller, discount) và phân trang chuẩn Pageable chống N+1 query.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01. Bộ lọc cơ bản (Single Filters)",
+      "item": [
+        {
+          "name": "1.1 Lấy danh mục Hãng phục vụ Dropdown lọc (/api/phones/filters)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Trả về danh sách thương hiệu không bị N+1\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data).to.have.property('brands');",
+                  "    pm.expect(json.data.brands).to.be.an('array');",
+                  "    pm.expect(json.data.brands.length).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones/filters",
+              "host": ["{{base_url}}"],
+              "path": ["api", "phones", "filters"]
+            }
+          }
+        },
+        {
+          "name": "1.2 Lọc theo 1 Hãng sản xuất (Apple: brandIds=1)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Chỉ trả về các sản phẩm của Apple (brandId=1)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data.content).to.be.an('array');",
+                  "    json.data.content.forEach(function(phone) {",
+                  "        pm.expect(phone.brandId).to.eql(1);",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones?brandIds=1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "phones"],
+              "query": [
+                {
+                  "key": "brandIds",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "1.3 Lọc theo nhiều Hãng (Apple & Samsung: brandIds=1,2)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Sản phẩm trả về thuộc Apple hoặc Samsung\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    json.data.content.forEach(function(phone) {",
+                  "        pm.expect([1, 2]).to.include(phone.brandId);",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones?brandIds=1,2",
+              "host": ["{{base_url}}"],
+              "path": ["api", "phones"],
+              "query": [
+                {
+                  "key": "brandIds",
+                  "value": "1,2"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "1.4 Lọc theo khoảng giá (minPrice=20M & maxPrice=35M)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Giá điện thoại nằm trong khoảng 20M - 35M\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    json.data.content.forEach(function(phone) {",
+                  "        pm.expect(phone.lowestPrice).to.be.at.least(20000000);",
+                  "        pm.expect(phone.lowestPrice).to.be.at.most(35000000);",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones?minPrice=20000000&maxPrice=35000000",
+              "host": ["{{base_url}}"],
+              "path": ["api", "phones"],
+              "query": [
+                {
+                  "key": "minPrice",
+                  "value": "20000000"
+                },
+                {
+                  "key": "maxPrice",
+                  "value": "35000000"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "1.5 Lọc theo giá trần (Dưới 15 triệu: maxPrice=15M)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Tất cả sản phẩm có lowestPrice <= 15 triệu\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    json.data.content.forEach(function(phone) {",
+                  "        pm.expect(phone.lowestPrice).to.be.at.most(15000000);",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones?maxPrice=15000000",
+              "host": ["{{base_url}}"],
+              "path": ["api", "phones"],
+              "query": [
+                {
+                  "key": "maxPrice",
+                  "value": "15000000"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02. Lọc cấu hình biến thể (RAM, ROM, Màu sắc)",
+      "item": [
+        {
+          "name": "2.1 Lọc theo dung lượng RAM (8GB, 12GB)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Trả về danh sách smartphone hợp lệ\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data.content.length).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones?rams=8GB,12GB",
+              "host": ["{{base_url}}"],
+              "path": ["api", "phones"],
+              "query": [
+                {
+                  "key": "rams",
+                  "value": "8GB,12GB"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "2.2 Lọc theo bộ nhớ trong ROM (256GB, 512GB)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Lọc ROM 256GB/512GB thành công\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data.content.length).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones?storages=256GB,512GB",
+              "host": ["{{base_url}}"],
+              "path": ["api", "phones"],
+              "query": [
+                {
+                  "key": "storages",
+                  "value": "256GB,512GB"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "2.3 Lọc theo Màu sắc (Titan)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Lọc màu sắc thành công\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones?colors=Titan",
+              "host": ["{{base_url}}"],
+              "path": ["api", "phones"],
+              "query": [
+                {
+                  "key": "colors",
+                  "value": "Titan"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "2.4 Lọc kết hợp RAM 8GB + ROM 256GB + Màu Titan",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Không bị duplicate dòng máy nhờ distinct(true)\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    var ids = json.data.content.map(p => p.id);",
+                  "    var uniqueIds = Array.from(new Set(ids));",
+                  "    pm.expect(ids.length).to.eql(uniqueIds.length);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones?rams=8GB&storages=256GB&colors=Titan",
+              "host": ["{{base_url}}"],
+              "path": ["api", "phones"],
+              "query": [
+                {
+                  "key": "rams",
+                  "value": "8GB"
+                },
+                {
+                  "key": "storages",
+                  "value": "256GB"
+                },
+                {
+                  "key": "colors",
+                  "value": "Titan"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03. Sắp xếp đa chiều (Multi-dimensional Sorting)",
+      "item": [
+        {
+          "name": "3.1 Sắp xếp Giá tăng dần (sort=price-asc)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Mảng trả về có lowestPrice tăng dần\", function () {",
+                  "    var json = pm.response.json();",
+                  "    var list = json.data.content;",
+                  "    for (var i = 0; i < list.length - 1; i++) {",
+                  "        pm.expect(list[i].lowestPrice).to.be.at.most(list[i + 1].lowestPrice);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones?sort=price-asc&page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "phones"],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "price-asc"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "3.2 Sắp xếp Giá giảm dần (sort=price-desc)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Mảng trả về có lowestPrice giảm dần\", function () {",
+                  "    var json = pm.response.json();",
+                  "    var list = json.data.content;",
+                  "    for (var i = 0; i < list.length - 1; i++) {",
+                  "        pm.expect(list[i].lowestPrice).to.be.at.least(list[i + 1].lowestPrice);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones?sort=price-desc&page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "phones"],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "price-desc"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "3.3 Sắp xếp Điện thoại Mới nhất (sort=newest)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Xếp theo id/createdAt mới nhất giảm dần\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data.content.length).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones?sort=newest&page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "phones"],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "newest"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "3.4 Sắp xếp Bán chạy nhất (sort=bestseller)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Subquery tổng hợp số lượng bán chạy thành công\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data.content).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones?sort=bestseller&page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "phones"],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "bestseller"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "3.5 Sắp xếp Giảm giá nhiều nhất (sort=discount)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Thành công\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones?sort=discount&page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "phones"],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "discount"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "04. Phân trang & Tìm kiếm kết hợp",
+      "item": [
+        {
+          "name": "4.1 Phân trang: Lấy trang đầu tiên (page=0&size=5)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Cấu trúc PageResponse chuẩn\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.data.pageNumber).to.eql(0);",
+                  "    pm.expect(json.data.pageSize).to.eql(5);",
+                  "    pm.expect(json.data).to.have.property('totalElements');",
+                  "    pm.expect(json.data).to.have.property('totalPages');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones?page=0&size=5",
+              "host": ["{{base_url}}"],
+              "path": ["api", "phones"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "5"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "4.2 Phân trang: Lấy trang kế tiếp (page=1&size=5)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Chuyển trang pageNumber=1 chính xác\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.data.pageNumber).to.eql(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones?page=1&size=5",
+              "host": ["{{base_url}}"],
+              "path": ["api", "phones"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "size",
+                  "value": "5"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "4.3 Tìm kiếm từ khóa kết hợp bộ lọc (/api/phones/search)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Tìm kiếm iPhone theo tên và lọc RAM\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    json.data.content.forEach(function(phone) {",
+                  "        pm.expect(phone.name.toLowerCase()).to.include('iphone');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones/search?q=iPhone&brandIds=1&rams=8GB&sort=price-asc&page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "phones", "search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "iPhone"
+                },
+                {
+                  "key": "brandIds",
+                  "value": "1"
+                },
+                {
+                  "key": "rams",
+                  "value": "8GB"
+                },
+                {
+                  "key": "sort",
+                  "value": "price-asc"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "4.4 Bộ lọc phức tạp đa tiêu chí (Brand + RAM + ROM + Giá + Sort + Pageable)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Tổ hợp lọc phức tạp thực thi nhanh và chuẩn xác\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data.content).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones?brandIds=1,2&rams=8GB,12GB&storages=256GB,512GB&minPrice=15000000&maxPrice=35000000&sort=price-asc&page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "phones"],
+              "query": [
+                {
+                  "key": "brandIds",
+                  "value": "1,2"
+                },
+                {
+                  "key": "rams",
+                  "value": "8GB,12GB"
+                },
+                {
+                  "key": "storages",
+                  "value": "256GB,512GB"
+                },
+                {
+                  "key": "minPrice",
+                  "value": "15000000"
+                },
+                {
+                  "key": "maxPrice",
+                  "value": "35000000"
+                },
+                {
+                  "key": "sort",
+                  "value": "price-asc"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "4.5 Xem chi tiết điện thoại (/api/phones/{id})",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Trả về đầy đủ thông tin máy, biến thể và gallery ảnh\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data).to.have.property('name');",
+                  "    pm.expect(json.data).to.have.property('variants');",
+                  "    pm.expect(json.data).to.have.property('images');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/phones/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "phones", "1"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
