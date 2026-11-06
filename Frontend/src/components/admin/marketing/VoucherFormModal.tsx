@@ -86,6 +86,20 @@ export default function VoucherFormModal({
         layout="vertical"
         onFinish={(values) => {
           const [start, end] = values.dateRange;
+          if (end.isBefore(start) || end.isSame(start)) {
+            Modal.error({
+              title: 'Lỗi thời gian hiệu lực',
+              content: 'Ngày kết thúc phải sau ngày bắt đầu!',
+            });
+            return;
+          }
+          if (end.isBefore(dayjs())) {
+            Modal.error({
+              title: 'Lỗi thời gian hiệu lực',
+              content: 'Ngày hết hạn không được ở quá khứ!',
+            });
+            return;
+          }
           const payload: PromotionRequest = {
             code: values.code.trim().toUpperCase(),
             name: values.name.trim(),
@@ -95,8 +109,8 @@ export default function VoucherFormModal({
             maxDiscountAmount: values.maxDiscountAmount || 0,
             minOrderValue: values.minOrderValue || 0,
             quantity: values.quantity,
-            startDate: start.toISOString(),
-            endDate: end.toISOString(),
+            startDate: start.format('YYYY-MM-DDTHH:mm:ss'),
+            endDate: end.format('YYYY-MM-DDTHH:mm:ss'),
           };
           onSubmit(payload);
         }}
@@ -229,7 +243,24 @@ export default function VoucherFormModal({
             name="dateRange"
             label="Thời hạn hiệu lực chiến dịch (Bắt đầu - Kết thúc)"
             className="col-span-2"
-            rules={[{ required: true, message: 'Chọn khoảng thời gian hiệu lực' }]}
+            rules={[
+              { required: true, message: 'Chọn khoảng thời gian hiệu lực' },
+              () => ({
+                validator(_, value) {
+                  if (!value || !value[0] || !value[1]) {
+                    return Promise.resolve();
+                  }
+                  const [start, end] = value;
+                  if (!end.isAfter(start)) {
+                    return Promise.reject(new Error('Ngày kết thúc phải sau ngày bắt đầu'));
+                  }
+                  if (end.isBefore(dayjs())) {
+                    return Promise.reject(new Error('Ngày hết hạn không được ở trong quá khứ'));
+                  }
+                  return Promise.resolve();
+                },
+              }),
+            ]}
           >
             <DatePicker.RangePicker
               showTime

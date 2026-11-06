@@ -179,7 +179,17 @@ export default function AdminPromotionsPage() {
             <Form.Item name="quantity" label="Số lượng mã">
               <InputNumber className="w-full" min={0} placeholder="VD: 100" />
             </Form.Item>
-            <Form.Item name="startDate" label="Bắt đầu" rules={[{ required: true, message: 'Chọn ngày' }]}><DatePicker showTime className="w-full" /></Form.Item>
+            <Form.Item
+              name="startDate"
+              label="Bắt đầu"
+              rules={[{ required: true, message: 'Chọn ngày' }]}
+            >
+              <DatePicker
+                showTime
+                className="w-full"
+                disabledDate={(current) => current && current < dayjs().startOf('day')}
+              />
+            </Form.Item>
             <Form.Item
               name="endDate"
               label="Kết thúc"
@@ -189,15 +199,23 @@ export default function AdminPromotionsPage() {
                 ({ getFieldValue }) => ({
                   validator(_, value) {
                     const start = getFieldValue('startDate');
-                    if (!value || !start || value.isAfter(start)) {
-                      return Promise.resolve();
+                    if (!value) return Promise.resolve();
+                    if (value.isBefore(dayjs().startOf('day'))) {
+                      return Promise.reject(new Error('Ngày hết hạn không được ở quá khứ'));
                     }
-                    return Promise.reject(new Error('Ngày kết thúc phải sau ngày bắt đầu'));
+                    if (start && !value.isAfter(start)) {
+                      return Promise.reject(new Error('Ngày kết thúc phải sau ngày bắt đầu'));
+                    }
+                    return Promise.resolve();
                   },
                 }),
               ]}
             >
-              <DatePicker showTime className="w-full" />
+              <DatePicker
+                showTime
+                className="w-full"
+                disabledDate={(current) => current && current < dayjs().startOf('day')}
+              />
             </Form.Item>
           </div>
         </Form>

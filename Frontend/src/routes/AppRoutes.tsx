@@ -77,6 +77,7 @@ export default function AppRoutes() {
       {/* Auth Layout */}
       <Route element={<AuthLayout />}>
         <Route path={ROUTES.LOGIN} element={withSuspense(LoginPage)} />
+        <Route path={ROUTES.ADMIN_LOGIN} element={withSuspense(LoginPage)} />
         <Route path={ROUTES.REGISTER} element={withSuspense(RegisterPage)} />
         <Route path={ROUTES.FORGOT_PASSWORD} element={withSuspense(ForgotPasswordPage)} />
         <Route path={ROUTES.VERIFY_OTP} element={withSuspense(VerifyOTPPage)} />

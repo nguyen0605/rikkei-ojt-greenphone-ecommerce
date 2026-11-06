@@ -16,6 +16,7 @@ import {
   DeleteOutlined,
   CopyOutlined,
   StopOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons';
 import { useState } from 'react';
 import adminMarketingService from '@/services/adminMarketingService';
@@ -60,9 +61,10 @@ export default function AdminVoucherPage() {
     },
   });
 
-  // Nút vô hiệu hóa khẩn cấp 1-click
-  const emergencyDeactivateMut = useMutation({
+  // Nút vô hiệu hóa khẩn cấp hoặc kích hoạt lại 1-click
+  const toggleStatusMut = useMutation({
     mutationFn: (voucher: PromotionDTO) => {
+      const nextStatus = voucher.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
       const payload: PromotionRequest = {
         code: voucher.code,
         name: voucher.name,
@@ -74,13 +76,20 @@ export default function AdminVoucherPage() {
         quantity: voucher.quantity,
         startDate: voucher.startDate,
         endDate: voucher.endDate,
-        status: 'INACTIVE',
+        status: nextStatus,
       };
       return adminMarketingService.updateVoucher(voucher.id, payload);
     },
-    onSuccess: () => {
+    onSuccess: (_, voucher) => {
       qc.invalidateQueries({ queryKey: ['admin-vouchers'] });
-      message.warning('Đã vô hiệu hóa khẩn cấp mã voucher thành công!');
+      if (voucher.status === 'ACTIVE') {
+        message.warning(`Đã vô hiệu hóa mã voucher ${voucher.code}`);
+      } else {
+        message.success(`Đã kích hoạt lại mã voucher ${voucher.code}`);
+      }
+    },
+    onError: (err: any) => {
+      message.error(err?.response?.data?.message || 'Không thể thay đổi trạng thái');
     },
   });
 
@@ -216,11 +225,11 @@ export default function AdminVoucherPage() {
             title="Chỉnh sửa voucher"
           />
 
-          {r.status === 'ACTIVE' && (
+          {r.status === 'ACTIVE' ? (
             <Popconfirm
               title="Vô hiệu hóa khẩn cấp"
-              description={`Bạn có chắc muốn vô hiệu hóa ngay mã ${r.code}?`}
-              onConfirm={() => emergencyDeactivateMut.mutate(r)}
+              description={`Bạn có chắc muốn vô hiệu hóa mã ${r.code}?`}
+              onConfirm={() => toggleStatusMut.mutate(r)}
               okText="Vô hiệu hóa"
               cancelText="Hủy"
               okButtonProps={{ danger: true }}
@@ -230,7 +239,22 @@ export default function AdminVoucherPage() {
                 danger
                 icon={<StopOutlined />}
                 className="!rounded-full"
-                title="Vô hiệu hóa khẩn cấp voucher"
+                title="Khóa mã voucher (INACTIVE)"
+              />
+            </Popconfirm>
+          ) : (
+            <Popconfirm
+              title="Mở khóa voucher"
+              description={`Kích hoạt lại mã ${r.code}?`}
+              onConfirm={() => toggleStatusMut.mutate(r)}
+              okText="Kích hoạt"
+              cancelText="Hủy"
+            >
+              <Button
+                size="small"
+                icon={<CheckCircleOutlined />}
+                className="!rounded-full !text-primary-600 hover:!text-primary-700"
+                title="Kích hoạt lại voucher (ACTIVE)"
               />
             </Popconfirm>
           )}
