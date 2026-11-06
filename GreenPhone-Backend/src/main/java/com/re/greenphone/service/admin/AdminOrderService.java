@@ -8,6 +8,7 @@ import com.re.greenphone.dto.response.OrderDTO;
 import com.re.greenphone.entity.Order;
 import com.re.greenphone.entity.Payment;
 import com.re.greenphone.entity.PhoneVariant;
+import com.re.greenphone.enums.OrderStatus;
 import com.re.greenphone.mapper.OrderMapper;
 import com.re.greenphone.repository.OrderRepository;
 import com.re.greenphone.repository.PaymentRepository;
@@ -68,21 +69,37 @@ public class AdminOrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
 
-        if ("CANCELLED".equals(status)) {
-            // State gate: already-cancelled orders are not cancelled twice
-            if ("CANCELLED".equals(order.getOrderStatus())) {
-                throw new BadRequestException("Order is already cancelled");
-            }
+        OrderStatus currentStatus;
+        try {
+            currentStatus = OrderStatus.valueOf(order.getOrderStatus());
+        } catch (Exception e) {
+            throw new BadRequestException("Trạng thái hiện tại của đơn hàng không hợp lệ: " + order.getOrderStatus());
+        }
+
+        OrderStatus newStatus;
+        try {
+            newStatus = OrderStatus.valueOf(status);
+        } catch (Exception e) {
+            throw new BadRequestException("Trạng thái đơn hàng không hợp lệ: " + status);
+        }
+
+        if (!currentStatus.canTransitionTo(newStatus)) {
+            throw new BadRequestException("Không thể chuyển trạng thái từ " + currentStatus + " sang " + newStatus);
+        }
+
+        if (newStatus == OrderStatus.CANCELLED) {
             // Restore stock (pessimistic lock per variant — no double-restore)
-            for (var detail : order.getOrderDetails()) {
-                PhoneVariant variant = detail.getPhoneVariant();
-                if (variant.getStockQuantity() != null) {
-                    PhoneVariant locked = phoneVariantRepository.findByIdWithLock(variant.getId())
-                            .orElse(variant);
-                    int quantityBefore = locked.getStockQuantity();
-                    locked.setStockQuantity(quantityBefore + detail.getQuantity());
-                    inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Admin hủy đơn hàng");
-                    phoneVariantRepository.save(locked);
+            if (order.getOrderDetails() != null) {
+                for (var detail : order.getOrderDetails()) {
+                    PhoneVariant variant = detail.getPhoneVariant();
+                    if (variant != null && variant.getStockQuantity() != null) {
+                        PhoneVariant locked = phoneVariantRepository.findByIdWithLock(variant.getId())
+                                .orElse(variant);
+                        int quantityBefore = locked.getStockQuantity();
+                        locked.setStockQuantity(quantityBefore + detail.getQuantity());
+                        inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Admin hủy đơn hàng");
+                        phoneVariantRepository.save(locked);
+                    }
                 }
             }
             // Restore the promotion so the voucher can be reused
@@ -97,10 +114,10 @@ public class AdminOrderService {
             }
         }
 
-        order.setOrderStatus(status);
+        order.setOrderStatus(newStatus.name());
         order = orderRepository.save(order);
 
-        if ("DELIVERED".equals(status)) {
+        if (newStatus == OrderStatus.DELIVERED) {
             sendDeliveredEmail(order);
         }
 
