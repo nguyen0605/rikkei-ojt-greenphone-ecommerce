@@ -10,6 +10,8 @@ DOMAIN="greenphone.duckdns.org"
 EMAIL="${SSL_EMAIL:-admin@greenphone.vn}"
 WEBROOT_DIR="/var/www/certbot"
 CERT_DIR="/etc/letsencrypt/live/${DOMAIN}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEPLOY_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 echo "=============================================================================="
 echo "[$(date)] Khoi tao SSL HTTPS Let's Encrypt cho ${DOMAIN}..."
@@ -21,41 +23,23 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-# 2. Tao thu muc webroot cho ACME challenge
+# 2. Tao thu muc can thiet
 mkdir -p "${WEBROOT_DIR}"
 chmod -R 755 "${WEBROOT_DIR}"
 
 # 3. Cai dat Certbot tren Ubuntu neu chua co
 if ! command -v certbot >/dev/null 2>&1; then
-    echo "[$(date)] Dang cai dat Certbot..."
+    echo "[$(date)] Dang cai dat Certbot tren he dieu hanh..."
     apt update && apt install -y certbot
 fi
 
-# 4. Neu chua co chung chi, tao chung chi tam (dummy) de Nginx container khoi dong khong bi crash
-if [ ! -f "${CERT_DIR}/fullchain.pem" ]; then
-    echo "[$(date)] Chua co chung chi SSL. Tao chung chi tam thoi (self-signed) de Nginx khoi dong..."
-    mkdir -p "${CERT_DIR}"
-    openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
-        -keyout "${CERT_DIR}/privkey.pem" \
-        -out "${CERT_DIR}/fullchain.pem" \
-        -subj "/CN=${DOMAIN}" 2>/dev/null
-    chmod 600 "${CERT_DIR}/privkey.pem"
-    chmod 644 "${CERT_DIR}/fullchain.pem"
-    echo "[$(date)] Da tao xong chung chi tam thoi."
-fi
+# 4. Tam dung container frontend de giai phong cong 80 cho Certbot cap phat doc lap
+echo "[$(date)] Tam dung container greenphone-frontend de giai phong cong 80..."
+docker stop greenphone-frontend 2>/dev/null || true
 
-# 5. Khoi dong hoac reload Nginx de phuc vu /.well-known/acme-challenge/
-echo "[$(date)] Khoi dong / Reload Nginx container..."
-cd "$(dirname "$0")/.."
-docker compose -f docker-compose.prod.yml up -d frontend
-
-# Cho Nginx san sang
-sleep 3
-
-# 6. Chay Certbot xin cap chung chi Let's Encrypt chinh thuc
-echo "[$(date)] Dang gui yeu cau cap chung chi Let's Encrypt qua Certbot..."
-certbot certonly --webroot \
-    -w "${WEBROOT_DIR}" \
+# 5. Chay Certbot o che do Standalone de xin cap chung chi Let's Encrypt (tranh moi loi xung dot Nginx/SPA)
+echo "[$(date)] Dang gui yeu cau cap chung chi Let's Encrypt qua Certbot Standalone..."
+certbot certonly --standalone \
     -d "${DOMAIN}" \
     --email "${EMAIL}" \
     --agree-tos \
@@ -63,17 +47,17 @@ certbot certonly --webroot \
     --force-renewal \
     --non-interactive
 
-# 7. Reload Nginx de nap chung chi Let's Encrypt moi nhat
-echo "[$(date)] Cap chung chi thanh cong! Dang reload Nginx de ap dung HTTPS chinh thuc..."
-docker exec greenphone-frontend nginx -s reload
+# 6. Khoi chay / Reload toan bo frontend container voi chung chi SSL thuc te
+echo "[$(date)] Cap chung chi thanh cong! Dang khoi chay Nginx voi SSL HTTPS..."
+cd "${DEPLOY_DIR}"
+docker compose -f docker-compose.prod.yml up -d frontend
 
-# 8. Cai dat cronjob tu dong gia han chung chi (chay 03:00 moi ngay)
-CRON_JOB="0 3 * * * certbot renew --webroot -w ${WEBROOT_DIR} --quiet --post-hook 'docker exec greenphone-frontend nginx -s reload' >> /var/log/certbot_renew.log 2>&1"
+# 7. Cai dat cronjob tu dong gia han chung chi (chay vao 03:00 moi ngay)
+CRON_JOB="0 3 * * * certbot renew --standalone --pre-hook 'docker stop greenphone-frontend' --post-hook 'docker start greenphone-frontend' --quiet >> /var/log/certbot_renew.log 2>&1"
 (crontab -l 2>/dev/null | grep -v "certbot renew" ; echo "${CRON_JOB}") | crontab -
 
 echo "=============================================================================="
 echo "[$(date)] HOAN TAT CAI DAT SSL HTTPS!"
-echo "Website da san sang tai: https://${DOMAIN}"
+echo "Website da san sang hoat dong tai: https://${DOMAIN}"
 echo "Cronjob tu dong gia han SSL da duoc thiet lap tai 03:00 hang ngay."
 echo "=============================================================================="
-
