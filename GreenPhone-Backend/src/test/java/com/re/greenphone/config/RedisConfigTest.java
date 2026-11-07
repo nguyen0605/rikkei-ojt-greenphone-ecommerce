@@ -16,7 +16,7 @@ import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.RedisSerializer;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
@@ -75,7 +75,7 @@ class RedisConfigTest {
     @DisplayName("Kiểm tra RedisTemplate được cấu hình đúng ConnectionFactory và Serializer")
     void testRedisTemplateConfiguration() {
         ObjectMapper mapper = redisConfig.redisObjectMapper();
-        GenericJackson2JsonRedisSerializer jsonSerializer = redisConfig.redisJsonSerializer(mapper);
+        RedisSerializer<Object> jsonSerializer = redisConfig.redisJsonSerializer(mapper);
 
         RedisTemplate<String, Object> template = redisConfig.redisTemplate(connectionFactory, jsonSerializer);
         assertNotNull(template);
@@ -88,7 +88,7 @@ class RedisConfigTest {
     @DisplayName("Kiểm tra CacheManager cấu hình TTL riêng biệt cho Catalog, Promotion và Settings")
     void testCacheManagerTtlConfigurations() {
         ObjectMapper mapper = redisConfig.redisObjectMapper();
-        GenericJackson2JsonRedisSerializer jsonSerializer = redisConfig.redisJsonSerializer(mapper);
+        RedisSerializer<Object> jsonSerializer = redisConfig.redisJsonSerializer(mapper);
 
         RedisCacheManager manager = redisConfig.cacheManager(connectionFactory, jsonSerializer);
         assertNotNull(manager);
