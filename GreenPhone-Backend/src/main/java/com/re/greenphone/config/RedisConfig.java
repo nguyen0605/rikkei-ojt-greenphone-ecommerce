@@ -8,7 +8,6 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.Cache;
-import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.context.annotation.Bean;
@@ -19,6 +18,7 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
+import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import java.time.Duration;
@@ -28,7 +28,7 @@ import java.util.Map;
 @Slf4j
 @Configuration
 @EnableCaching
-public class RedisConfig implements CachingConfigurer {
+public class RedisConfig {
 
     @Value("${spring.cache.redis.time-to-live:1800000}")
     private long defaultTtlMillis;
@@ -47,14 +47,15 @@ public class RedisConfig implements CachingConfigurer {
     }
 
     @Bean
-    public GenericJackson2JsonRedisSerializer redisJsonSerializer(ObjectMapper redisObjectMapper) {
+    @SuppressWarnings({"deprecation", "removal"})
+    public RedisSerializer<Object> redisJsonSerializer(ObjectMapper redisObjectMapper) {
         return new GenericJackson2JsonRedisSerializer(redisObjectMapper);
     }
 
     @Bean
     public RedisTemplate<String, Object> redisTemplate(
             RedisConnectionFactory connectionFactory,
-            GenericJackson2JsonRedisSerializer redisJsonSerializer) {
+            RedisSerializer<Object> redisJsonSerializer) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
 
@@ -70,7 +71,7 @@ public class RedisConfig implements CachingConfigurer {
     @Bean
     public RedisCacheManager cacheManager(
             RedisConnectionFactory connectionFactory,
-            GenericJackson2JsonRedisSerializer redisJsonSerializer) {
+            RedisSerializer<Object> redisJsonSerializer) {
 
         RedisCacheConfiguration defaultConfiguration = RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(Duration.ofMillis(defaultTtlMillis))
@@ -108,7 +109,7 @@ public class RedisConfig implements CachingConfigurer {
         return manager;
     }
 
-    @Override
+    @Bean
     public CacheErrorHandler errorHandler() {
         return new CacheErrorHandler() {
             @Override

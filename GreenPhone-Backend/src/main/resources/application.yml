@@ -1,6 +1,8 @@
 spring:
   application:
     name: GreenPhone
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
   flyway:
     enabled: 
     baseline-on-migrate: true
