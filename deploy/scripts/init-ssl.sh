@@ -53,12 +53,20 @@ certbot certonly --standalone \
     --force-renewal \
     --non-interactive
 
-# 6. Khoi chay / Reload toan bo frontend container voi chung chi SSL thuc te
+# 6. Dong bo duong dan chung chi ve /etc/letsencrypt/live/${DOMAIN} (neu Certbot tao hau to -0001)
+LATEST_CERT_DIR=$(ls -d /etc/letsencrypt/live/${DOMAIN}* 2>/dev/null | tail -n 1)
+if [ -n "${LATEST_CERT_DIR}" ] && [ "${LATEST_CERT_DIR}" != "/etc/letsencrypt/live/${DOMAIN}" ]; then
+    echo "[$(date)] Phat hien chung chi tai ${LATEST_CERT_DIR}, dong bo ve /etc/letsencrypt/live/${DOMAIN}..."
+    rm -rf "/etc/letsencrypt/live/${DOMAIN}"
+    cp -rL "${LATEST_CERT_DIR}" "/etc/letsencrypt/live/${DOMAIN}"
+fi
+
+# 7. Khoi chay / Reload toan bo frontend container voi chung chi SSL thuc te
 echo "[$(date)] Cap chung chi thanh cong! Dang khoi chay Nginx voi SSL HTTPS..."
 cd "${DEPLOY_DIR}"
-docker compose -f docker-compose.prod.yml up -d frontend
+docker compose -f docker-compose.prod.yml restart frontend || docker compose -f docker-compose.prod.yml up -d frontend
 
-# 7. Cai dat cronjob tu dong gia han chung chi (chay vao 03:00 moi ngay)
+# 8. Cai dat cronjob tu dong gia han chung chi (chay vao 03:00 moi ngay)
 CRON_JOB="0 3 * * * certbot renew --standalone --pre-hook 'docker stop greenphone-frontend' --post-hook 'docker start greenphone-frontend' --quiet >> /var/log/certbot_renew.log 2>&1"
 (crontab -l 2>/dev/null | grep -v "certbot renew" ; echo "${CRON_JOB}") | crontab -
 
