@@ -33,7 +33,13 @@ if ! command -v certbot >/dev/null 2>&1; then
     apt update && apt install -y certbot
 fi
 
-# 4. Tam dung container frontend de giai phong cong 80 cho Certbot cap phat doc lap
+# 4. Xoa thu muc live cu neu chua co file renewal hop le (tranh loi Live directory exists)
+if [ -d "${CERT_DIR}" ] && [ ! -f "/etc/letsencrypt/renewal/${DOMAIN}.conf" ]; then
+    echo "[$(date)] Xoa thu muc chung chi tam de Certbot khoi tao lineage chinh thuc..."
+    rm -rf "${CERT_DIR}"
+fi
+
+# 5. Tam dung container frontend de giai phong cong 80 cho Certbot cap phat doc lap
 echo "[$(date)] Tam dung container greenphone-frontend de giai phong cong 80..."
 docker stop greenphone-frontend 2>/dev/null || true
 
