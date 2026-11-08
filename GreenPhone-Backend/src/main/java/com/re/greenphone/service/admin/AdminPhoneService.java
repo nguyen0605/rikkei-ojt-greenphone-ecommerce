@@ -63,6 +63,17 @@ public class AdminPhoneService {
     public PageResponse<PhoneDTO> getPhones(String keyword, Long brandId, String status,
                                             boolean lowStock,
                                             com.re.greenphone.common.pagination.PageRequest pageRequest) {
+        return getPhonesWithThreshold(keyword, brandId, status, lowStock, LOW_STOCK_THRESHOLD, pageRequest);
+    }
+
+    public PageResponse<PhoneDTO> getLowStockPhones(int threshold,
+                                                    com.re.greenphone.common.pagination.PageRequest pageRequest) {
+        return getPhonesWithThreshold(null, null, null, true, threshold, pageRequest);
+    }
+
+    private PageResponse<PhoneDTO> getPhonesWithThreshold(String keyword, Long brandId, String status,
+                                                          boolean lowStock, int threshold,
+                                                          com.re.greenphone.common.pagination.PageRequest pageRequest) {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(
                 pageRequest.getPage(), pageRequest.getSize(),
                 Sort.by(Sort.Direction.fromString(pageRequest.getSortDir()), pageRequest.getSortBy()));
@@ -81,7 +92,7 @@ public class AdminPhoneService {
             }
             if (lowStock) {
                 var variants = root.join("variants");
-                predicates.add(cb.lessThanOrEqualTo(variants.get("stockQuantity"), LOW_STOCK_THRESHOLD));
+                predicates.add(cb.lessThanOrEqualTo(variants.get("stockQuantity"), threshold));
                 cq.distinct(true);
             }
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
