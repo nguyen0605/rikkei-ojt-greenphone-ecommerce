@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
-import { Button, Tag, Descriptions, Spin, Steps, Modal, message } from 'antd';
+import { Button, Tag, Descriptions, Spin, Steps, Modal, Input, message } from 'antd';
 import { CreditCard, Clock, AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 import { orderService, paymentService } from '@/services';
@@ -43,6 +43,7 @@ export default function AccountOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancelReasonInput, setCancelReasonInput] = useState('');
 
   const { data: order, isLoading } = useQuery({
     queryKey: ['order', id],
@@ -59,10 +60,11 @@ export default function AccountOrderDetailPage() {
 
   // Mutation hủy đơn hàng phía khách hàng
   const cancelMutation = useMutation({
-    mutationFn: () => orderService.cancel(Number(id)),
+    mutationFn: () => orderService.cancel(Number(id), cancelReasonInput.trim() || undefined),
     onSuccess: () => {
       message.success('Đã hủy đơn hàng thành công');
       setCancelModalOpen(false);
+      setCancelReasonInput('');
       qc.invalidateQueries({ queryKey: ['order', id] });
       qc.invalidateQueries({ queryKey: ['orders'] });
     },
@@ -271,7 +273,10 @@ export default function AccountOrderDetailPage() {
       <Modal
         title="Xác nhận hủy đơn hàng"
         open={cancelModalOpen}
-        onCancel={() => setCancelModalOpen(false)}
+        onCancel={() => {
+          setCancelModalOpen(false);
+          setCancelReasonInput('');
+        }}
         onOk={() => cancelMutation.mutate()}
         okText="Xác nhận hủy"
         okButtonProps={{ danger: true, loading: cancelMutation.isPending }}
@@ -282,6 +287,19 @@ export default function AccountOrderDetailPage() {
           <p className="text-sm text-gray-700">
             Bạn có chắc chắn muốn hủy đơn hàng <strong>#{order.id}</strong> không?
           </p>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              Lý do hủy đơn (không bắt buộc):
+            </label>
+            <Input.TextArea
+              rows={2}
+              placeholder="VD: Đặt nhầm màu, muốn thay đổi địa chỉ..."
+              value={cancelReasonInput}
+              onChange={(e) => setCancelReasonInput(e.target.value)}
+              maxLength={200}
+              showCount
+            />
+          </div>
           <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
             ⚠️ Lưu ý: Khi hủy đơn hàng, số lượng tồn kho của sản phẩm và mã giảm giá Voucher đã dùng (nếu có) sẽ được khôi phục tự động.
           </div>
