@@ -475,9 +475,9 @@ export interface PromotionRequest {
   description: string;
   discountType: string;
   discountValue: number;
-  maxDiscountAmount: number;
-  minOrderValue: number;
-  quantity: number;
+  maxDiscountAmount?: number | null;
+  minOrderValue?: number | null;
+  quantity?: number;
   startDate: string;
   endDate: string;
   status?: string;

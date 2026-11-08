@@ -106,9 +106,11 @@ export default function VoucherFormModal({
             description: values.description?.trim() || '',
             discountType: values.discountType,
             discountValue: values.discountValue,
-            maxDiscountAmount: values.maxDiscountAmount || 0,
-            minOrderValue: values.minOrderValue || 0,
-            quantity: values.quantity,
+            maxDiscountAmount: values.discountType === 'PERCENT' && values.maxDiscountAmount && values.maxDiscountAmount > 0
+              ? values.maxDiscountAmount
+              : undefined,
+            minOrderValue: values.minOrderValue && values.minOrderValue > 0 ? values.minOrderValue : undefined,
+            quantity: values.quantity ?? 100,
             startDate: start.format('YYYY-MM-DDTHH:mm:ss'),
             endDate: end.format('YYYY-MM-DDTHH:mm:ss'),
           };
