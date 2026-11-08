@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -43,13 +44,15 @@ public class PromotionService {
         return promotions.stream()
                 .map(up -> {
                     Promotion promo = up.getPromotion();
-                    boolean eligible = promo.getStartDate().isBefore(now)
+                    boolean eligible = "ACTIVE".equals(promo.getStatus())
+                            && promo.getStartDate().isBefore(now)
                             && promo.getEndDate().isAfter(now)
                             && (promo.getMinOrderValue() == null || orderAmount.compareTo(promo.getMinOrderValue()) >= 0);
 
                     BigDecimal discountValue;
                     if ("PERCENT".equals(promo.getDiscountType())) {
-                        BigDecimal pctDiscount = orderAmount.multiply(promo.getDiscountValue().divide(BigDecimal.valueOf(100)));
+                        BigDecimal rate = promo.getDiscountValue().divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
+                        BigDecimal pctDiscount = orderAmount.multiply(rate).setScale(0, RoundingMode.HALF_UP);
                         discountValue = promo.getMaxDiscountAmount() != null
                                 && pctDiscount.compareTo(promo.getMaxDiscountAmount()) > 0
                                 ? promo.getMaxDiscountAmount() : pctDiscount;
