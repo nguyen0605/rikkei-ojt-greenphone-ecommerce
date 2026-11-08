@@ -1,7 +1,7 @@
 export { authService, userService } from "./authService";
 import { get, post, put, del } from './api';
 import type {
-  CartDTO, CartItemRequest, CartSyncRequest, OrderDTO, OrderRequest,
+  CartDTO, CartItemRequest, CartSyncRequest, OrderDTO,
   PaymentDTO, PaymentQRInfo, PromotionDTO, UserPromotionDTO, AvailablePromotionDTO, ReviewDTO,
   ReviewSummary, PageResponse, PhoneDTO, PhoneDetailDTO,
   PhoneVariantDTO, PhoneImageDTO, BrandDTO, BannerDTO,
@@ -52,13 +52,7 @@ export const cartService = {
 };
 
 // Order
-export const orderService = {
-  create: (data: OrderRequest) => post<OrderDTO>('/orders', data),
-  list: (params?: Record<string, string>) => get<PageResponse<OrderDTO>>('/orders', { params }),
-  detail: (id: number) => get<OrderDTO>('/orders/' + id),
-  cancel: (id: number) => put<OrderDTO>('/orders/' + id + '/cancel'),
-  applyPromotion: (id: number, userPromotionId: number) => put<OrderDTO>('/orders/' + id + '/promotion', { userPromotionId }),
-};
+export { orderService, default as defaultOrderService } from './orderService';
 
 // Payment
 export const paymentService = {
