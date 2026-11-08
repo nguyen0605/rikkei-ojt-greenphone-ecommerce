@@ -245,7 +245,7 @@ class PromotionServiceTest {
         try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
             mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
             when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-            when(promotionRepository.findByCode("SUMMER25")).thenReturn(Optional.of(activePromo));
+            when(promotionRepository.findByCodeWithLock("SUMMER25")).thenReturn(Optional.of(activePromo));
             when(userPromotionRepository.existsByUserIdAndPromotionId(1L, 10L)).thenReturn(false);
             when(userPromotionRepository.save(any(UserPromotion.class))).thenReturn(upActive);
             when(userPromotionMapper.toDto(upActive)).thenReturn(null); // Not testing mapper output
@@ -253,6 +253,32 @@ class PromotionServiceTest {
             promotionService.claimPromotion("SUMMER25");
 
             verify(userPromotionRepository).save(any(UserPromotion.class));
+            verify(promotionRepository).save(argThat(p -> p.getClaimedQuantity() == 1));
+        }
+    }
+
+    @Test
+    void claimPromotion_ReachedClaimLimit() {
+        try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
+            mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+
+            Promotion limitedPromo = Promotion.builder()
+                    .code("LIMITED")
+                    .quantity(10)
+                    .claimedQuantity(10)
+                    .startDate(LocalDateTime.now().minusDays(1))
+                    .endDate(LocalDateTime.now().plusDays(10))
+                    .status("ACTIVE")
+                    .build();
+            limitedPromo.setId(99L);
+
+            when(promotionRepository.findByCodeWithLock("LIMITED")).thenReturn(Optional.of(limitedPromo));
+            when(userPromotionRepository.existsByUserIdAndPromotionId(1L, 99L)).thenReturn(false);
+
+            assertThatThrownBy(() -> promotionService.claimPromotion("LIMITED"))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("claim limit");
         }
     }
 
@@ -261,7 +287,7 @@ class PromotionServiceTest {
         try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
             mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
             when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-            when(promotionRepository.findByCode("INVALID")).thenReturn(Optional.empty());
+            when(promotionRepository.findByCodeWithLock("INVALID")).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> promotionService.claimPromotion("INVALID"))
                     .isInstanceOf(ResourceNotFoundException.class)
@@ -274,7 +300,7 @@ class PromotionServiceTest {
         try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
             mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
             when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-            when(promotionRepository.findByCode("EXPIRED10")).thenReturn(Optional.of(expiredPromo));
+            when(promotionRepository.findByCodeWithLock("EXPIRED10")).thenReturn(Optional.of(expiredPromo));
 
             assertThatThrownBy(() -> promotionService.claimPromotion("EXPIRED10"))
                     .isInstanceOf(BadRequestException.class)
@@ -287,7 +313,7 @@ class PromotionServiceTest {
         try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
             mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
             when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-            when(promotionRepository.findByCode("SUMMER25")).thenReturn(Optional.of(activePromo));
+            when(promotionRepository.findByCodeWithLock("SUMMER25")).thenReturn(Optional.of(activePromo));
             when(userPromotionRepository.existsByUserIdAndPromotionId(1L, 10L)).thenReturn(true);
 
             assertThatThrownBy(() -> promotionService.claimPromotion("SUMMER25"))
