@@ -96,9 +96,14 @@ export default function CartPage() {
           </p>
         </div>
         <Popconfirm title="Xóa toàn bộ giỏ hàng?" onConfirm={async () => {
-          if (isAuthenticated) await dispatch(clearCartRemote()).unwrap();
-          else dispatch(clearCart());
-          message.success('Đã xóa toàn bộ');
+          try {
+            if (isAuthenticated) await dispatch(clearCartRemote()).unwrap();
+            else dispatch(clearCart());
+            message.success('Đã xóa toàn bộ');
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            message.error(msg || 'Lỗi khi xóa giỏ hàng');
+          }
         }} okText="Xóa" cancelText="Hủy">
           <Button danger type="text" icon={<DeleteOutlined />} className="!text-sm">Xóa tất cả</Button>
         </Popconfirm>
@@ -140,15 +145,25 @@ export default function CartPage() {
                 item={item}
                 checked={selectedIds.has(item.id)}
                 onToggle={() => toggleItem(item.id)}
-                onUpdate={(q) => {
-                  if (isAuthenticated) void dispatch(updateCartItem({ id: item.id, quantity: q }));
-                  else dispatch(updateQuantity({ id: item.id, quantity: q }));
+                onUpdate={async (q) => {
+                  try {
+                    if (isAuthenticated) await dispatch(updateCartItem({ id: item.id, quantity: q })).unwrap();
+                    else dispatch(updateQuantity({ id: item.id, quantity: q }));
+                  } catch (err: unknown) {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    message.error(msg || 'Không thể cập nhật số lượng');
+                  }
                 }}
                 onMove={(dir) => dispatch(moveCartItem({ id: item.id, dir }))}
                 onRemove={async () => {
-                  if (isAuthenticated) await dispatch(removeCartItem(item.id)).unwrap();
-                  else dispatch(removeFromCart(item.id));
-                  message.success('Đã xóa sản phẩm');
+                  try {
+                    if (isAuthenticated) await dispatch(removeCartItem(item.id)).unwrap();
+                    else dispatch(removeFromCart(item.id));
+                    message.success('Đã xóa sản phẩm');
+                  } catch (err: unknown) {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    message.error(msg || 'Không thể xóa sản phẩm');
+                  }
                 }}
               />
             ))}

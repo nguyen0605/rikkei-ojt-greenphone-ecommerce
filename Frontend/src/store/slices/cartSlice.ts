@@ -1,20 +1,46 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import type { CartItem, AppliedVoucher } from '@/types';
-import type { Product } from '@/types';
-import type { CartDTO, CartItemDTO, PhoneDetailDTO } from '@/types/api';
+import type { CartItem, AppliedVoucher, Product } from '@/types';
+import type {
+  CartDTO,
+  CartItemDTO,
+  CartItemRequest,
+  CartSyncRequest,
+  PhoneDetailDTO,
+} from '@/types/api';
 import { cartService, phoneService } from '@/services';
+import { clearGuestCart } from '@/store/guestCartStorage';
 
-interface CartState {
+export interface CartState {
   items: CartItem[];
   appliedVoucher: AppliedVoucher | null;
+  status: 'idle' | 'loading' | 'succeeded' | 'failed';
+  error: string | null;
 }
 
 const initialState: CartState = {
   items: [],
   appliedVoucher: null,
+  status: 'idle',
+  error: null,
 };
 
 const supportedBrands = ['apple', 'samsung', 'xiaomi', 'oppo', 'realme', 'vivo'] as const;
+
+function extractErrorMessage(error: unknown, fallback: string): string {
+  if (typeof error === 'object' && error !== null) {
+    const errObj = error as {
+      response?: { data?: { message?: string } };
+      message?: string;
+    };
+    if (errObj.response?.data?.message) {
+      return errObj.response.data.message;
+    }
+    if (errObj.message) {
+      return errObj.message;
+    }
+  }
+  return fallback;
+}
 
 function toProduct(item: CartItemDTO, detail?: PhoneDetailDTO): Product {
   const image = item.imageUrl || detail?.mainImageUrl || detail?.images?.[0]?.imageUrl || '';
@@ -71,6 +97,8 @@ async function mapCart(dto: CartDTO): Promise<CartState> {
       addedAt: new Date().toISOString(),
     })),
     appliedVoucher: null,
+    status: 'succeeded',
+    error: null,
   };
 }
 
@@ -78,59 +106,188 @@ async function fetchCartState(): Promise<CartState> {
   return mapCart(await cartService.get());
 }
 
-export const loadCart = createAsyncThunk('cart/load', async (_, thunkAPI) => {
-  const getAuth = () => (thunkAPI.getState() as { auth?: { user?: { id: number } | null; token?: string | null } }).auth;
-  const auth = getAuth();
-  const cart = await fetchCartState();
-  if (getAuth()?.user?.id !== auth?.user?.id || getAuth()?.token !== auth?.token) {
-    return thunkAPI.rejectWithValue('Cart session changed');
+/**
+ * BE2-01: Sync and merge client guest cart with user database cart.
+ * Clears local guest cart strictly after server confirms merge success.
+ */
+export const syncCart = createAsyncThunk<
+  CartState,
+  CartItemRequest[] | CartSyncRequest,
+  { rejectValue: string }
+>('cart/sync', async (payload, thunkAPI) => {
+  try {
+    const getAuth = () =>
+      (thunkAPI.getState() as {
+        auth?: { user?: { id: number } | null; token?: string | null };
+      }).auth;
+    const auth = getAuth();
+    if (!auth?.token) {
+      return thunkAPI.rejectWithValue('Chưa đăng nhập');
+    }
+
+    const request: CartSyncRequest = Array.isArray(payload)
+      ? { items: payload }
+      : payload;
+
+    const res = await cartService.sync(request);
+    const mapped = await mapCart(res);
+
+    if (
+      getAuth()?.user?.id !== auth?.user?.id ||
+      getAuth()?.token !== auth?.token
+    ) {
+      return thunkAPI.rejectWithValue('Phiên đăng nhập đã thay đổi');
+    }
+
+    clearGuestCart();
+    return mapped;
+  } catch (error: unknown) {
+    return thunkAPI.rejectWithValue(
+      extractErrorMessage(error, 'Không thể đồng bộ giỏ hàng'),
+    );
   }
-  return cart;
 });
 
-export const addCartItem = createAsyncThunk(
-  'cart/addItem',
-  async (data: { phoneVariantId: number; quantity: number }) => {
+/**
+ * Fetch authenticated user's remote shopping cart.
+ */
+export const fetchCart = createAsyncThunk<
+  CartState,
+  void,
+  { rejectValue: string }
+>('cart/fetch', async (_, thunkAPI) => {
+  try {
+    const getAuth = () =>
+      (thunkAPI.getState() as {
+        auth?: { user?: { id: number } | null; token?: string | null };
+      }).auth;
+    const auth = getAuth();
+    const cart = await fetchCartState();
+    if (
+      getAuth()?.user?.id !== auth?.user?.id ||
+      getAuth()?.token !== auth?.token
+    ) {
+      return thunkAPI.rejectWithValue('Cart session changed');
+    }
+    return cart;
+  } catch (error: unknown) {
+    return thunkAPI.rejectWithValue(
+      extractErrorMessage(error, 'Không thể tải giỏ hàng'),
+    );
+  }
+});
+
+// Alias for backward compatibility
+export const loadCart = fetchCart;
+
+/**
+ * Add an item to backend cart when authenticated.
+ */
+export const addCartItem = createAsyncThunk<
+  CartState,
+  { phoneVariantId: number; quantity: number },
+  { rejectValue: string }
+>('cart/addItem', async (data, thunkAPI) => {
+  try {
     await cartService.addItem(data);
-    return fetchCartState();
-  },
-);
+    return await fetchCartState();
+  } catch (error: unknown) {
+    return thunkAPI.rejectWithValue(
+      extractErrorMessage(error, 'Không thể thêm sản phẩm vào giỏ hàng'),
+    );
+  }
+});
 
-export const updateCartItem = createAsyncThunk(
-  'cart/updateItem',
-  async (data: { id: string; quantity: number }, thunkAPI) => {
-    const state = thunkAPI.getState() as { auth?: { isAuthenticated: boolean }; cart: CartState };
-    if (!state.auth?.isAuthenticated || !Number.isInteger(Number(data.id))) {
-      const items = state.cart.items.map((i) =>
-        i.id === data.id ? { ...i, quantity: Math.max(1, data.quantity) } : i,
-      );
-      return { items, appliedVoucher: state.cart.appliedVoucher };
-    }
+export const addToCartAsync = addCartItem;
+
+/**
+ * Update quantity of a cart item.
+ */
+export const updateCartItem = createAsyncThunk<
+  CartState,
+  { id: string; quantity: number },
+  { rejectValue: string }
+>('cart/updateItem', async (data, thunkAPI) => {
+  const state = thunkAPI.getState() as {
+    auth?: { isAuthenticated: boolean };
+    cart: CartState;
+  };
+  if (!state.auth?.isAuthenticated || !Number.isInteger(Number(data.id))) {
+    const items = state.cart.items.map((i) =>
+      i.id === data.id ? { ...i, quantity: Math.max(1, data.quantity) } : i,
+    );
+    return {
+      items,
+      appliedVoucher: state.cart.appliedVoucher,
+      status: 'succeeded',
+      error: null,
+    };
+  }
+  try {
     await cartService.updateItem(Number(data.id), data.quantity);
-    return fetchCartState();
-  },
-);
+    return await fetchCartState();
+  } catch (error: unknown) {
+    return thunkAPI.rejectWithValue(
+      extractErrorMessage(error, 'Không thể cập nhật số lượng'),
+    );
+  }
+});
 
-export const removeCartItem = createAsyncThunk(
-  'cart/removeItem',
-  async (id: string, thunkAPI) => {
-    const state = thunkAPI.getState() as { auth?: { isAuthenticated: boolean }; cart: CartState };
-    if (!state.auth?.isAuthenticated || !Number.isInteger(Number(id))) {
-      const items = state.cart.items.filter((i) => i.id !== id);
-      return { items, appliedVoucher: state.cart.appliedVoucher };
-    }
+export const updateQuantityAsync = updateCartItem;
+
+/**
+ * Remove an item from cart.
+ */
+export const removeCartItem = createAsyncThunk<
+  CartState,
+  string,
+  { rejectValue: string }
+>('cart/removeItem', async (id, thunkAPI) => {
+  const state = thunkAPI.getState() as {
+    auth?: { isAuthenticated: boolean };
+    cart: CartState;
+  };
+  if (!state.auth?.isAuthenticated || !Number.isInteger(Number(id))) {
+    const items = state.cart.items.filter((i) => i.id !== id);
+    return {
+      items,
+      appliedVoucher: state.cart.appliedVoucher,
+      status: 'succeeded',
+      error: null,
+    };
+  }
+  try {
     await cartService.removeItem(Number(id));
-    return fetchCartState();
-  },
-);
+    return await fetchCartState();
+  } catch (error: unknown) {
+    return thunkAPI.rejectWithValue(
+      extractErrorMessage(error, 'Không thể xóa sản phẩm'),
+    );
+  }
+});
 
-export const clearCartRemote = createAsyncThunk('cart/clearRemote', async (_, thunkAPI) => {
+export const removeItemAsync = removeCartItem;
+
+/**
+ * Clear user cart on server when authenticated.
+ */
+export const clearCartRemote = createAsyncThunk<
+  CartState,
+  void,
+  { rejectValue: string }
+>('cart/clearRemote', async (_, thunkAPI) => {
   const state = thunkAPI.getState() as { auth?: { isAuthenticated: boolean } };
   if (!state.auth?.isAuthenticated) {
     return initialState;
   }
-  await cartService.clear();
-  return initialState;
+  try {
+    await cartService.clear();
+    return initialState;
+  } catch (error: unknown) {
+    return thunkAPI.rejectWithValue(
+      extractErrorMessage(error, 'Không thể xóa toàn bộ giỏ hàng'),
+    );
+  }
 });
 
 const cartSlice = createSlice({
@@ -200,6 +357,8 @@ const cartSlice = createSlice({
     clearCart: (state) => {
       state.items = [];
       state.appliedVoucher = null;
+      state.status = 'idle';
+      state.error = null;
     },
 
     applyVoucher: (state, action: PayloadAction<AppliedVoucher>) => {
@@ -211,17 +370,70 @@ const cartSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    const replaceCart = (state: CartState, action: { payload: CartState }) => {
+    const setPending = (state: CartState) => {
+      state.status = 'loading';
+      state.error = null;
+    };
+
+    const setFulfilled = (
+      state: CartState,
+      action: PayloadAction<CartState>,
+    ) => {
+      state.status = 'succeeded';
       state.items = action.payload.items;
       state.appliedVoucher = action.payload.appliedVoucher;
+      state.error = null;
+    };
+
+    const setRejected = (
+      state: CartState,
+      action: { payload?: unknown; error?: { message?: string } },
+    ) => {
+      state.status = 'failed';
+      state.error =
+        (typeof action.payload === 'string' && action.payload) ||
+        action.error?.message ||
+        'Lỗi thao tác giỏ hàng';
     };
 
     builder
-      .addCase(loadCart.fulfilled, replaceCart)
-      .addCase(addCartItem.fulfilled, replaceCart)
-      .addCase(updateCartItem.fulfilled, replaceCart)
-      .addCase(removeCartItem.fulfilled, replaceCart)
-      .addCase(clearCartRemote.fulfilled, replaceCart);
+      // fetchCart / loadCart
+      .addCase(fetchCart.pending, setPending)
+      .addCase(fetchCart.fulfilled, setFulfilled)
+      .addCase(fetchCart.rejected, setRejected)
+      // syncCart
+      .addCase(syncCart.pending, setPending)
+      .addCase(syncCart.fulfilled, setFulfilled)
+      .addCase(syncCart.rejected, setRejected)
+      // addCartItem
+      .addCase(addCartItem.pending, setPending)
+      .addCase(addCartItem.fulfilled, setFulfilled)
+      .addCase(addCartItem.rejected, setRejected)
+      // updateCartItem
+      .addCase(updateCartItem.pending, setPending)
+      .addCase(updateCartItem.fulfilled, setFulfilled)
+      .addCase(updateCartItem.rejected, setRejected)
+      // removeCartItem
+      .addCase(removeCartItem.pending, setPending)
+      .addCase(removeCartItem.fulfilled, setFulfilled)
+      .addCase(removeCartItem.rejected, setRejected)
+      // clearCartRemote
+      .addCase(clearCartRemote.pending, setPending)
+      .addCase(clearCartRemote.fulfilled, setFulfilled)
+      .addCase(clearCartRemote.rejected, setRejected)
+      // Reset on logout
+      .addMatcher(
+        (action) =>
+          action.type === 'auth/logout' ||
+          action.type === 'auth/logout/fulfilled',
+        (state) => {
+          state.items = [];
+          state.appliedVoucher = null;
+          state.status = 'idle';
+          state.error = null;
+          clearGuestCart();
+        },
+      );
   },
 });
 

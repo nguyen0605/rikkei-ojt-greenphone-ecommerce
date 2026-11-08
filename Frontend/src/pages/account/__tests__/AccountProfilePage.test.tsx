@@ -8,7 +8,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import authReducer from '@/store/slices/authSlice';
 import AccountProfilePage from '@/pages/account/AccountProfilePage';
-import { userService, orderService, reviewService } from '@/services';
+import { userService } from '@/services';
 
 vi.mock('@/services', () => ({
   userService: {

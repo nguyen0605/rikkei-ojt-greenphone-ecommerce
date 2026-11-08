@@ -9,10 +9,10 @@ export function readGuestCart(): CartState {
     if (Array.isArray(items) && items.every((item) => item && typeof item.id === 'string'
       && Number.isInteger(item.quantity) && item.quantity > 0 && item.product
       && typeof item.product.name === 'string' && Number.isFinite(item.product.price))) {
-      return { items, appliedVoucher: null };
+      return { items, appliedVoucher: null, status: 'idle', error: null };
     }
   } catch { /* Invalid or unavailable browser storage starts an empty guest cart. */ }
-  return { items: [], appliedVoucher: null };
+  return { items: [], appliedVoucher: null, status: 'idle', error: null };
 }
 
 export function clearGuestCart() {

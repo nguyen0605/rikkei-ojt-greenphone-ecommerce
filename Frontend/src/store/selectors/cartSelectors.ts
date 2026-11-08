@@ -6,10 +6,11 @@ const selectAppliedVoucher = (state: RootState) => state.cart.appliedVoucher;
 const selectCheckoutVoucherDiscount = (state: RootState) => state.checkout?.voucherDiscount ?? 0;
 const selectSettings = (state: RootState) => state.settings;
 
-export const selectCartItemsList = createSelector(
-  [selectCartItems],
-  (items) => items,
-);
+export const selectCartItemsList = selectCartItems;
+
+export const selectCartStatus = (state: RootState) => state.cart.status;
+export const selectCartError = (state: RootState) => state.cart.error;
+export const selectCartLoading = (state: RootState) => state.cart.status === 'loading';
 
 export const selectCartTotalItems = createSelector([selectCartItems], (items) =>
   items.reduce((sum, item) => sum + item.quantity, 0),

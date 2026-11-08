@@ -47,6 +47,7 @@ const PageLoader = () => (
   </div>
 );
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const withSuspense = (Component: LazyExoticComponent<ComponentType<any>>) => (
   <Suspense fallback={<PageLoader />}>
     <Component />
