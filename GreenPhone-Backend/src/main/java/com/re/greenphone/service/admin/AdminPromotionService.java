@@ -8,6 +8,7 @@ import com.re.greenphone.dto.response.PromotionDTO;
 import com.re.greenphone.entity.Promotion;
 import com.re.greenphone.mapper.PromotionMapper;
 import com.re.greenphone.repository.PromotionRepository;
+import com.re.greenphone.repository.UserPromotionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -27,6 +28,7 @@ import java.util.List;
 public class AdminPromotionService {
 
     private final PromotionRepository promotionRepository;
+    private final UserPromotionRepository userPromotionRepository;
     private final PromotionMapper promotionMapper;
 
     @Transactional(readOnly = true)
@@ -134,6 +136,15 @@ public class AdminPromotionService {
     public void deletePromotion(Long id) {
         Promotion promo = promotionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Promotion", "id", id));
-        promotionRepository.delete(promo);
+
+        boolean isReferenced = userPromotionRepository.existsByPromotionId(id);
+        if (isReferenced) {
+            promo.setStatus("INACTIVE");
+            promotionRepository.save(promo);
+            log.info("Chương trình khuyến mãi ID {} đã có người nhận hoặc sử dụng, thực hiện Soft Delete (chuyển sang INACTIVE)", id);
+        } else {
+            promotionRepository.delete(promo);
+            log.info("Chương trình khuyến mãi ID {} chưa có ai nhận, đã xóa hoàn toàn khỏi hệ thống", id);
+        }
     }
 }

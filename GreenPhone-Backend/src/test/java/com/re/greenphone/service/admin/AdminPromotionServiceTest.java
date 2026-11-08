@@ -8,6 +8,7 @@ import com.re.greenphone.dto.response.PromotionDTO;
 import com.re.greenphone.entity.Promotion;
 import com.re.greenphone.mapper.PromotionMapper;
 import com.re.greenphone.repository.PromotionRepository;
+import com.re.greenphone.repository.UserPromotionRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +34,9 @@ class AdminPromotionServiceTest {
 
     @Mock
     private PromotionRepository promotionRepository;
+
+    @Mock
+    private UserPromotionRepository userPromotionRepository;
 
     @Mock
     private PromotionMapper promotionMapper;
@@ -192,4 +196,36 @@ class AdminPromotionServiceTest {
         assertThat(response.getContent()).hasSize(1);
         assertThat(response.getTotalElements()).isEqualTo(1);
     }
+
+    @Test
+    @DisplayName("Admin xóa Promotion đã có người nhận -> Soft delete chuyển INACTIVE")
+    void deletePromotion_WhenReferenced_SoftDelete() {
+        Promotion promo = Promotion.builder().code("VOUCHER1").status("ACTIVE").build();
+        promo.setId(10L);
+
+        when(promotionRepository.findById(10L)).thenReturn(Optional.of(promo));
+        when(userPromotionRepository.existsByPromotionId(10L)).thenReturn(true);
+
+        adminPromotionService.deletePromotion(10L);
+
+        assertThat(promo.getStatus()).isEqualTo("INACTIVE");
+        verify(promotionRepository).save(promo);
+        verify(promotionRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("Admin xóa Promotion chưa ai nhận -> Hard delete khỏi database")
+    void deletePromotion_WhenNotReferenced_HardDelete() {
+        Promotion promo = Promotion.builder().code("VOUCHER2").status("ACTIVE").build();
+        promo.setId(20L);
+
+        when(promotionRepository.findById(20L)).thenReturn(Optional.of(promo));
+        when(userPromotionRepository.existsByPromotionId(20L)).thenReturn(false);
+
+        adminPromotionService.deletePromotion(20L);
+
+        verify(promotionRepository).delete(promo);
+        verify(promotionRepository, never()).save(any());
+    }
 }
+

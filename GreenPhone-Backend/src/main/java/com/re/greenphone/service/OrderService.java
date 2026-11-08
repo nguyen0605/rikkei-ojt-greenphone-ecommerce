@@ -34,6 +34,7 @@ public class OrderService {
     private final UserRepository userRepository;
     private final PhoneVariantRepository phoneVariantRepository;
     private final UserPromotionRepository userPromotionRepository;
+    private final PromotionRepository promotionRepository;
     private final CartRepository cartRepository;
     private final OrderMapper orderMapper;
     private final EmailService emailService;
@@ -134,6 +135,10 @@ public class OrderService {
             up.setStatus("USED");
             up.setUsedAt(now);
             userPromotionRepository.save(up);
+
+            int currentUsed = promo.getUsedQuantity() != null ? promo.getUsedQuantity() : 0;
+            promo.setUsedQuantity(currentUsed + 1);
+            promotionRepository.save(promo);
         }
 
         order.setTotalAmount(total);
@@ -225,11 +230,25 @@ public class OrderService {
             }
         }
 
-        // Restore the promotion so the voucher can be reused
+        // Restore the promotion so the voucher can be reused (only if not expired)
         if (order.getUserPromotion() != null) {
-            order.getUserPromotion().setStatus("AVAILABLE");
-            order.getUserPromotion().setUsedAt(null);
-            userPromotionRepository.save(order.getUserPromotion());
+            UserPromotion up = order.getUserPromotion();
+            Promotion promo = up.getPromotion();
+            LocalDateTime now = LocalDateTime.now();
+
+            if (promo != null && "ACTIVE".equals(promo.getStatus())
+                    && (promo.getEndDate() == null || promo.getEndDate().isAfter(now))) {
+                up.setStatus("AVAILABLE");
+            } else {
+                up.setStatus("EXPIRED");
+            }
+            up.setUsedAt(null);
+            userPromotionRepository.save(up);
+
+            if (promo != null && promo.getUsedQuantity() != null && promo.getUsedQuantity() > 0) {
+                promo.setUsedQuantity(promo.getUsedQuantity() - 1);
+                promotionRepository.save(promo);
+            }
         }
 
         order.setOrderStatus("CANCELLED");
@@ -289,12 +308,23 @@ public class OrderService {
             throw new BadRequestException("Giá trị đơn hàng chưa đạt mức tối thiểu để áp dụng mã khuyến mãi");
         }
 
-        // 6. Hoàn lại voucher cũ về AVAILABLE nếu đơn hàng đã gắn voucher khác trước đó
+        // 6. Hoàn lại voucher cũ nếu đơn hàng đã gắn voucher khác trước đó
         if (order.getUserPromotion() != null && !order.getUserPromotion().getId().equals(up.getId())) {
             UserPromotion oldUp = order.getUserPromotion();
-            oldUp.setStatus("AVAILABLE");
+            Promotion oldPromo = oldUp.getPromotion();
+            if (oldPromo != null && "ACTIVE".equals(oldPromo.getStatus())
+                    && (oldPromo.getEndDate() == null || oldPromo.getEndDate().isAfter(now))) {
+                oldUp.setStatus("AVAILABLE");
+            } else {
+                oldUp.setStatus("EXPIRED");
+            }
             oldUp.setUsedAt(null);
             userPromotionRepository.save(oldUp);
+
+            if (oldPromo != null && oldPromo.getUsedQuantity() != null && oldPromo.getUsedQuantity() > 0) {
+                oldPromo.setUsedQuantity(oldPromo.getUsedQuantity() - 1);
+                promotionRepository.save(oldPromo);
+            }
         }
 
         BigDecimal discount = calculateDiscount(order.getTotalAmount(), promo);
@@ -314,6 +344,10 @@ public class OrderService {
         up.setStatus("USED");
         up.setUsedAt(now);
         userPromotionRepository.save(up);
+
+        int currentUsed = promo.getUsedQuantity() != null ? promo.getUsedQuantity() : 0;
+        promo.setUsedQuantity(currentUsed + 1);
+        promotionRepository.save(promo);
 
         order = orderRepository.save(order);
         return orderMapper.toDto(order);

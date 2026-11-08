@@ -33,6 +33,7 @@ class OrderServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private PhoneVariantRepository phoneVariantRepository;
     @Mock private UserPromotionRepository userPromotionRepository;
+    @Mock private PromotionRepository promotionRepository;
     @Mock private CartRepository cartRepository;
     @Mock private OrderMapper orderMapper;
     @Mock private EmailService emailService;
@@ -251,7 +252,8 @@ class OrderServiceTest {
         securityUtilsMock.when(SecurityUtils::getCurrentUserId).thenReturn(USER_ID);
 
         PhoneVariant v = createVariant(100L, new BigDecimal("15000000"), null, 5);
-        UserPromotion up = UserPromotion.builder().status("USED").usedAt(java.time.LocalDateTime.now()).build();
+        Promotion promo = Promotion.builder().code("VOUCHER").status("ACTIVE").endDate(java.time.LocalDateTime.now().plusDays(5)).usedQuantity(1).build();
+        UserPromotion up = UserPromotion.builder().promotion(promo).status("USED").usedAt(java.time.LocalDateTime.now()).build();
         up.setId(77L);
 
         com.re.greenphone.entity.Order order = com.re.greenphone.entity.Order.builder()
@@ -275,8 +277,36 @@ class OrderServiceTest {
         assertEquals("AVAILABLE", up.getStatus());
         assertNull(up.getUsedAt());
         verify(userPromotionRepository).save(up);
+        verify(promotionRepository).save(argThat(p -> p.getUsedQuantity() == 0));
         assertEquals("CANCELLED", order.getOrderStatus());
         assertEquals("[Lý do hủy: Đặt nhầm màu]", order.getNote());
+    }
+
+    @Test void cancelOrder_SetsVoucherExpired_WhenPromotionExpired() {
+        User u = createUser(); u.setId(USER_ID);
+        securityUtilsMock.when(SecurityUtils::getCurrentUserId).thenReturn(USER_ID);
+
+        Promotion expiredPromo = Promotion.builder().code("EXPIRED_VOUCHER").status("ACTIVE")
+                .endDate(java.time.LocalDateTime.now().minusDays(1)).usedQuantity(1).build();
+        UserPromotion up = UserPromotion.builder().promotion(expiredPromo).status("USED").usedAt(java.time.LocalDateTime.now()).build();
+        up.setId(78L);
+
+        com.re.greenphone.entity.Order order = com.re.greenphone.entity.Order.builder()
+                .user(u).totalAmount(new BigDecimal("1000000")).finalAmount(new BigDecimal("900000"))
+                .orderStatus("PENDING").paymentStatus("UNPAID").userPromotion(up).build();
+        order.setId(3L);
+        order.setOrderDetails(List.of());
+
+        when(orderRepository.findById(3L)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any())).thenReturn(order);
+        when(orderMapper.toDto(any())).thenReturn(new OrderDTO());
+
+        orderService.cancelOrder(3L, "Đổi ý");
+
+        assertEquals("EXPIRED", up.getStatus());
+        assertNull(up.getUsedAt());
+        verify(userPromotionRepository).save(up);
+        verify(promotionRepository).save(argThat(p -> p.getUsedQuantity() == 0));
     }
 
     @Test void cancelOrder_ThrowsWhenAnotherUserOrder() {
