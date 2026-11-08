@@ -34,6 +34,7 @@ function renderPage(initialState = {}) {
         isAuthenticated: true,
         loading: false,
         error: null,
+        errorCode: null,
         rememberedEmail: null,
         ...initialState,
       },

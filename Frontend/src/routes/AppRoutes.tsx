@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ComponentType, type LazyExoticComponent } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Spin } from 'antd';
 import DefaultLayout from '@/layouts/DefaultLayout';
 import CheckoutLayout from '@/layouts/CheckoutLayout';
