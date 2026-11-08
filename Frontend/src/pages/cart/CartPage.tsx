@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button, Empty, App, Popconfirm, Checkbox } from 'antd';
 import { DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, ShoppingOutlined, TagOutlined, CloseOutlined, RightOutlined } from '@ant-design/icons';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { removeCartItem, updateCartItem, moveItem as moveCartItem, clearCartRemote, applyVoucher } from '@/store/slices/cartSlice';
+import { removeCartItem, updateCartItem, removeFromCart, updateQuantity, clearCart, moveItem as moveCartItem, clearCartRemote, applyVoucher } from '@/store/slices/cartSlice';
 import { selectCartSummary } from '@/store/selectors/cartSelectors';
 import type { CartItem } from '@/types';
 import { formatVND } from '@/utils';
@@ -17,6 +17,7 @@ export default function CartPage() {
   const dispatch = useAppDispatch();
   const { message } = App.useApp();
   const items = useAppSelector((s) => s.cart.items);
+  const isAuthenticated = useAppSelector((s) => s.auth.isAuthenticated);
   const appliedVoucher = useAppSelector((s) => s.cart.appliedVoucher);
   const summary = useAppSelector(selectCartSummary);
 
@@ -94,7 +95,11 @@ export default function CartPage() {
             {summary.totalItems} sản phẩm · {appliedVoucher ? `Mã ${appliedVoucher.code} đang áp dụng` : 'Chưa có mã giảm giá'}
           </p>
         </div>
-        <Popconfirm title="Xóa toàn bộ giỏ hàng?" onConfirm={() => { void dispatch(clearCartRemote()).unwrap().then(() => message.success('Đã xóa toàn bộ')); }} okText="Xóa" cancelText="Hủy">
+        <Popconfirm title="Xóa toàn bộ giỏ hàng?" onConfirm={async () => {
+          if (isAuthenticated) await dispatch(clearCartRemote()).unwrap();
+          else dispatch(clearCart());
+          message.success('Đã xóa toàn bộ');
+        }} okText="Xóa" cancelText="Hủy">
           <Button danger type="text" icon={<DeleteOutlined />} className="!text-sm">Xóa tất cả</Button>
         </Popconfirm>
       </div>
@@ -135,10 +140,14 @@ export default function CartPage() {
                 item={item}
                 checked={selectedIds.has(item.id)}
                 onToggle={() => toggleItem(item.id)}
-                onUpdate={(q) => { void dispatch(updateCartItem({ id: item.id, quantity: q })); }}
+                onUpdate={(q) => {
+                  if (isAuthenticated) void dispatch(updateCartItem({ id: item.id, quantity: q }));
+                  else dispatch(updateQuantity({ id: item.id, quantity: q }));
+                }}
                 onMove={(dir) => dispatch(moveCartItem({ id: item.id, dir }))}
-                onRemove={() => {
-                  void dispatch(removeCartItem(item.id)).unwrap();
+                onRemove={async () => {
+                  if (isAuthenticated) await dispatch(removeCartItem(item.id)).unwrap();
+                  else dispatch(removeFromCart(item.id));
                   message.success('Đã xóa sản phẩm');
                 }}
               />

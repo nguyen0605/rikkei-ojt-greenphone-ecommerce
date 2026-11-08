@@ -9,6 +9,7 @@ import com.re.greenphone.mapper.BannerMapper;
 import com.re.greenphone.repository.BannerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -43,6 +44,7 @@ public class AdminBannerService {
                 page.getTotalElements(), page.getTotalPages(), page.isLast());
     }
 
+    @CacheEvict(value = "banners", allEntries = true)
     public BannerDTO createBanner(BannerRequest request) {
         Banner banner = Banner.builder()
                 .title(request.getTitle())
@@ -55,6 +57,7 @@ public class AdminBannerService {
         return bannerMapper.toDto(banner);
     }
 
+    @CacheEvict(value = "banners", allEntries = true)
     public BannerDTO updateBanner(Long id, BannerRequest request) {
         Banner banner = bannerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Banner", "id", id));
@@ -67,6 +70,7 @@ public class AdminBannerService {
         return bannerMapper.toDto(banner);
     }
 
+    @CacheEvict(value = "banners", allEntries = true)
     public void deleteBanner(Long id) {
         Banner banner = bannerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Banner", "id", id));

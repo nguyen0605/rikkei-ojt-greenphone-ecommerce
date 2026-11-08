@@ -1,12 +1,11 @@
-import { lazy, Suspense, type ReactElement } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense, type ComponentType, type LazyExoticComponent } from 'react';
+import { Routes, Route } from 'react-router-dom';
 import { Spin } from 'antd';
 import DefaultLayout from '@/layouts/DefaultLayout';
 import CheckoutLayout from '@/layouts/CheckoutLayout';
 import AccountLayout from '@/layouts/AccountLayout';
 import AdminLayout from '@/layouts/AdminLayout';
 import AuthLayout from '@/pages/auth/AuthLayout';
-import RequireAuth from '@/components/auth/RequireAuth';
 import { ROUTES } from './routePaths';
 
 const HomePage = lazy(() => import('@/pages/HomePage'));
@@ -32,6 +31,7 @@ const AccountReviewsPage = lazy(() => import('@/pages/account/AccountReviewsPage
 const AccountPasswordPage = lazy(() => import('@/pages/account/AccountPasswordPage'));
 const AdminDashboardPage = lazy(() => import('@/pages/admin/AdminDashboardPage'));
 const AdminProductsPage = lazy(() => import('@/pages/admin/AdminProductsPage'));
+const AdminInventoryPage = lazy(() => import('@/pages/admin/AdminInventoryPage'));
 const AdminBrandsPage = lazy(() => import('@/pages/admin/AdminBrandsPage'));
 const AdminOptionsPage = lazy(() => import('@/pages/admin/AdminOptionsPage'));
 const AdminOrdersPage = lazy(() => import('@/pages/admin/AdminOrdersPage'));
@@ -47,7 +47,7 @@ const PageLoader = () => (
   </div>
 );
 
-const withSuspense = (Component: React.LazyExoticComponent<() => ReactElement | null>) => (
+const withSuspense = (Component: LazyExoticComponent<ComponentType<any>>) => (
   <Suspense fallback={<PageLoader />}>
     <Component />
   </Suspense>
@@ -62,7 +62,7 @@ export default function AppRoutes() {
         <Route path={ROUTES.PRODUCTS} element={withSuspense(ProductsPage)} />
         <Route path={ROUTES.PRODUCT_DETAIL()} element={withSuspense(ProductDetailPage)} />
         <Route path={ROUTES.VOUCHERS} element={withSuspense(VouchersPage)} />
-        <Route path={ROUTES.CART} element={<RequireAuth>{withSuspense(CartPage)}</RequireAuth>} />
+        <Route path={ROUTES.CART} element={withSuspense(CartPage)} />
         <Route path={ROUTES.DIEU_KHOAN} element={withSuspense(TermsPage)} />
         <Route path={ROUTES.CHINH_SACH_BAO_MAT} element={withSuspense(PrivacyPage)} />
         <Route path="*" element={withSuspense(NotFoundPage)} />
@@ -104,6 +104,7 @@ export default function AppRoutes() {
       <Route element={<AdminLayout />}>
         <Route path={ROUTES.ADMIN} element={withSuspense(AdminDashboardPage)} />
         <Route path={ROUTES.ADMIN_PRODUCTS} element={withSuspense(AdminProductsPage)} />
+        <Route path={ROUTES.ADMIN_INVENTORY} element={withSuspense(AdminInventoryPage)} />
         <Route path={ROUTES.ADMIN_BRANDS} element={withSuspense(AdminBrandsPage)} />
         <Route path={ROUTES.ADMIN_OPTIONS} element={withSuspense(AdminOptionsPage)} />
         <Route path={ROUTES.ADMIN_ORDERS} element={withSuspense(AdminOrdersPage)} />

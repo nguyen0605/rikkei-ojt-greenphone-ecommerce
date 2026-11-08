@@ -2,14 +2,15 @@ export { authService } from "./authService";
 export { userService, formatFullAddress } from "./userService";
 import { get, post, put, del } from './api';
 import type {
-  CartDTO, CartItemRequest, OrderDTO, OrderRequest,
+  CartDTO, CartItemRequest, CartSyncRequest, OrderDTO, OrderRequest,
   PaymentDTO, PaymentQRInfo, PromotionDTO, UserPromotionDTO, AvailablePromotionDTO, ReviewDTO,
   ReviewSummary, PageResponse, PhoneDTO, PhoneDetailDTO,
   PhoneVariantDTO, PhoneImageDTO, BrandDTO, BannerDTO,
-  PhoneRequest, PhoneVariantRequest, BrandRequest,
+  PhoneRequest, PhoneVariantRequest, BrandRequest, InventoryStockMovementRequest,
   BannerRequest, PromotionRequest, RevenueStats,
   OrderStats, TopSellingPhone, UserDTO, SettingsDTO,
   OptionDTO, OptionRequest, OptionItemDTO, OptionItemRequest, OptionTreeDTO,
+  InventoryHistoryDTO,
 } from '@/types/api';
 
 // Phone
@@ -44,6 +45,7 @@ export const reviewService = {
 // Cart
 export const cartService = {
   get: () => get<CartDTO>('/cart'),
+  sync: (data: CartSyncRequest) => post<CartDTO>('/cart/sync', data),
   addItem: (data: CartItemRequest) => post<CartDTO>('/cart/items', data),
   updateItem: (id: number, quantity: number) => put<CartDTO>('/cart/items/' + id, { quantity }),
   removeItem: (id: number) => del<CartDTO>('/cart/items/' + id),
@@ -93,6 +95,11 @@ export const adminPhoneService = {
   reorderImages: (phoneId: number, imageIds: number[]) => put<PhoneImageDTO[]>('/admin/phones/' + phoneId + '/images/reorder', { imageIds }),
 };
 
+export const adminInventoryService = {
+  history: (variantId: number) => get<InventoryHistoryDTO>('/admin/inventory/variants/' + variantId + '/history'),
+  movement: (variantId: number, data: InventoryStockMovementRequest) => post<PhoneVariantDTO>('/admin/inventory/variants/' + variantId + '/movements', data),
+};
+
 // Option catalog — categories (tree) + items
 export const optionService = {
   list: () => get<OptionTreeDTO[]>('/options'),
@@ -124,7 +131,7 @@ export const adminBrandService = {
 export const adminOrderService = {
   list: (params?: Record<string, string>) => get<PageResponse<OrderDTO>>('/admin/orders', { params }),
   detail: (id: number) => get<OrderDTO>('/admin/orders/' + id),
-  updateStatus: (id: number, status: string) => put<OrderDTO>('/admin/orders/' + id + '/status', { status }),
+  updateStatus: (id: number, status: string, reason?: string) => put<OrderDTO>('/admin/orders/' + id + '/status', { status, reason }),
   updatePaymentStatus: (id: number, paymentStatus: string) => put<OrderDTO>('/admin/orders/' + id + '/payment-status', { paymentStatus }),
   confirm: (id: number) => put<OrderDTO>('/admin/orders/' + id + '/confirm'),
   updateDelivery: (id: number, status: string) => put<OrderDTO>('/admin/orders/' + id + '/delivery', { status }),

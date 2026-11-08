@@ -34,6 +34,7 @@ export const ROUTES = {
   ADMIN: '/admin',
   ADMIN_DASHBOARD: '/admin',
   ADMIN_PRODUCTS: '/admin/san-pham',
+  ADMIN_INVENTORY: '/admin/ton-kho',
   ADMIN_BRANDS: '/admin/hang',
   ADMIN_OPTIONS: '/admin/tuy-chon',
   ADMIN_ORDERS: '/admin/don-hang',

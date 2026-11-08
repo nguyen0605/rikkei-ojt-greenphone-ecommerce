@@ -9,6 +9,7 @@ import com.re.greenphone.mapper.PromotionMapper;
 import com.re.greenphone.repository.PromotionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -55,6 +56,7 @@ public class AdminPromotionService {
         return promotionMapper.toDto(promo);
     }
 
+    @CacheEvict(value = "promotions", allEntries = true)
     public PromotionDTO createPromotion(PromotionRequest request) {
         Promotion promo = Promotion.builder()
                 .code(request.getCode())
@@ -72,6 +74,7 @@ public class AdminPromotionService {
         return promotionMapper.toDto(promo);
     }
 
+    @CacheEvict(value = "promotions", allEntries = true)
     public PromotionDTO updatePromotion(Long id, PromotionRequest request) {
         Promotion promo = promotionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Promotion", "id", id));
@@ -90,6 +93,7 @@ public class AdminPromotionService {
         return promotionMapper.toDto(promo);
     }
 
+    @CacheEvict(value = "promotions", allEntries = true)
     public void deletePromotion(Long id) {
         Promotion promo = promotionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Promotion", "id", id));

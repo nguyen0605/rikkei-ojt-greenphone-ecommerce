@@ -10,6 +10,7 @@ interface AuthState {
   isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
+  errorCode: string | null;
   rememberedEmail: string | null;
 }
 
@@ -42,6 +43,7 @@ const initialState: AuthState = {
   isAuthenticated: !!validToken && !!loadUser(),
   loading: false,
   error: null,
+  errorCode: null,
   rememberedEmail,
 };
 
@@ -59,9 +61,19 @@ export const logoutThunk = createAsyncThunk('auth/logout', async () => {
   await authService.logout();
 });
 
-export const verifyOTPThunk = createAsyncThunk('auth/verifyOTP', async (data: { email: string; otp: string }) => {
-  const res = await post<{ userId: number; token: string; fullName: string; email: string; role: string }>('/auth/verify-otp', data);
-  return res;
+export const verifyOTPThunk = createAsyncThunk<
+  { userId: number; token: string; fullName: string; email: string; role: string },
+  { email: string; otp: string },
+  { rejectValue: { message: string; errorCode?: string } }
+>('auth/verifyOTP', async (data, { rejectWithValue }) => {
+  try {
+    const res = await post<{ userId: number; token: string; fullName: string; email: string; role: string }>('/auth/verify-otp', data);
+    return res;
+  } catch (err: any) {
+    const message = err.response?.data?.message || err.message || 'OTP verification failed';
+    const errorCode = err.response?.data?.errorCode || err.errorCode;
+    return rejectWithValue({ message, errorCode });
+  }
 });
 
 const authSlice = createSlice({
@@ -70,6 +82,7 @@ const authSlice = createSlice({
   reducers: {
     clearError(state) {
       state.error = null;
+      state.errorCode = null;
     },
     updateUserProfile(state, action: PayloadAction<{ fullName?: string; phone?: string; address?: string; avatar?: string }>) {
       if (state.user) {
@@ -104,16 +117,30 @@ const authSlice = createSlice({
       .addCase(registerThunk.pending, (state) => { state.loading = true; state.error = null; })
       .addCase(registerThunk.fulfilled, (state) => { state.loading = false; })
       .addCase(registerThunk.rejected, (state, action) => { state.loading = false; state.error = action.error.message || 'Register failed'; })
-      .addCase(verifyOTPThunk.pending, (state) => { state.loading = true; })
+      .addCase(verifyOTPThunk.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.errorCode = null;
+      })
       .addCase(verifyOTPThunk.fulfilled, (state, action) => {
         state.loading = false;
+        state.errorCode = null;
         state.user = { id: action.payload.userId, email: action.payload.email, fullName: action.payload.fullName, role: action.payload.role };
         state.token = action.payload.token;
         state.isAuthenticated = true;
         localStorage.setItem('greenphone.token', action.payload.token);
         localStorage.setItem('greenphone.user', JSON.stringify(state.user));
       })
-      .addCase(verifyOTPThunk.rejected, (state, action) => { state.loading = false; state.error = action.error.message || 'OTP verification failed'; })
+      .addCase(verifyOTPThunk.rejected, (state, action) => {
+        state.loading = false;
+        if (action.payload) {
+          state.error = action.payload.message;
+          state.errorCode = action.payload.errorCode || null;
+        } else {
+          state.error = action.error.message || 'OTP verification failed';
+          state.errorCode = null;
+        }
+      })
       .addCase(logoutThunk.fulfilled, (state) => {
         state.user = null;
         state.token = null;

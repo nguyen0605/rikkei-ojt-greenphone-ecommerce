@@ -27,6 +27,7 @@ import com.re.greenphone.repository.ReviewRepository;
 import com.re.greenphone.service.CloudinaryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -43,6 +44,8 @@ import java.util.Map;
 @Transactional
 public class AdminPhoneService {
 
+    public static final int LOW_STOCK_THRESHOLD = 5;
+
     private final PhoneRepository phoneRepository;
     private final BrandRepository brandRepository;
     private final PhoneVariantRepository phoneVariantRepository;
@@ -55,8 +58,10 @@ public class AdminPhoneService {
     private final PhoneVariantMapper phoneVariantMapper;
     private final PhoneImageMapper phoneImageMapper;
     private final CloudinaryService cloudinaryService;
+    private final InventoryStockHistoryService inventoryStockHistoryService;
 
     public PageResponse<PhoneDTO> getPhones(String keyword, Long brandId, String status,
+                                            boolean lowStock,
                                             com.re.greenphone.common.pagination.PageRequest pageRequest) {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(
                 pageRequest.getPage(), pageRequest.getSize(),
@@ -73,6 +78,11 @@ public class AdminPhoneService {
             }
             if (status != null && !status.isBlank()) {
                 predicates.add(cb.equal(root.get("status"), status));
+            }
+            if (lowStock) {
+                var variants = root.join("variants");
+                predicates.add(cb.lessThanOrEqualTo(variants.get("stockQuantity"), LOW_STOCK_THRESHOLD));
+                cq.distinct(true);
             }
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
         };
@@ -91,6 +101,7 @@ public class AdminPhoneService {
         return buildDetailDTO(phone);
     }
 
+    @CacheEvict(value = "phones", allEntries = true)
     public PhoneDTO createPhone(PhoneRequest request) {
         Brand brand = brandRepository.findById(request.getBrandId())
                 .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", request.getBrandId()));
@@ -113,6 +124,7 @@ public class AdminPhoneService {
         return phoneMapper.toDto(phone);
     }
 
+    @CacheEvict(value = "phones", key = "#id")
     public PhoneDTO updatePhone(Long id, PhoneRequest request) {
         Phone phone = phoneRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Phone", "id", id));
@@ -141,6 +153,7 @@ public class AdminPhoneService {
      * review, or cart item — those keep the FK alive, so the phone cannot be removed.
      * Use the status toggle (INACTIVE) to hide such phones from the store instead.
      */
+    @CacheEvict(value = "phones", key = "#id")
     public void deletePhone(Long id) {
         Phone phone = phoneRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Phone", "id", id));
@@ -173,6 +186,7 @@ public class AdminPhoneService {
         phoneRepository.delete(phone);
     }
 
+    @CacheEvict(value = "phones", key = "#id")
     public PhoneDTO updateStatus(Long id, String status) {
         if (!List.of("ACTIVE", "INACTIVE").contains(status)) {
             throw new BadRequestException("Invalid status: " + status);
@@ -189,6 +203,7 @@ public class AdminPhoneService {
                 phoneVariantRepository.findByPhoneId(phoneId));
     }
 
+    @CacheEvict(value = "phones", key = "#phoneId")
     public PhoneVariantDTO addVariant(Long phoneId, PhoneVariantRequest request) {
         Phone phone = phoneRepository.findById(phoneId)
                 .orElseThrow(() -> new ResourceNotFoundException("Phone", "id", phoneId));
@@ -200,7 +215,7 @@ public class AdminPhoneService {
                 .colorItem(requireItem(request.getColorItemId(), "COLOR"))
                 .price(request.getPrice())
                 .discountPrice(request.getDiscountPrice())
-                .stockQuantity(request.getStockQuantity())
+                .stockQuantity(0)
                 .status("ACTIVE")
                 .build();
 
@@ -208,6 +223,7 @@ public class AdminPhoneService {
         return phoneVariantMapper.toDto(variant);
     }
 
+    @CacheEvict(value = "phones", key = "#result.phoneId")
     public PhoneVariantDTO updateVariant(Long variantId, PhoneVariantRequest request) {
         PhoneVariant variant = phoneVariantRepository.findById(variantId)
                 .orElseThrow(() -> new ResourceNotFoundException("PhoneVariant", "id", variantId));
@@ -217,7 +233,20 @@ public class AdminPhoneService {
         if (request.getColorItemId() != null) variant.setColorItem(requireItem(request.getColorItemId(), "COLOR"));
         variant.setPrice(request.getPrice());
         variant.setDiscountPrice(request.getDiscountPrice());
-        variant.setStockQuantity(request.getStockQuantity());
+        if (request.getStockQuantity() != null) {
+            int quantityBefore = variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
+            variant.setStockQuantity(request.getStockQuantity());
+            int quantityAfter = variant.getStockQuantity();
+            int quantityChange = quantityAfter - quantityBefore;
+            if (quantityChange != 0) {
+                inventoryStockHistoryService.record(
+                        variant,
+                        quantityBefore,
+                        quantityChange,
+                        "ADJUSTMENT",
+                        "Admin cập nhật tồn kho");
+            }
+        }
 
         variant = phoneVariantRepository.save(variant);
         return phoneVariantMapper.toDto(variant);
@@ -236,6 +265,7 @@ public class AdminPhoneService {
         return item;
     }
 
+    @CacheEvict(value = "phones", allEntries = true)
     public void deleteVariant(Long variantId) {
         PhoneVariant variant = phoneVariantRepository.findById(variantId)
                 .orElseThrow(() -> new ResourceNotFoundException("PhoneVariant", "id", variantId));
@@ -248,6 +278,7 @@ public class AdminPhoneService {
                 phoneImageRepository.findByPhoneIdOrderBySortOrderAscIdAsc(phoneId));
     }
 
+    @CacheEvict(value = "phones", key = "#phoneId")
     public PhoneImageDTO addImage(Long phoneId, MultipartFile file) {
         Phone phone = phoneRepository.findById(phoneId)
                 .orElseThrow(() -> new ResourceNotFoundException("Phone", "id", phoneId));
@@ -274,6 +305,7 @@ public class AdminPhoneService {
      * Batch reorder: the client sends the full ordered list of image ids;
      * sortOrder is assigned by position (0, 1, 2, ...).
      */
+    @CacheEvict(value = "phones", key = "#phoneId")
     public List<PhoneImageDTO> reorderImages(Long phoneId, List<Long> imageIds) {
         List<PhoneImage> images = phoneImageRepository.findByPhoneId(phoneId);
         java.util.Map<Long, PhoneImage> byId = images.stream()
@@ -298,6 +330,7 @@ public class AdminPhoneService {
         return phoneImageMapper.toDtoList(phoneImageRepository.findByPhoneIdOrderBySortOrderAscIdAsc(phoneId));
     }
 
+    @CacheEvict(value = "phones", allEntries = true)
     public PhoneImageDTO updateImage(Long imageId, Map<String, Object> body) {
         PhoneImage image = phoneImageRepository.findById(imageId)
                 .orElseThrow(() -> new ResourceNotFoundException("PhoneImage", "id", imageId));
@@ -321,6 +354,7 @@ public class AdminPhoneService {
         return phoneImageMapper.toDto(image);
     }
 
+    @CacheEvict(value = "phones", allEntries = true)
     public void deleteImage(Long imageId) {
         PhoneImage image = phoneImageRepository.findById(imageId)
                 .orElseThrow(() -> new ResourceNotFoundException("PhoneImage", "id", imageId));
@@ -347,6 +381,7 @@ public class AdminPhoneService {
     private PhoneDTO toAdminListingDto(Phone phone) {
         PhoneDTO dto = phoneMapper.toDto(phone);
         dto.setMainImageUrl(getMainImageUrl(phone));
+        dto.setVariantCount((long) phone.getVariants().size());
         return dto;
     }
 
