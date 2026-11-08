@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * Auto-cancels PENDING orders that have been unpaid for more than configured timeout minutes (default 10).
+ * Auto-cancels PENDING orders that have been unpaid for more than configured timeout minutes (default 15).
  */
 @Slf4j
 @Component
@@ -37,8 +37,8 @@ public class OrderTimeoutScheduler {
     private final UserPromotionRepository userPromotionRepository;
     private final EntityManager entityManager;
 
-    @Value("${app.order.timeout-minutes:10}")
-    private int timeoutMinutes = 10;
+    @Value("${app.order.timeout-minutes:15}")
+    private int timeoutMinutes = 15;
 
     /**
      * Runs every 60 seconds. Cancels orders that are PENDING + UNPAID for > timeoutMinutes

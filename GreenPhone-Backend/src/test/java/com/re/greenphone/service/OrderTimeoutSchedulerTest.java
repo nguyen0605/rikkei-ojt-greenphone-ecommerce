@@ -52,9 +52,9 @@ class OrderTimeoutSchedulerTest {
     private OrderTimeoutScheduler scheduler;
 
     @Test
-    @DisplayName("Case 1: Quá hạn 10 phút - Hủy đơn VietQR/Sepay, hoàn trả tồn kho, hoàn voucher và ghi log lịch sử kho")
+    @DisplayName("Case 1: Quá hạn 15 phút - Hủy đơn VietQR/Sepay, hoàn trả tồn kho, hoàn voucher và ghi log lịch sử kho")
     void cancelExpiredPendingOrders_ShouldCancelAndRestoreStockAndVoucher() {
-        ReflectionTestUtils.setField(scheduler, "timeoutMinutes", 10);
+        ReflectionTestUtils.setField(scheduler, "timeoutMinutes", 15);
 
         PhoneVariant variant = PhoneVariant.builder()
                 .price(new BigDecimal("10000000"))
@@ -97,7 +97,7 @@ class OrderTimeoutSchedulerTest {
 
         assertEquals("CANCELLED", order.getOrderStatus());
         assertEquals("UNPAID", order.getPaymentStatus());
-        assertEquals("Quá hạn thanh toán 10 phút", order.getNote());
+        assertEquals("Quá hạn thanh toán 15 phút", order.getNote());
         assertEquals(10, variant.getStockQuantity()); // 8 + 2
 
         // Verify hoàn voucher
@@ -117,7 +117,7 @@ class OrderTimeoutSchedulerTest {
     @Test
     @DisplayName("Case 2: Đơn đã thanh toán (PAID) - Không bao giờ bị hủy")
     void cancelExpiredPendingOrders_WhenPaid_ShouldNotCancel() {
-        ReflectionTestUtils.setField(scheduler, "timeoutMinutes", 10);
+        ReflectionTestUtils.setField(scheduler, "timeoutMinutes", 15);
 
         Order paidOrder = Order.builder()
                 .orderStatus("CONFIRMED")
@@ -148,7 +148,7 @@ class OrderTimeoutSchedulerTest {
     @Test
     @DisplayName("Case 3: Đơn thanh toán khi nhận hàng (COD) - Tuyệt đối không hủy")
     void cancelExpiredPendingOrders_CODOrder_ShouldNotCancel() {
-        ReflectionTestUtils.setField(scheduler, "timeoutMinutes", 10);
+        ReflectionTestUtils.setField(scheduler, "timeoutMinutes", 15);
 
         Order codOrder = Order.builder()
                 .orderStatus("PENDING")
@@ -173,7 +173,7 @@ class OrderTimeoutSchedulerTest {
     @Test
     @DisplayName("Case 4: Xung đột OptimisticLockException - Không crash tiến trình, bỏ qua để round sau xử lý")
     void cancelExpiredPendingOrders_ConcurrentModification_ShouldCatchAndNotThrow() {
-        ReflectionTestUtils.setField(scheduler, "timeoutMinutes", 10);
+        ReflectionTestUtils.setField(scheduler, "timeoutMinutes", 15);
 
         Order order = Order.builder()
                 .orderStatus("PENDING")
