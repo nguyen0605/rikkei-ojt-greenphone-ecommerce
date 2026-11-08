@@ -17,6 +17,7 @@ import {
   CopyOutlined,
   StopOutlined,
   CheckCircleOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import { useState } from 'react';
 import adminMarketingService from '@/services/adminMarketingService';
@@ -316,8 +317,9 @@ export default function AdminVoucherPage() {
               ]}
             />
           </div>
-          <div className="text-xs text-ink-2">
-            🛡️ Bấm nút <StopOutlined className="text-rose-500" /> để khóa khẩn cấp voucher khi hết ngân sách
+          <div className="text-xs text-ink-2 flex items-center gap-1">
+            <SafetyCertificateOutlined className="text-primary-600" />
+            <span>Bấm nút <StopOutlined className="text-rose-500" /> để khóa khẩn cấp voucher khi hết ngân sách</span>
           </div>
         </div>
 

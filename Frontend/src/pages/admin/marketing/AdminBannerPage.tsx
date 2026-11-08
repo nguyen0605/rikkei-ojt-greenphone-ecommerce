@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Table, Button, Input, message, Space, Switch, type TableColumnsType } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, PictureOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, PictureOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import adminMarketingService from '@/services/adminMarketingService';
 import type { BannerDTO, BannerRequest } from '@/types/api';
@@ -46,6 +46,7 @@ export default function AdminBannerPage() {
         title: banner.title,
         imageUrl: banner.imageUrl,
         linkUrl: banner.linkUrl,
+        status: checked ? 'ACTIVE' : 'INACTIVE',
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-banners'] });
@@ -185,8 +186,9 @@ export default function AdminBannerPage() {
             }}
             className="!w-64"
           />
-          <div className="text-xs text-ink-2">
-            💡 Tỷ lệ ảnh khuyến nghị chuẩn trang chủ: <strong>3:1</strong> (VD: 1200x400px)
+          <div className="text-xs text-ink-2 flex items-center gap-1">
+            <InfoCircleOutlined className="text-primary-500" />
+            <span>Tỷ lệ ảnh khuyến nghị chuẩn trang chủ: <strong>3:1</strong> (VD: 1200x400px)</span>
           </div>
         </div>
 

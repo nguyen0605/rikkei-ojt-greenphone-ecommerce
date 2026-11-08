@@ -65,6 +65,9 @@ public class AdminBannerService {
         banner.setTitle(request.getTitle());
         if (request.getImageUrl() != null) banner.setImageUrl(request.getImageUrl());
         banner.setLinkUrl(request.getLinkUrl());
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            banner.setStatus(request.getStatus());
+        }
 
         banner = bannerRepository.save(banner);
         return bannerMapper.toDto(banner);

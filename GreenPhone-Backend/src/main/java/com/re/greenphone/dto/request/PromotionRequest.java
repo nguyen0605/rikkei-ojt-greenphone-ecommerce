@@ -43,5 +43,6 @@ public class PromotionRequest {
     @NotNull(message = "End date is required")
     private LocalDateTime endDate;
 
+    @Pattern(regexp = "^(ACTIVE|INACTIVE)$", message = "Status must be ACTIVE or INACTIVE")
     private String status;
 }

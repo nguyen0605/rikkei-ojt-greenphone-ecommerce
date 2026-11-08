@@ -1,4 +1,5 @@
 import { Modal, Form, Input } from 'antd';
+import { WarningOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import type { BannerDTO, BannerRequest } from '@/types/api';
 
@@ -109,8 +110,9 @@ export default function BannerFormModal({
         </Form.Item>
 
         {aspectRatioWarning && (
-          <div className="mb-4 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-700 border border-amber-200">
-            ⚠️ {aspectRatioWarning}
+          <div className="mb-4 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-700 border border-amber-200 flex items-center gap-1.5">
+            <WarningOutlined className="text-amber-500 flex-shrink-0" />
+            <span>{aspectRatioWarning}</span>
           </div>
         )}
 

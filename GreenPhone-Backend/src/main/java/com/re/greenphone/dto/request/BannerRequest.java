@@ -19,4 +19,7 @@ public class BannerRequest {
     private String imageUrl;
 
     private String linkUrl;
+
+    @jakarta.validation.constraints.Pattern(regexp = "^(ACTIVE|INACTIVE)$", message = "Status must be ACTIVE or INACTIVE")
+    private String status;
 }

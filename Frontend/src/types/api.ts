@@ -436,6 +436,7 @@ export interface BannerRequest {
   title: string;
   imageUrl: string;
   linkUrl: string;
+  status?: string;
 }
 
 export interface PromotionRequest {
