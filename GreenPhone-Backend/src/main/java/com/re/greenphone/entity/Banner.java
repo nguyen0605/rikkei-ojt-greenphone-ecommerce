@@ -25,4 +25,12 @@ public class Banner extends BaseEntity {
     @Column(name = "STATUS", nullable = false, length = 30)
     @Builder.Default
     private String status = "ACTIVE";
+
+    @Column(name = "SORT_ORDER", nullable = false)
+    @Builder.Default
+    private Integer sortOrder = 0;
+
+    @Column(name = "POSITION", nullable = false, length = 50)
+    @Builder.Default
+    private String position = "HERO";
 }

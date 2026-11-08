@@ -11,7 +11,9 @@ import java.util.List;
 @Repository
 public interface BannerRepository extends JpaRepository<Banner, Long> {
 
-    List<Banner> findByStatus(String status);
+    List<Banner> findByStatusOrderBySortOrderAsc(String status);
 
-    Page<Banner> findByTitleContainingIgnoreCase(String title, Pageable pageable);
+    Page<Banner> findByTitleContainingIgnoreCaseOrderBySortOrderAsc(String title, Pageable pageable);
+
+    Page<Banner> findAllByOrderBySortOrderAsc(Pageable pageable);
 }

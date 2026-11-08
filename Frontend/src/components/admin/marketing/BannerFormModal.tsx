@@ -1,4 +1,4 @@
-import { Modal, Form, Input } from 'antd';
+import { Modal, Form, Input, InputNumber, Select } from 'antd';
 import { WarningOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import type { BannerDTO, BannerRequest } from '@/types/api';
@@ -28,10 +28,16 @@ export default function BannerFormModal({
           title: editData.title,
           imageUrl: editData.imageUrl,
           linkUrl: editData.linkUrl,
+          sortOrder: editData.sortOrder ?? 0,
+          position: editData.position || 'HERO',
         });
         checkImageAspect(editData.imageUrl);
       } else {
         form.resetFields();
+        form.setFieldsValue({
+          sortOrder: 0,
+          position: 'HERO',
+        });
         setAspectRatioWarning(null);
       }
     }
@@ -123,6 +129,31 @@ export default function BannerFormModal({
         >
           <Input placeholder="/san-pham hoặc https://..." />
         </Form.Item>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Form.Item
+            name="position"
+            label="Vị trí hiển thị"
+            rules={[{ required: true, message: 'Chọn vị trí hiển thị' }]}
+          >
+            <Select
+              options={[
+                { value: 'HERO', label: 'Slider chính (Hero Banner)' },
+                { value: 'SUB_BANNER', label: 'Banner phụ (Sub Banner)' },
+                { value: 'PROMOTION', label: 'Banner khuyến mãi nổi bật' },
+              ]}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="sortOrder"
+            label="Thứ tự hiển thị (Ưu tiên nhỏ trước)"
+            tooltip="Số càng nhỏ sẽ hiển thị càng trước (vd: 0, 1, 2...)"
+            rules={[{ required: true, message: 'Nhập thứ tự hiển thị' }]}
+          >
+            <InputNumber className="w-full" min={0} placeholder="VD: 0" />
+          </Form.Item>
+        </div>
       </Form>
     </Modal>
   );

@@ -47,6 +47,8 @@ export default function AdminBannerPage() {
         imageUrl: banner.imageUrl,
         linkUrl: banner.linkUrl,
         status: checked ? 'ACTIVE' : 'INACTIVE',
+        sortOrder: banner.sortOrder ?? 0,
+        position: banner.position || 'HERO',
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-banners'] });
@@ -99,10 +101,30 @@ export default function AdminBannerPage() {
     },
     {
       title: 'Vị trí hiển thị',
-      width: 150,
-      render: () => (
-        <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 border border-blue-200">
-          Slider chính (Hero)
+      dataIndex: 'position',
+      width: 170,
+      render: (pos: string) => {
+        const labels: Record<string, { label: string; color: string }> = {
+          HERO: { label: 'Slider chính (Hero)', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+          SUB_BANNER: { label: 'Banner phụ', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+          PROMOTION: { label: 'Khuyến mãi nổi bật', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+        };
+        const item = labels[pos || 'HERO'] || { label: pos || 'Hero', color: 'bg-gray-50 text-gray-700 border-gray-200' };
+        return (
+          <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium border ${item.color}`}>
+            {item.label}
+          </span>
+        );
+      },
+    },
+    {
+      title: 'Thứ tự',
+      dataIndex: 'sortOrder',
+      width: 90,
+      align: 'center',
+      render: (val: number) => (
+        <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-bg-muted text-ink-2">
+          {val ?? 0}
         </span>
       ),
     },

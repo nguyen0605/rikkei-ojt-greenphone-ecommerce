@@ -147,6 +147,8 @@ export interface BannerDTO {
   imageUrl: string;
   linkUrl: string;
   status: string;
+  sortOrder?: number;
+  position?: string;
 }
 
 // Review
@@ -437,6 +439,8 @@ export interface BannerRequest {
   imageUrl: string;
   linkUrl: string;
   status?: string;
+  sortOrder?: number;
+  position?: string;
 }
 
 export interface PromotionRequest {

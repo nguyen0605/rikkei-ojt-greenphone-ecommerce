@@ -22,4 +22,8 @@ public class BannerRequest {
 
     @jakarta.validation.constraints.Pattern(regexp = "^(ACTIVE|INACTIVE)$", message = "Status must be ACTIVE or INACTIVE")
     private String status;
+
+    private Integer sortOrder;
+
+    private String position;
 }

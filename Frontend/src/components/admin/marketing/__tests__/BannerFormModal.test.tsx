@@ -69,6 +69,7 @@ describe('BannerFormModal', () => {
     expect(screen.getByLabelText(/Tiêu đề banner/i)).toHaveValue('Khuyến mãi mùa hè');
     expect(screen.getByLabelText(/URL hình ảnh/i)).toHaveValue('https://example.com/banner.png');
     expect(screen.getByLabelText(/Liên kết điều hướng/i)).toHaveValue('/khuyen-mai');
+    expect(screen.getByLabelText(/Thứ tự hiển thị/i)).toHaveValue('0');
   });
 
   it('triggers form validation when submitting empty fields', async () => {
