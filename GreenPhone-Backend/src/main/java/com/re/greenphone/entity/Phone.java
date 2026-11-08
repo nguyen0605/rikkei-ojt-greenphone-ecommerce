@@ -3,6 +3,7 @@ package com.re.greenphone.entity;
 import com.re.greenphone.entity.base.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -52,15 +53,18 @@ public class Phone extends BaseEntity {
     private String status = "ACTIVE";
 
     @OneToMany(mappedBy = "phone", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 32)
     @Builder.Default
     private List<PhoneVariant> variants = new ArrayList<>();
 
     @OneToMany(mappedBy = "phone", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC, id ASC")
+    @BatchSize(size = 32)
     @Builder.Default
     private List<PhoneImage> images = new ArrayList<>();
 
     @OneToMany(mappedBy = "phone")
+    @BatchSize(size = 32)
     @Builder.Default
     private List<Review> reviews = new ArrayList<>();
 }
