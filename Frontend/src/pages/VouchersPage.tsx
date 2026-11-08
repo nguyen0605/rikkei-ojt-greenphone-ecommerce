@@ -213,45 +213,85 @@ export default function VouchersPage() {
       ),
       children: (
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {(myPromos || []).map((up: UserPromotionDTO) => (
-            <div
-              key={String(up.id)}
-              className={cn(
-                'flex overflow-hidden rounded-2xl border bg-white shadow-sm',
-                up.status === 'AVAILABLE'
-                  ? 'border-dashed border-green-300'
-                  : 'border-gray-200 opacity-60',
-              )}
-            >
-              <div className={cn(
-                'relative flex w-28 shrink-0 flex-col items-center justify-center p-3 text-center text-white',
-                up.status === 'AVAILABLE' ? 'bg-gradient-to-br from-green-500 to-green-700' : 'bg-gray-400',
-              )}>
-                <Ticket className="absolute left-2 top-2 h-4 w-4 opacity-50" />
-                <div className="text-xs font-medium tracking-wider opacity-90">GIẢM</div>
-                <div className="text-lg font-bold leading-tight">{getDiscountLabel(String(up.discountType), Number(up.discountValue))}</div>
-                <div className="absolute -bottom-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45 bg-white" />
-              </div>
-              <div className="flex flex-1 flex-col justify-between p-4">
-                <div>
-                  <h4 className="mb-1 line-clamp-2 text-sm font-semibold text-gray-900">{String(up.name)}</h4>
-                  <p className="mb-2 text-xs text-gray-500">Mã: <span className="rounded bg-green-100 px-1.5 py-0.5 font-mono text-xs font-semibold text-green-700">{String(up.code)}</span></p>
-                  <div className="space-y-1 text-xs text-gray-500">
-                    <div className="flex items-center gap-1.5">
-                      <Calendar className="h-3 w-3" />
-                      <span>HSD: {new Date(String(up.endDate)).toLocaleDateString('vi-VN')}</span>
+          {(myPromos || []).map((up: UserPromotionDTO) => {
+            const isExpired =
+              up.status === 'EXPIRED' ||
+              (up.endDate ? new Date(String(up.endDate)).getTime() < Date.now() : false);
+            const isUsed = up.status === 'USED';
+            const isAvailable = up.status === 'AVAILABLE' && !isExpired;
+
+            return (
+              <div
+                key={String(up.id)}
+                className={cn(
+                  'flex overflow-hidden rounded-2xl border bg-white shadow-sm transition-all',
+                  isAvailable
+                    ? 'border-dashed border-green-300 hover:shadow-md'
+                    : 'border-gray-200 bg-gray-50/60 opacity-70',
+                )}
+              >
+                <div
+                  className={cn(
+                    'relative flex w-28 shrink-0 flex-col items-center justify-center p-3 text-center text-white',
+                    isAvailable
+                      ? 'bg-gradient-to-br from-green-500 to-green-700'
+                      : 'bg-gray-400',
+                  )}
+                >
+                  <Ticket className="absolute left-2 top-2 h-4 w-4 opacity-50" />
+                  <div className="text-xs font-medium tracking-wider opacity-90">GIẢM</div>
+                  <div className="text-lg font-bold leading-tight">
+                    {getDiscountLabel(String(up.discountType), Number(up.discountValue))}
+                  </div>
+                  {up.maxDiscountAmount != null && (
+                    <div className="text-[10px] opacity-90">
+                      Tối đa {formatVND(Number(up.maxDiscountAmount))}
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Tag className="h-3 w-3" />
-                      <span className={cn(up.status === 'AVAILABLE' ? 'font-semibold text-green-600' : 'text-gray-400')}>
-                        {up.status === 'AVAILABLE' ? 'Có thể sử dụng' : up.status === 'USED' ? 'Đã dùng' : String(up.status)}
+                  )}
+                  <div className="absolute -bottom-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45 bg-white" />
+                </div>
+                <div className="flex flex-1 flex-col justify-between p-4">
+                  <div>
+                    <h4 className="mb-1 line-clamp-2 text-sm font-semibold text-gray-900">
+                      {String(up.name)}
+                    </h4>
+                    <p className="mb-2 text-xs text-gray-500">
+                      Mã:{' '}
+                      <span className="rounded bg-green-100 px-1.5 py-0.5 font-mono text-xs font-semibold text-green-700">
+                        {String(up.code)}
                       </span>
+                    </p>
+                    <div className="space-y-1 text-xs text-gray-500">
+                      <div className={cn('flex items-center gap-1.5', isExpired && 'text-red-500 font-medium')}>
+                        <Calendar className="h-3 w-3" />
+                        <span>HSD: {new Date(String(up.endDate)).toLocaleDateString('vi-VN')}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Tag className="h-3 w-3" />
+                        {isExpired ? (
+                          <span className="font-semibold text-red-600">
+                            Không thể sử dụng (Đã hết hạn)
+                          </span>
+                        ) : isUsed ? (
+                          <span className="font-medium text-gray-500">
+                            Đã sử dụng
+                          </span>
+                        ) : isAvailable ? (
+                          <span className="font-semibold text-green-600">
+                            Có thể sử dụng
+                          </span>
+                        ) : (
+                          <span className="font-semibold text-red-600">
+                            Không thể sử dụng
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {(!myPromos || myPromos.length === 0) && (
             <div className="col-span-full rounded-xl bg-blue-50 p-4 text-center text-sm text-blue-700">
               Bạn chưa có voucher nào. Hãy qua tab "Tất cả ưu đãi" để nhận voucher nhé!
