@@ -83,7 +83,7 @@ export default function BannerFormModal({
       confirmLoading={loading}
       okButtonProps={{ className: '!rounded-full !bg-primary-600 hover:!bg-primary-700' }}
       cancelButtonProps={{ className: '!rounded-full' }}
-      width={560}
+      width={600}
       destroyOnClose
     >
       <Form
@@ -130,13 +130,15 @@ export default function BannerFormModal({
           <Input placeholder="/san-pham hoặc https://..." />
         </Form.Item>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4 items-start">
           <Form.Item
             name="position"
             label="Vị trí hiển thị"
             rules={[{ required: true, message: 'Chọn vị trí hiển thị' }]}
+            className="mb-0"
           >
             <Select
+              className="w-full"
               options={[
                 { value: 'HERO', label: 'Slider chính (Hero Banner)' },
                 { value: 'SUB_BANNER', label: 'Banner phụ (Sub Banner)' },
@@ -147,11 +149,12 @@ export default function BannerFormModal({
 
           <Form.Item
             name="sortOrder"
-            label="Thứ tự hiển thị (Ưu tiên nhỏ trước)"
-            tooltip="Số càng nhỏ sẽ hiển thị càng trước (vd: 0, 1, 2...)"
+            label="Thứ tự hiển thị"
+            tooltip="Số càng nhỏ sẽ được ưu tiên hiển thị trước (vd: 0, 1, 2...)"
             rules={[{ required: true, message: 'Nhập thứ tự hiển thị' }]}
+            className="mb-0"
           >
-            <InputNumber className="w-full" min={0} placeholder="VD: 0" />
+            <InputNumber className="!w-full" min={0} placeholder="VD: 0" />
           </Form.Item>
         </div>
       </Form>
