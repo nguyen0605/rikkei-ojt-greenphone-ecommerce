@@ -3,6 +3,7 @@ package com.re.greenphone.controller;
 import com.re.greenphone.common.dto.ApiResponse;
 import com.re.greenphone.dto.request.ForgotPasswordRequest;
 import com.re.greenphone.dto.request.LoginRequest;
+import com.re.greenphone.dto.request.RefreshTokenRequest;
 import com.re.greenphone.dto.request.RegisterRequest;
 import com.re.greenphone.dto.request.ResendOtpRequest;
 import com.re.greenphone.dto.request.ResetPasswordRequest;
@@ -38,8 +39,14 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(authService.getCurrentUser()));
     }
 
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<AuthResponse>> refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(authService.refreshToken(request.getRefreshToken())));
+    }
+
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<?>> logout() {
+    public ResponseEntity<ApiResponse<String>> logout(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        authService.logout(authHeader);
         return ResponseEntity.ok(ApiResponse.success("Logged out successfully"));
     }
 

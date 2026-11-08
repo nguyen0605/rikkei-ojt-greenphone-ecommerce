@@ -28,10 +28,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -85,8 +87,8 @@ class AuthServiceTest {
         when(userRepository.save(any(User.class))).thenReturn(testUser);
         when(jwtTokenProvider.generateToken(any())).thenReturn("jwt_token_xyz");
         when(jwtConfig.getExpiration()).thenReturn(86400000L);
-        when(authMapper.toAuthResponse(any(), anyString(), anyLong()))
-                .thenReturn(new AuthResponse(1L, "", "Test User", "test@example.com", "CUSTOMER", 86400000L));
+        when(authMapper.toAuthResponse(any(), anyString(), anyString(), anyLong()))
+                .thenReturn(new AuthResponse(1L, "", "refresh_xyz", "Test User", "test@example.com", "CUSTOMER", 86400000L));
 
         AuthResponse r = authService.register(registerReq);
 
@@ -123,8 +125,8 @@ class AuthServiceTest {
         when(userRepository.save(any())).thenReturn(testUser);
         when(jwtTokenProvider.generateToken(any())).thenReturn("jwt_token_xyz");
         when(jwtConfig.getExpiration()).thenReturn(86400000L);
-        when(authMapper.toAuthResponse(any(), anyString(), anyLong()))
-                .thenReturn(new AuthResponse(1L, "", "", "", "", 0L));
+        when(authMapper.toAuthResponse(any(), anyString(), anyString(), anyLong()))
+                .thenReturn(new AuthResponse(1L, "", "refresh_xyz", "", "", 0L));
 
         authService.register(registerReq);
 
@@ -139,8 +141,8 @@ class AuthServiceTest {
         when(passwordEncoder.matches("password123", "encoded_password")).thenReturn(true);
         when(jwtTokenProvider.generateToken(any(UserPrincipal.class))).thenReturn("jwt_token_xyz");
         when(jwtConfig.getExpiration()).thenReturn(86400000L);
-        when(authMapper.toAuthResponse(eq(testUser), eq("jwt_token_xyz"), eq(86400000L)))
-                .thenReturn(new AuthResponse(1L, "jwt_token_xyz", "Test User", "test@example.com", "CUSTOMER", 86400000L));
+        when(authMapper.toAuthResponse(eq(testUser), eq("jwt_token_xyz"), anyString(), eq(86400000L)))
+                .thenReturn(new AuthResponse(1L, "jwt_token_xyz", "refresh_xyz", "Test User", "test@example.com", "CUSTOMER", 86400000L));
 
         AuthResponse r = authService.login(loginReq);
         assertThat(r.getToken()).isEqualTo("jwt_token_xyz");
@@ -183,8 +185,8 @@ class AuthServiceTest {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
         when(jwtTokenProvider.generateToken(any())).thenReturn("jwt_token");
         when(jwtConfig.getExpiration()).thenReturn(86400000L);
-        when(authMapper.toAuthResponse(any(), anyString(), anyLong()))
-                .thenReturn(new AuthResponse(1L, "jwt_token", "Test User", "test@example.com", "CUSTOMER", 86400000L));
+        when(authMapper.toAuthResponse(any(), anyString(), anyString(), anyLong()))
+                .thenReturn(new AuthResponse(1L, "jwt_token", "refresh_xyz", "Test User", "test@example.com", "CUSTOMER", 86400000L));
 
         AuthResponse r = authService.verifyOTP("test@example.com", "123456");
 
@@ -305,5 +307,67 @@ class AuthServiceTest {
             when(userMapper.toDto(testUser)).thenReturn(dto);
             assertThat(authService.getCurrentUser().getEmail()).isEqualTo("test@example.com");
         }
+    }
+
+    // === REFRESH TOKEN ===
+
+    @Test void refreshToken_Success() {
+        when(valueOperations.get("refresh_token:valid-refresh-token")).thenReturn("1");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(jwtTokenProvider.generateToken(any(UserPrincipal.class))).thenReturn("new_access_token");
+        when(jwtConfig.getExpiration()).thenReturn(1800000L);
+        when(authMapper.toAuthResponse(eq(testUser), eq("new_access_token"), anyString(), eq(1800000L)))
+                .thenReturn(new AuthResponse(1L, "new_access_token", "new_refresh_token", "Test User", "test@example.com", "CUSTOMER", 1800000L));
+
+        AuthResponse res = authService.refreshToken("valid-refresh-token");
+
+        assertThat(res.getToken()).isEqualTo("new_access_token");
+        verify(valueOperations).set(startsWith("refresh_token:"), eq("1"), anyLong(), any(TimeUnit.class));
+        verify(valueOperations).set(eq("user_refresh_token:1"), anyString(), anyLong(), any(TimeUnit.class));
+    }
+
+    @Test void refreshToken_Blank_ThrowsBadRequest() {
+        assertThatThrownBy(() -> authService.refreshToken("   "))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("cannot be blank");
+    }
+
+    @Test void refreshToken_InvalidOrExpired_ThrowsUnauthorized() {
+        when(valueOperations.get("refresh_token:invalid-token")).thenReturn(null);
+
+        assertThatThrownBy(() -> authService.refreshToken("invalid-token"))
+                .isInstanceOf(com.re.greenphone.common.exception.UnauthorizedException.class)
+                .hasMessageContaining("Invalid or expired refresh token");
+    }
+
+    @Test void refreshToken_AccountNotActive_ThrowsBadRequest() {
+        testUser.setStatus("UNVERIFIED");
+        when(valueOperations.get("refresh_token:valid-token")).thenReturn("1");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+
+        assertThatThrownBy(() -> authService.refreshToken("valid-token"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Account is not active");
+    }
+
+    // === LOGOUT ===
+
+    @Test void logout_Success_BlacklistsTokenAndRemovesRefreshToken() {
+        when(jwtTokenProvider.getRemainingExpiration("sample_token")).thenReturn(120000L);
+        when(jwtTokenProvider.getUserIdFromToken("sample_token")).thenReturn(1L);
+        when(valueOperations.get("user_refresh_token:1")).thenReturn("old_refresh_token");
+
+        authService.logout("Bearer sample_token");
+
+        verify(valueOperations).set("blacklist:sample_token", "revoked", 120000L, TimeUnit.MILLISECONDS);
+        verify(redisTemplate).delete("refresh_token:old_refresh_token");
+        verify(redisTemplate).delete("user_refresh_token:1");
+    }
+
+    @Test void logout_BlankToken_NoOp() {
+        authService.logout("");
+        authService.logout(null);
+
+        verifyNoInteractions(jwtTokenProvider);
     }
 }

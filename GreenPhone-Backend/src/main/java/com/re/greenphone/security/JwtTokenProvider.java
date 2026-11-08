@@ -41,6 +41,35 @@ public class JwtTokenProvider {
         return parseClaims(token).getSubject();
     }
 
+    public Long getUserIdFromToken(String token) {
+        try {
+            Claims claims = parseClaims(token);
+            Object userId = claims.get("userId");
+            if (userId instanceof Number) {
+                return ((Number) userId).longValue();
+            }
+            return null;
+        } catch (Exception e) {
+            log.error("Failed to extract userId from token: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    public long getRemainingExpiration(String token) {
+        try {
+            Claims claims = parseClaims(token);
+            Date expiration = claims.getExpiration();
+            if (expiration == null) {
+                return 0;
+            }
+            long diff = expiration.getTime() - System.currentTimeMillis();
+            return Math.max(0, diff);
+        } catch (JwtException | IllegalArgumentException e) {
+            log.error("Failed to get expiration from token: {}", e.getMessage());
+            return 0;
+        }
+    }
+
     public boolean validateToken(String token) {
         try {
             parseClaims(token);
