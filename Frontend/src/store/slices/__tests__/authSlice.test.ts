@@ -7,6 +7,7 @@ import authReducer, {
   verifyOTPThunk,
   clearError,
   logout,
+  updateUserProfile,
 } from '@/store/slices/authSlice';
 import type { RootState } from '@/store/rootReducer';
 import type { AuthResponse } from '@/types/api';
@@ -78,6 +79,22 @@ describe('authSlice', () => {
         expect(store.getState().auth.user).toBeNull();
         expect(store.getState().auth.token).toBeNull();
         expect(store.getState().auth.isAuthenticated).toBe(false);
+      });
+    });
+
+    describe('updateUserProfile', () => {
+      it('should update user fields and sync to localStorage', () => {
+        const store = createTestStore();
+        store.dispatch({
+          type: loginThunk.fulfilled.type,
+          payload: { userId: 1, email: 'test@example.com', fullName: 'Old Name', role: 'CUSTOMER', token: 'token' },
+        });
+
+        store.dispatch(updateUserProfile({ fullName: 'New Name', avatar: 'data:image/png;base64,...' }));
+        const user = store.getState().auth.user;
+        expect(user?.fullName).toBe('New Name');
+        expect(user?.avatar).toBe('data:image/png;base64,...');
+        expect(localStorage.getItem('greenphone.user')).toContain('New Name');
       });
     });
   });

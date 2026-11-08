@@ -323,6 +323,7 @@ export interface UserDTO {
   email: string;
   phone: string;
   address: string;
+  avatar?: string;
   role: string;
   status: string;
 }
@@ -330,12 +331,37 @@ export interface UserDTO {
 export interface UserProfileRequest {
   fullName: string;
   phone: string;
-  address: string;
+  address?: string;
+  avatar?: string;
 }
 
 export interface ChangePasswordRequest {
   oldPassword: string;
   newPassword: string;
+}
+
+export interface AddressItem {
+  id: string | number;
+  receiverName: string;
+  receiverPhone: string;
+  province: string;
+  district?: string;
+  ward?: string;
+  streetAddress: string;
+  note?: string;
+  isDefault: boolean;
+  createdAt?: string;
+}
+
+export interface AddressRequest {
+  receiverName: string;
+  receiverPhone: string;
+  province: string;
+  district?: string;
+  ward?: string;
+  streetAddress: string;
+  note?: string;
+  isDefault?: boolean;
 }
 
 // Statistics
