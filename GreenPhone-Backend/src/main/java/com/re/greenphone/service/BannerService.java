@@ -22,6 +22,6 @@ public class BannerService {
 
     @Cacheable(value = "banners", key = "'active'")
     public List<BannerDTO> getActiveBanners() {
-        return bannerMapper.toDtoList(bannerRepository.findByStatus("ACTIVE"));
+        return bannerMapper.toDtoList(bannerRepository.findByStatusOrderBySortOrderAsc("ACTIVE"));
     }
 }

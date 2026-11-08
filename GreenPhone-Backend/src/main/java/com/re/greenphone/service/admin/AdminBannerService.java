@@ -35,9 +35,9 @@ public class AdminBannerService {
 
         Page<Banner> page;
         if (title != null && !title.isBlank()) {
-            page = bannerRepository.findByTitleContainingIgnoreCase(title, pageable);
+            page = bannerRepository.findByTitleContainingIgnoreCaseOrderBySortOrderAsc(title, pageable);
         } else {
-            page = bannerRepository.findAll(pageable);
+            page = bannerRepository.findAllByOrderBySortOrderAsc(pageable);
         }
         List<BannerDTO> dtos = bannerMapper.toDtoList(page.getContent());
         return new PageResponse<>(dtos, page.getNumber(), page.getSize(),
@@ -51,6 +51,8 @@ public class AdminBannerService {
                 .imageUrl(request.getImageUrl())
                 .linkUrl(request.getLinkUrl())
                 .status("ACTIVE")
+                .sortOrder(request.getSortOrder() != null ? request.getSortOrder() : 0)
+                .position(request.getPosition() != null && !request.getPosition().isBlank() ? request.getPosition() : "HERO")
                 .build();
 
         banner = bannerRepository.save(banner);
@@ -65,6 +67,15 @@ public class AdminBannerService {
         banner.setTitle(request.getTitle());
         if (request.getImageUrl() != null) banner.setImageUrl(request.getImageUrl());
         banner.setLinkUrl(request.getLinkUrl());
+        if (request.getStatus() != null && !request.getStatus().isBlank()) {
+            banner.setStatus(request.getStatus());
+        }
+        if (request.getSortOrder() != null) {
+            banner.setSortOrder(request.getSortOrder());
+        }
+        if (request.getPosition() != null && !request.getPosition().isBlank()) {
+            banner.setPosition(request.getPosition());
+        }
 
         banner = bannerRepository.save(banner);
         return bannerMapper.toDto(banner);

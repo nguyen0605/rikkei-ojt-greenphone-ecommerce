@@ -147,6 +147,8 @@ export interface BannerDTO {
   imageUrl: string;
   linkUrl: string;
   status: string;
+  sortOrder?: number;
+  position?: string;
 }
 
 // Review
@@ -281,6 +283,8 @@ export interface PromotionDTO {
   maxDiscountAmount: number;
   minOrderValue: number;
   quantity: number;
+  claimedQuantity?: number;
+  usedQuantity?: number;
   startDate: string;
   endDate: string;
   status: string;
@@ -460,6 +464,9 @@ export interface BannerRequest {
   title: string;
   imageUrl: string;
   linkUrl: string;
+  status?: string;
+  sortOrder?: number;
+  position?: string;
 }
 
 export interface PromotionRequest {
@@ -473,6 +480,7 @@ export interface PromotionRequest {
   quantity: number;
   startDate: string;
   endDate: string;
+  status?: string;
 }
 
 // Settings
