@@ -1,9 +1,10 @@
 export { authService, userService } from "./authService";
+export { reviewService } from './reviewService';
 import { get, post, put, del } from './api';
 import type {
   CartDTO, CartItemRequest, CartSyncRequest, OrderDTO, OrderRequest,
   PaymentDTO, PaymentQRInfo, PromotionDTO, UserPromotionDTO, AvailablePromotionDTO, ReviewDTO,
-  ReviewSummary, PageResponse, PhoneDTO, PhoneDetailDTO,
+  PageResponse, PhoneDTO, PhoneDetailDTO,
   PhoneVariantDTO, PhoneImageDTO, BrandDTO, BannerDTO,
   PhoneRequest, PhoneVariantRequest, BrandRequest, InventoryStockMovementRequest,
   BannerRequest, PromotionRequest, RevenueStats,
@@ -28,17 +29,6 @@ export const brandService = {
 // Banner
 export const bannerService = {
   active: () => get<BannerDTO[]>('/banners'),
-};
-
-// Review
-export const reviewService = {
-  byPhone: (phoneId: number, params?: Record<string, string>) => get<PageResponse<ReviewDTO>>('/reviews/phone/' + phoneId, { params }),
-  summary: (phoneId: number) => get<ReviewSummary>('/reviews/phone/' + phoneId + '/summary'),
-  create: (data: { orderDetailId: number; rating: number; content: string }) => post<ReviewDTO>('/reviews', data),
-  update: (id: number, data: { rating: number; content: string }) => put<ReviewDTO>('/reviews/' + id, data),
-  remove: (id: number) => del<void>('/reviews/' + id),
-  myReviews: (params?: Record<string, string>) => get<PageResponse<ReviewDTO>>('/reviews/me', { params }),
-  eligible: (params?: Record<string, string>) => get<PageResponse<OrderDTO>>('/reviews/eligible', { params }),
 };
 
 // Cart

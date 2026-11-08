@@ -154,17 +154,32 @@ export interface ReviewDTO {
   id: number;
   userId: number;
   userName: string;
+  userAvatar?: string;
   phoneId: number;
+  orderDetailId?: number;
   rating: number;
   content: string;
   status: string;
   createdAt: string;
+  isPurchased?: boolean;
+  images?: string[];
 }
 
 export interface ReviewSummary {
   averageRating: number;
   totalReviews: number;
   distribution: Record<number, number>;
+}
+
+export type ReviewFilterType = 'ALL' | 5 | 4 | 3 | 2 | 1 | 'WITH_IMAGE';
+
+export interface ReviewQueryParams {
+  page?: number | string;
+  size?: number | string;
+  rating?: number | string;
+  hasImage?: boolean | string;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
 }
 
 // Cart
