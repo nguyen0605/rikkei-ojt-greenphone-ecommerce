@@ -57,7 +57,7 @@ export const orderService = {
   create: (data: OrderRequest) => post<OrderDTO>('/orders', data),
   list: (params?: Record<string, string>) => get<PageResponse<OrderDTO>>('/orders', { params }),
   detail: (id: number) => get<OrderDTO>('/orders/' + id),
-  cancel: (id: number) => put<OrderDTO>('/orders/' + id + '/cancel'),
+  cancel: (id: number, reason?: string) => post<OrderDTO>('/orders/' + id + '/cancel', reason ? { reason } : {}),
   applyPromotion: (id: number, userPromotionId: number) => put<OrderDTO>('/orders/' + id + '/promotion', { userPromotionId }),
 };
 

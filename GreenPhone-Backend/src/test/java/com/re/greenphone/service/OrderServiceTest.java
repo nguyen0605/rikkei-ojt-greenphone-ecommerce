@@ -163,14 +163,17 @@ class OrderServiceTest {
         verify(orderRepository).save(any());
     }
 
-    @Test void cancelOrder_RestoresStock() {
+    @Test void cancelOrder_RestoresStockAndVoucherAndRecordsReason() {
         User u = createUser(); u.setId(USER_ID);
         securityUtilsMock.when(SecurityUtils::getCurrentUserId).thenReturn(USER_ID);
 
         PhoneVariant v = createVariant(100L, new BigDecimal("15000000"), null, 5);
+        UserPromotion up = UserPromotion.builder().status("USED").usedAt(java.time.LocalDateTime.now()).build();
+        up.setId(77L);
+
         com.re.greenphone.entity.Order order = com.re.greenphone.entity.Order.builder()
-                .user(u).totalAmount(new BigDecimal("15000000")).finalAmount(new BigDecimal("15000000"))
-                .orderStatus("PENDING").paymentStatus("UNPAID").build();
+                .user(u).totalAmount(new BigDecimal("15000000")).finalAmount(new BigDecimal("14500000"))
+                .orderStatus("PENDING").paymentStatus("UNPAID").userPromotion(up).build();
         order.setId(1L);
         OrderDetail detail = OrderDetail.builder().order(order).phoneVariant(v)
                 .quantity(2).unitPrice(new BigDecimal("15000000")).build();
@@ -182,10 +185,40 @@ class OrderServiceTest {
         when(phoneVariantRepository.save(any())).thenReturn(v);
         when(orderMapper.toDto(any())).thenReturn(new OrderDTO());
 
-        orderService.cancelOrder(1L);
+        orderService.cancelOrder(1L, "Đặt nhầm màu");
 
         assertEquals(7, v.getStockQuantity());
         verify(inventoryStockHistoryService).record(eq(v), eq(5), eq(2), eq("IMPORT"), anyString());
+        assertEquals("AVAILABLE", up.getStatus());
+        assertNull(up.getUsedAt());
+        verify(userPromotionRepository).save(up);
         assertEquals("CANCELLED", order.getOrderStatus());
+        assertEquals("[Lý do hủy: Đặt nhầm màu]", order.getNote());
+    }
+
+    @Test void cancelOrder_ThrowsWhenAnotherUserOrder() {
+        User owner = createUser(); owner.setId(999L);
+        securityUtilsMock.when(SecurityUtils::getCurrentUserId).thenReturn(USER_ID);
+
+        com.re.greenphone.entity.Order order = com.re.greenphone.entity.Order.builder()
+                .user(owner).orderStatus("PENDING").build();
+        order.setId(2L);
+
+        when(orderRepository.findById(2L)).thenReturn(Optional.of(order));
+
+        assertThrows(BadRequestException.class, () -> orderService.cancelOrder(2L, "Lý do"));
+    }
+
+    @Test void cancelOrder_ThrowsWhenStatusNotPendingOrConfirmed() {
+        User u = createUser(); u.setId(USER_ID);
+        securityUtilsMock.when(SecurityUtils::getCurrentUserId).thenReturn(USER_ID);
+
+        com.re.greenphone.entity.Order shippingOrder = com.re.greenphone.entity.Order.builder()
+                .user(u).orderStatus("SHIPPING").build();
+        shippingOrder.setId(3L);
+
+        when(orderRepository.findById(3L)).thenReturn(Optional.of(shippingOrder));
+
+        assertThrows(BadRequestException.class, () -> orderService.cancelOrder(3L, "Lý do"));
     }
 }
