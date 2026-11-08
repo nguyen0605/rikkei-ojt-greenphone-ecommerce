@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { CheckCircle2, Truck, ShieldCheck, RefreshCw, Headphones, Ticket } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { App } from 'antd';
@@ -7,11 +8,13 @@ import { formatVND } from '@/utils';
 import { promotionService } from '@/services';
 import type { AvailablePromotionDTO } from '@/types/api';
 import { applyCheckoutVoucher, removeCheckoutVoucher } from '@/store/slices/checkoutSlice';
+import { applyVoucher, removeVoucher } from '@/store/slices/cartSlice';
 
 export default function OrderSummary() {
   const dispatch = useAppDispatch();
   const { message } = App.useApp();
   const cartItems = useAppSelector((s) => s.cart.items);
+  const cartVoucher = useAppSelector((s) => s.cart.appliedVoucher);
   const summary = useAppSelector(selectCartSummary);
   const voucherCode = useAppSelector((s) => s.checkout.voucherCode);
   const voucherDiscount = useAppSelector((s) => s.checkout.voucherDiscount);
@@ -23,13 +26,65 @@ export default function OrderSummary() {
     enabled: isAuthenticated,
   });
 
+  // Auto-sync cart voucher into checkout if already present
+  useEffect(() => {
+    if (!voucherCode && cartVoucher?.code && myPromos) {
+      const match = myPromos.find((p) => p.code === cartVoucher.code);
+      if (match && match.eligible) {
+        dispatch(
+          applyCheckoutVoucher({
+            userPromotionId: match.id,
+            code: match.code,
+            discount: match.calculatedDiscount,
+          }),
+        );
+      }
+    }
+  }, [cartVoucher, voucherCode, myPromos, dispatch]);
+
+  // Keep discount updated or remove if subtotal changes and makes voucher ineligible
+  useEffect(() => {
+    if (voucherCode && myPromos) {
+      const current = myPromos.find((p) => p.code === voucherCode);
+      if (current && !current.eligible) {
+        dispatch(removeCheckoutVoucher());
+        dispatch(removeVoucher());
+        message.warning(`Voucher ${voucherCode} không còn đủ điều kiện áp dụng`);
+      } else if (current && current.calculatedDiscount !== voucherDiscount) {
+        dispatch(
+          applyCheckoutVoucher({
+            userPromotionId: current.id,
+            code: current.code,
+            discount: current.calculatedDiscount,
+          }),
+        );
+        dispatch(
+          applyVoucher({
+            code: current.code,
+            discountAmount: current.calculatedDiscount,
+            title: current.name || current.code,
+          }),
+        );
+      }
+    }
+  }, [myPromos, voucherCode, voucherDiscount, dispatch, message]);
+
   const handleSelectVoucher = (promo: AvailablePromotionDTO) => {
     if (promo.eligible) {
-      dispatch(applyCheckoutVoucher({
-        userPromotionId: promo.id,
-        code: promo.code,
-        discount: promo.calculatedDiscount,
-      }));
+      dispatch(
+        applyCheckoutVoucher({
+          userPromotionId: promo.id,
+          code: promo.code,
+          discount: promo.calculatedDiscount,
+        }),
+      );
+      dispatch(
+        applyVoucher({
+          code: promo.code,
+          discountAmount: promo.calculatedDiscount,
+          title: promo.name || promo.code,
+        }),
+      );
       message.success(`Đã áp dụng ${promo.code}`);
     } else {
       message.warning('Voucher này không đủ điều kiện áp dụng');
@@ -88,7 +143,15 @@ export default function OrderSummary() {
           <div className="flex-1">
             <div className="text-sm font-semibold text-gray-900">Bạn tiết kiệm được {formatVND(voucherDiscount)}</div>
             <div className="text-xs text-gray-600">Mã <strong>{voucherCode}</strong> đã được áp dụng</div>
-            <button onClick={() => dispatch(removeCheckoutVoucher())} className="mt-1 text-xs text-red-500 hover:underline">Bỏ chọn</button>
+            <button
+              onClick={() => {
+                dispatch(removeCheckoutVoucher());
+                dispatch(removeVoucher());
+              }}
+              className="mt-1 text-xs text-red-500 hover:underline"
+            >
+              Bỏ chọn
+            </button>
           </div>
         </div>
       )}

@@ -5,7 +5,7 @@ import PaymentMethodSelect from '@/components/checkout/PaymentMethodSelect';
 import OrderSummary from '@/components/checkout/OrderSummary';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { selectCartSummary } from '@/store/selectors/cartSelectors';
-import { nextStep, prevStep, completeOrder, setCurrentStep } from '@/store/slices/checkoutSlice';
+import { nextStep, prevStep, completeOrder, setCurrentStep, removeCheckoutVoucher } from '@/store/slices/checkoutSlice';
 import { clearCart } from '@/store/slices/cartSlice';
 import { orderService, paymentService, phoneService } from '@/services';
 import { Button, App } from 'antd';
@@ -101,10 +101,12 @@ export default function CheckoutPage() {
         // then move to the dedicated payment page (QR keyed by orderId in URL).
         await paymentService.create(order.id, 'VIETQR');
         dispatch(clearCart());
+        dispatch(removeCheckoutVoucher());
         navigate(ROUTES.CHECKOUT_PAYMENT(String(order.id)));
       } else {
         // COD — done
         dispatch(clearCart());
+        dispatch(removeCheckoutVoucher());
         dispatch(completeOrder({ orderId: String(order.id) }));
         navigate(`/thanh-toan/hoan-tat?orderId=${order.id}`);
       }
