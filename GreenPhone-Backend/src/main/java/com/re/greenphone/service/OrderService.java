@@ -180,6 +180,10 @@ public class OrderService {
     }
 
     public OrderDTO cancelOrder(Long orderId) {
+        return cancelOrder(orderId, null);
+    }
+
+    public OrderDTO cancelOrder(Long orderId, String reason) {
         Long userId = SecurityUtils.getCurrentUserId();
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
@@ -213,6 +217,15 @@ public class OrderService {
         }
 
         order.setOrderStatus("CANCELLED");
+        if (reason != null && !reason.trim().isEmpty()) {
+            String existingNote = order.getNote();
+            String cancelNote = "[Lý do hủy: " + reason.trim() + "]";
+            if (existingNote != null && !existingNote.trim().isEmpty()) {
+                order.setNote(existingNote + " " + cancelNote);
+            } else {
+                order.setNote(cancelNote);
+            }
+        }
         order = orderRepository.save(order);
         return orderMapper.toDto(order);
     }
