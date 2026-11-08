@@ -103,17 +103,17 @@ public class PromotionService {
         if (!"ACTIVE".equals(promo.getStatus())
                 || (promo.getStartDate() != null && promo.getStartDate().isAfter(now))
                 || (promo.getEndDate() != null && promo.getEndDate().isBefore(now))) {
-            throw new BadRequestException("Promotion is not active");
+            throw new BadRequestException("Chương trình khuyến mãi không hoạt động hoặc đã hết hạn (Promotion is not active)");
         }
 
         if (userPromotionRepository.existsByUserIdAndPromotionId(userId, promo.getId())) {
-            throw new BadRequestException("You have already claimed this promotion");
+            throw new BadRequestException("Bạn đã nhận mã khuyến mãi này rồi (You have already claimed this promotion)");
         }
 
         // Kiểm tra số lượng phát hành tối đa
         int currentClaimed = promo.getClaimedQuantity() != null ? promo.getClaimedQuantity() : 0;
         if (promo.getQuantity() != null && promo.getQuantity() > 0 && currentClaimed >= promo.getQuantity()) {
-            throw new BadRequestException("Promotion has reached claim limit");
+            throw new BadRequestException("Mã khuyến mãi đã hết lượt nhận (Promotion has reached claim limit)");
         }
 
         promo.setClaimedQuantity(currentClaimed + 1);

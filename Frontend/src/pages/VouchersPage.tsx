@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, App, Button } from 'antd';
-import { Calendar, ShoppingBag, Ticket, Gift, Tag } from 'lucide-react';
+import { Calendar, ShoppingBag, Ticket, Gift, Tag, Check } from 'lucide-react';
 import { Breadcrumb } from '@/components/common';
 import { promotionService } from '@/services';
 import { useAppSelector } from '@/store/hooks';
@@ -12,9 +12,18 @@ import { ROUTES } from '@/routes/routePaths';
 import type { UserPromotionDTO } from '@/types/api';
 
 interface PublicPromo {
-  id: number; code: string; name: string; description: string | null;
-  discountType: string; discountValue: number; maxDiscountAmount: number | null;
-  minOrderValue: number | null; startDate: string; endDate: string;
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  discountType: string;
+  discountValue: number;
+  maxDiscountAmount: number | null;
+  minOrderValue: number | null;
+  quantity?: number | null;
+  claimedQuantity?: number | null;
+  startDate: string;
+  endDate: string;
 }
 
 export default function VouchersPage() {
@@ -35,11 +44,20 @@ export default function VouchersPage() {
     enabled: isAuthenticated,
   });
 
-  // Codes that user already claimed (to filter out from "all" tab)
-  const claimedCodes = new Set((myPromos || []).map((up) => up.code));
+  // Track claimed promotions by ID and uppercase code
+  const claimedPromotionIds = new Set(
+    (myPromos || [])
+      .map((up) => up.promotionId)
+      .filter((id): id is number => typeof id === 'number'),
+  );
+  const claimedCodes = new Set(
+    (myPromos || [])
+      .map((up) => up.code?.trim().toUpperCase())
+      .filter(Boolean),
+  );
 
-  // Filter: show only unclaimed vouchers in "all" tab
-  const unclaimedPromos = (promos || []).filter((p) => !claimedCodes.has(p.code));
+  const isClaimed = (p: PublicPromo) =>
+    claimedPromotionIds.has(p.id) || claimedCodes.has(p.code?.trim().toUpperCase());
 
   const claimMutation = useMutation({
     mutationFn: (code: string) => promotionService.claim(code),
@@ -48,7 +66,16 @@ export default function VouchersPage() {
       queryClient.invalidateQueries({ queryKey: ['promotions', 'my'] });
     },
     onError: (err: Error) => {
-      message.error(err.message || 'Không thể nhận voucher');
+      let msg = err.message || 'Không thể nhận voucher';
+      if (msg.includes('already claimed') || msg.includes('đã nhận')) {
+        msg = 'Bạn đã nhận mã khuyến mãi này rồi!';
+        queryClient.invalidateQueries({ queryKey: ['promotions', 'my'] });
+      } else if (msg.includes('claim limit') || msg.includes('hết lượt')) {
+        msg = 'Mã khuyến mãi đã hết lượt nhận!';
+      } else if (msg.includes('not active') || msg.includes('không hoạt động')) {
+        msg = 'Chương trình khuyến mãi hiện không khả dụng!';
+      }
+      message.error(msg);
     },
   });
 
@@ -70,62 +97,103 @@ export default function VouchersPage() {
         <>
           {isLoading && <p className="py-8 text-center text-gray-500">Đang tải...</p>}
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {unclaimedPromos.map((p) => (
-              <div
-                key={p.id}
-                className="flex overflow-hidden rounded-2xl border border-dashed border-green-300 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-              >
-                {/* Left — discount badge */}
-                <div className="relative flex w-28 shrink-0 flex-col items-center justify-center bg-gradient-to-br from-green-500 to-green-700 p-3 text-center text-white">
-                  <Ticket className="absolute left-2 top-2 h-4 w-4 opacity-50" />
-                  <div className="text-xs font-medium tracking-wider opacity-90">GIẢM</div>
-                  <div className="text-lg font-bold leading-tight">{getDiscountLabel(p.discountType, p.discountValue)}</div>
-                  {p.maxDiscountAmount != null && <div className="text-[10px] opacity-90">Tối đa {formatVND(p.maxDiscountAmount)}</div>}
-                  <div className="absolute -bottom-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45 bg-white" />
-                </div>
-                {/* Right — info */}
-                <div className="flex flex-1 flex-col justify-between p-4">
-                  <div>
-                    <h4 className="mb-1 line-clamp-2 text-sm font-semibold text-gray-900">{p.name}</h4>
-                    <p className="mb-2 text-xs text-gray-500">Mã: <span className="rounded bg-green-100 px-1.5 py-0.5 font-mono text-xs font-semibold text-green-700">{p.code}</span></p>
-                    {p.description && <p className="mb-2 text-xs text-gray-600 line-clamp-2">{p.description}</p>}
-                    <div className="space-y-1 text-xs text-gray-500">
-                      {p.minOrderValue && p.minOrderValue > 0 ? (
+            {(promos || []).map((p) => {
+              const claimed = isClaimed(p);
+              const isOut =
+                p.quantity != null &&
+                p.quantity > 0 &&
+                (p.claimedQuantity ?? 0) >= p.quantity;
+
+              return (
+                <div
+                  key={p.id}
+                  className="flex overflow-hidden rounded-2xl border border-dashed border-green-300 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  {/* Left — discount badge */}
+                  <div className="relative flex w-28 shrink-0 flex-col items-center justify-center bg-gradient-to-br from-green-500 to-green-700 p-3 text-center text-white">
+                    <Ticket className="absolute left-2 top-2 h-4 w-4 opacity-50" />
+                    <div className="text-xs font-medium tracking-wider opacity-90">GIẢM</div>
+                    <div className="text-lg font-bold leading-tight">{getDiscountLabel(p.discountType, p.discountValue)}</div>
+                    {p.maxDiscountAmount != null && <div className="text-[10px] opacity-90">Tối đa {formatVND(p.maxDiscountAmount)}</div>}
+                    <div className="absolute -bottom-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45 bg-white" />
+                  </div>
+                  {/* Right — info */}
+                  <div className="flex flex-1 flex-col justify-between p-4">
+                    <div>
+                      <h4 className="mb-1 line-clamp-2 text-sm font-semibold text-gray-900">{p.name}</h4>
+                      <p className="mb-2 text-xs text-gray-500">Mã: <span className="rounded bg-green-100 px-1.5 py-0.5 font-mono text-xs font-semibold text-green-700">{p.code}</span></p>
+                      {p.description && <p className="mb-2 text-xs text-gray-600 line-clamp-2">{p.description}</p>}
+                      <div className="space-y-1 text-xs text-gray-500">
+                        {p.minOrderValue && p.minOrderValue > 0 ? (
+                          <div className="flex items-center gap-1.5">
+                            <ShoppingBag className="h-3 w-3" />
+                            <span>Đơn tối thiểu: {formatVND(p.minOrderValue)}</span>
+                          </div>
+                        ) : <div className="flex items-center gap-1.5"><ShoppingBag className="h-3 w-3" /><span>Không giới hạn đơn tối thiểu</span></div>}
                         <div className="flex items-center gap-1.5">
-                          <ShoppingBag className="h-3 w-3" />
-                          <span>Đơn tối thiểu: {formatVND(p.minOrderValue)}</span>
+                          <Calendar className="h-3 w-3" />
+                          <span>HSD: {new Date(p.endDate).toLocaleDateString('vi-VN')}</span>
                         </div>
-                      ) : <div className="flex items-center gap-1.5"><ShoppingBag className="h-3 w-3" /><span>Không giới hạn đơn tối thiểu</span></div>}
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="h-3 w-3" />
-                        <span>HSD: {new Date(p.endDate).toLocaleDateString('vi-VN')}</span>
                       </div>
                     </div>
+                    {(() => {
+                      if (!isAuthenticated) {
+                        return (
+                          <Button
+                            size="small"
+                            className="mt-3 !rounded-full"
+                            onClick={() => navigate(ROUTES.LOGIN)}
+                          >
+                            Đăng nhập để nhận
+                          </Button>
+                        );
+                      }
+
+                      if (claimed) {
+                        return (
+                          <Button
+                            size="small"
+                            className="mt-3 !rounded-full !border-gray-200 !bg-gray-100 !text-gray-500 hover:!bg-gray-100 cursor-default"
+                            disabled
+                          >
+                            <span className="flex items-center gap-1">
+                              <Check className="h-3.5 w-3.5 text-green-600" />
+                              Đã lưu vào ví
+                            </span>
+                          </Button>
+                        );
+                      }
+
+                      if (isOut) {
+                        return (
+                          <Button
+                            size="small"
+                            className="mt-3 !rounded-full !border-gray-200 !bg-gray-100 !text-gray-400 cursor-not-allowed"
+                            disabled
+                          >
+                            Hết lượt nhận
+                          </Button>
+                        );
+                      }
+
+                      return (
+                        <Button
+                          type="primary"
+                          size="small"
+                          className="mt-3 !rounded-full !bg-green-600 hover:!bg-green-700"
+                          loading={claimMutation.isPending && claimMutation.variables === p.code}
+                          onClick={() => claimMutation.mutate(p.code)}
+                        >
+                          Lấy voucher
+                        </Button>
+                      );
+                    })()}
                   </div>
-                  {isAuthenticated ? (
-                    <Button
-                      type="primary"
-                      size="small"
-                      className="mt-3 !rounded-full"
-                      loading={claimMutation.isPending && claimMutation.variables === p.code}
-                      onClick={() => claimMutation.mutate(p.code)}
-                    >
-                      Lấy voucher
-                    </Button>
-                  ) : (
-                    <Button
-                      size="small"
-                      className="mt-3 !rounded-full"
-                      onClick={() => navigate(ROUTES.LOGIN)}
-                    >
-                      Đăng nhập để nhận
-                    </Button>
-                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
-          {unclaimedPromos.length === 0 && !isLoading && (
+          {(promos || []).length === 0 && !isLoading && (
             <p className="rounded-xl bg-yellow-50 p-4 text-center text-sm text-yellow-700">Hiện chưa có khuyến mãi nào.</p>
           )}
         </>
