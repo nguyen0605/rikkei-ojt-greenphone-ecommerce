@@ -96,6 +96,27 @@ public class PhoneService {
         int size = pageRequest.getSize() <= 0 ? 10 : Math.min(pageRequest.getSize(), 100);
         Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
 
+        boolean hasAdvancedFilters = (brandIds != null && !brandIds.isEmpty())
+                || (rams != null && !rams.isEmpty())
+                || (storages != null && !storages.isEmpty())
+                || (colors != null && !colors.isEmpty())
+                || (features != null && !features.isEmpty())
+                || minPrice != null
+                || maxPrice != null
+                || (sort != null && !sort.isBlank());
+
+        // Fast Full-Text Search pathway when searching pure keywords (no advanced facet filters)
+        if (query != null && !query.trim().isEmpty() && !hasAdvancedFilters) {
+            String fullTextTerm = toBooleanSearchTerm(query.trim());
+            Page<Phone> phonePage = phoneRepository.searchFullText(fullTextTerm, pageable);
+            List<PhoneDTO> dtos = phonePage.getContent().stream()
+                    .map(this::toListingDto)
+                    .toList();
+
+            return new PageResponse<>(dtos, phonePage.getNumber(), phonePage.getSize(),
+                    phonePage.getTotalElements(), phonePage.getTotalPages(), phonePage.isLast());
+        }
+
         Specification<Phone> spec = PhoneSpecification.filterPhones(
                 query, brandIds, rams, storages, colors, features, minPrice, maxPrice, sort);
 
@@ -106,6 +127,25 @@ public class PhoneService {
 
         return new PageResponse<>(dtos, phonePage.getNumber(), phonePage.getSize(),
                 phonePage.getTotalElements(), phonePage.getTotalPages(), phonePage.isLast());
+    }
+
+    /**
+     * Converts a user query into a MySQL Boolean Mode full-text search string.
+     * e.g. "Titan" -> "+Titan*", "iPhone 15" -> "+iPhone* +15*"
+     */
+    public static String toBooleanSearchTerm(String raw) {
+        if (raw == null || raw.isBlank()) return "";
+        String[] tokens = raw.trim().split("\\s+");
+        StringBuilder sb = new StringBuilder();
+        for (String token : tokens) {
+            // Strip special boolean fulltext characters
+            String clean = token.replaceAll("[+\\-*~<>\"()@]", "");
+            if (!clean.isEmpty()) {
+                if (sb.length() > 0) sb.append(" ");
+                sb.append("+").append(clean).append("*");
+            }
+        }
+        return sb.toString();
     }
 
     public Map<String, Object> getFilters() {

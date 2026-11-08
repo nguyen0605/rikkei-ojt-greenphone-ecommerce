@@ -230,4 +230,33 @@ class PhoneServiceTest {
         List<?> brands = (List<?>) filters.get("brands");
         assertThat(brands).hasSize(2);
     }
+
+    @Test
+    @DisplayName("BE3-03: Tìm kiếm Full-Text Search khi chỉ có từ khóa query")
+    void search_fullTextSearch_whenQueryOnly() {
+        Page<Phone> page = new PageImpl<>(List.of(phone15Pro));
+        when(phoneRepository.searchFullText(eq("+Titan*"), any(Pageable.class))).thenReturn(page);
+        when(phoneMapper.toDto(phone15Pro)).thenReturn(PhoneDTO.builder().id(10L).name("iPhone 15 Pro Max").build());
+
+        PageRequest pageRequest = new PageRequest();
+        pageRequest.setPage(0);
+        pageRequest.setSize(10);
+
+        PageResponse<PhoneDTO> res = phoneService.search("Titan", null, null, null, null, null, null, null, null, pageRequest);
+
+        assertThat(res).isNotNull();
+        assertThat(res.getContent()).hasSize(1);
+        assertThat(res.getContent().get(0).getName()).isEqualTo("iPhone 15 Pro Max");
+        verify(phoneRepository).searchFullText(eq("+Titan*"), any(Pageable.class));
+        verify(phoneRepository, never()).findAll(any(Specification.class), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("BE3-03: Chuyển đổi chuỗi sang Boolean Search Term chuẩn")
+    void toBooleanSearchTerm_convertsProperly() {
+        assertThat(PhoneService.toBooleanSearchTerm("Titan")).isEqualTo("+Titan*");
+        assertThat(PhoneService.toBooleanSearchTerm("iPhone 15")).isEqualTo("+iPhone* +15*");
+        assertThat(PhoneService.toBooleanSearchTerm("  ")).isEqualTo("");
+        assertThat(PhoneService.toBooleanSearchTerm("+Titan*~<>()@")).isEqualTo("+Titan*");
+    }
 }
