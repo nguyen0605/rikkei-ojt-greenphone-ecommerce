@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Radio, App, Rate, Progress } from 'antd';
-import { ShoppingCart, Truck, ShieldCheck, RefreshCw, Headphones, CheckCircle, Star } from 'lucide-react';
+import { Button, App, Rate, Progress } from 'antd';
+import { ShoppingCart, Star, Zap } from 'lucide-react';
 import { Breadcrumb, ProductCard } from '@/components/common';
+import { VariantSelector } from '@/components/product-detail';
 import { phoneService, reviewService } from '@/services';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { addCartItem, addToCart } from '@/store/slices/cartSlice';
@@ -46,12 +47,18 @@ export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const location = useLocation();
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const { message } = App.useApp();
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
-  // Ảnh lớn đang hiển thị — bấm ảnh nhỏ để đổi
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+
+  // Reset state when product id changes
+  const [prevId, setPrevId] = useState(id);
+  if (prevId !== id) {
+    setPrevId(id);
+    setActiveImageIndex(0);
+    setSelectedVariantId(null);
+  }
 
   const { data: phone, isLoading } = useQuery<PhoneDetailDTO>({
     queryKey: ['phone', id],
@@ -78,25 +85,72 @@ export default function ProductDetailPage() {
     enabled: !!phone,
   });
 
-  // Auto-select first variant
   useEffect(() => {
-    if (phone?.variants?.length && !selectedVariantId) {
-      setSelectedVariantId(phone.variants[0].id);
-    }
-  }, [phone, selectedVariantId]);
+    window.scrollTo(0, 0);
+  }, [id]);
 
-  useEffect(() => { window.scrollTo(0, 0); setActiveImageIndex(0); }, [id]);
+  // Derived selected variant (defaults to in-stock variant or first)
+  const variants = phone?.variants;
+  let selectedVariant: PhoneVariantDTO | null = null;
+  if (variants && variants.length > 0) {
+    if (selectedVariantId !== null) {
+      selectedVariant = variants.find((v) => v.id === selectedVariantId) || null;
+    }
+    if (!selectedVariant) {
+      selectedVariant = variants.find((v) => v.stockQuantity > 0) || variants[0];
+    }
+  }
 
   if (isLoading) return <div className="p-8 text-center text-gray-500">Đang tải...</div>;
   if (!phone) return <div className="p-8 text-center text-gray-500">Không tìm thấy sản phẩm</div>;
 
-  const selectedVariant = phone.variants?.find((v) => v.id === selectedVariantId) || phone.variants?.[0];
   const images = phone.images?.length ? phone.images : phone.mainImageUrl ? [{ id: 0, phoneId: phone.id, imageUrl: phone.mainImageUrl, isMain: true } as PhoneImageDTO] : [];
   const activeImage = images[Math.min(activeImageIndex, images.length - 1)]?.imageUrl || phone.mainImageUrl;
 
+  const handleVariantChange = (variant: PhoneVariantDTO) => {
+    setSelectedVariantId(variant.id);
+    if (images.length > 1 && phone.variants) {
+      // 1. Try matching image by color keyword in URL
+      const normalize = (s: string) =>
+        s
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/đ/g, 'd')
+          .replace(/[^a-z0-9]/g, '');
+
+      const colorNorm = normalize(variant.color || '');
+      let foundIndex = -1;
+
+      if (colorNorm) {
+        foundIndex = images.findIndex((img) => {
+          const urlNorm = normalize(img.imageUrl || '');
+          return urlNorm.includes(colorNorm);
+        });
+      }
+
+      // 2. If not matched by URL slug, fallback to position of color in distinct colors list
+      if (foundIndex === -1) {
+        const distinctColors: string[] = [];
+        phone.variants.forEach((v) => {
+          if (v.color && !distinctColors.includes(v.color)) {
+            distinctColors.push(v.color);
+          }
+        });
+        const colorIdx = distinctColors.indexOf(variant.color);
+        if (colorIdx >= 0 && colorIdx < images.length) {
+          foundIndex = colorIdx;
+        }
+      }
+
+      if (foundIndex >= 0 && foundIndex < images.length) {
+        setActiveImageIndex(foundIndex);
+      }
+    }
+  };
+
   const handleAddToCart = async () => {
-    if (!selectedVariant) return;
-    if (selectedVariant.stockQuantity <= 0) {
+    if (!selectedVariant || selectedVariant.stockQuantity <= 0) {
       message.warning('Sản phẩm này đã hết hàng');
       return;
     }
@@ -118,6 +172,15 @@ export default function ProductDetailPage() {
       return;
     }
     message.success(`Đã thêm ${phone.name} vào giỏ hàng`);
+  };
+
+  const handleBuyNow = async () => {
+    if (!selectedVariant || selectedVariant.stockQuantity <= 0) {
+      message.warning('Sản phẩm này đã hết hàng');
+      return;
+    }
+    await handleAddToCart();
+    navigate('/gio-hang');
   };
 
   return (
@@ -207,54 +270,38 @@ export default function ProductDetailPage() {
 
             <p className="mb-6 text-sm leading-relaxed text-gray-600">{phone.description}</p>
 
-            {/* Variant selectors */}
+            {/* Variant selector — 2 nhóm độc lập: Dung lượng & Màu sắc Swatch */}
             {phone.variants && phone.variants.length > 0 && (
-              <div className="mb-6 rounded-xl bg-gray-50 p-4">
-                <h3 className="mb-3 text-sm font-semibold text-gray-900">Chọn phiên bản:</h3>
-                <div className="flex flex-wrap gap-2.5">
-                  {phone.variants.map((v) => (
-                    <Radio.Button
-                      key={v.id}
-                      value={v.id}
-                      checked={selectedVariantId === v.id}
-                      onClick={() => setSelectedVariantId(v.id)}
-                      disabled={v.stockQuantity <= 0}
-                      className="!m-0 !rounded-lg !px-3.5 !py-2 !h-auto"
-                    >
-                      <span className="text-xs">
-                        {v.ram}/{v.storage} — {v.color}
-                        {v.stockQuantity <= 0 ? ' (Hết hàng)' : ''}
-                      </span>
-                    </Radio.Button>
-                  ))}
-                </div>
-              </div>
+              <VariantSelector
+                variants={phone.variants}
+                selectedVariantId={selectedVariant?.id ?? null}
+                onVariantChange={handleVariantChange}
+                className="mb-6"
+              />
             )}
 
-            {/* Stock info */}
-            {selectedVariant && (
-              <div className="mb-4">
-                {selectedVariant.stockQuantity > 0 ? (
-                  <p className="flex items-center gap-1 text-sm text-green-600">
-                    <CheckCircle className="h-4 w-4" /> Còn hàng ({selectedVariant.stockQuantity} sản phẩm)
-                  </p>
-                ) : (
-                  <p className="text-sm text-red-500">Tạm hết hàng</p>
-                )}
-              </div>
-            )}
-
-            {/* Add to cart button */}
-            <Button
-              type="primary"
-              size="large"
-              disabled={!selectedVariant || selectedVariant.stockQuantity <= 0}
-              onClick={handleAddToCart}
-              icon={<ShoppingCart className="h-5 w-5" />}
-              className="mb-2 !h-12 !w-full !rounded-full !bg-green-600 !text-base !font-semibold hover:!bg-green-700"
-            >
-              {selectedVariant && selectedVariant.stockQuantity > 0 ? 'Thêm vào giỏ hàng' : 'Hết hàng'}
-            </Button>
+            {/* Action buttons: Thêm vào giỏ hàng & Mua ngay */}
+            <div className="flex flex-col gap-2.5 sm:flex-row">
+              <Button
+                type="primary"
+                size="large"
+                disabled={!selectedVariant || selectedVariant.stockQuantity <= 0}
+                onClick={handleAddToCart}
+                icon={<ShoppingCart className="h-5 w-5" />}
+                className="!h-12 !flex-1 !rounded-full !bg-green-600 !text-base !font-semibold hover:!bg-green-700"
+              >
+                {selectedVariant && selectedVariant.stockQuantity > 0 ? 'Thêm vào giỏ hàng' : 'Hết hàng'}
+              </Button>
+              <Button
+                size="large"
+                disabled={!selectedVariant || selectedVariant.stockQuantity <= 0}
+                onClick={handleBuyNow}
+                icon={<Zap className="h-5 w-5" />}
+                className="!h-12 !flex-1 !rounded-full !border-2 !border-green-600 !text-base !font-semibold !text-green-700 hover:!bg-green-50"
+              >
+                Mua ngay
+              </Button>
+            </div>
           </div>
         </div>
 
