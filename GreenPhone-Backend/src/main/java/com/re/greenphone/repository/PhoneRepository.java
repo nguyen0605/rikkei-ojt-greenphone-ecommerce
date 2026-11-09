@@ -54,4 +54,21 @@ public interface PhoneRepository extends JpaRepository<Phone, Long>, JpaSpecific
 
     /** Hard-delete guard: any phone still referencing this brand blocks deletion. */
     boolean existsByBrandId(Long brandId);
+
+    /**
+     * MySQL Full-Text Search on name and description in BOOLEAN MODE.
+     * Prevents full table scans and uses idx_phone_fulltext index.
+     */
+    @Query(value = """
+        SELECT * FROM phone p
+        WHERE p.STATUS = 'ACTIVE'
+          AND MATCH(p.NAME, p.DESCRIPTION) AGAINST(:query IN BOOLEAN MODE)
+        """,
+        countQuery = """
+        SELECT count(*) FROM phone p
+        WHERE p.STATUS = 'ACTIVE'
+          AND MATCH(p.NAME, p.DESCRIPTION) AGAINST(:query IN BOOLEAN MODE)
+        """,
+        nativeQuery = true)
+    Page<Phone> searchFullText(@Param("query") String query, Pageable pageable);
 }
