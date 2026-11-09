@@ -22,7 +22,7 @@ spring:
     # connectionTimeZone=UTC: JVM runs UTC and writes LocalDateTime (UTC wall clock)
     # into datetime columns; pin the MySQL session tz to UTC so comparisons (e.g.
     # the order-timeout scheduler) are consistent instead of 7h off.
-    url: ${DB_URL:jdbc:mysql://localhost:3306/greenphone?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true}
+    url: ${DB_URL:jdbc:mysql://localhost:3306/greenphone?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&useUnicode=true&characterEncoding=UTF-8}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
