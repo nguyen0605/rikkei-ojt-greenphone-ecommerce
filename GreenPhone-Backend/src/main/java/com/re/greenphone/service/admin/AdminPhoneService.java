@@ -59,6 +59,7 @@ public class AdminPhoneService {
     private final PhoneVariantMapper phoneVariantMapper;
     private final PhoneImageMapper phoneImageMapper;
     private final CloudinaryService cloudinaryService;
+    private final com.re.greenphone.service.R2StorageService r2StorageService;
     private final InventoryStockHistoryService inventoryStockHistoryService;
 
     public PageResponse<PhoneDTO> getPhones(String keyword, Long brandId, String status,
@@ -172,13 +173,14 @@ public class AdminPhoneService {
                     "Không thể xóa sản phẩm đã có đánh giá. Hãy tắt trạng thái để ẩn sản phẩm.");
         }
 
-        // Xóa ảnh khỏi Cloudinary trước, rồi xóa row ảnh
+        // Xóa ảnh khỏi Cloudflare R2 / Cloudinary trước, rồi xóa row ảnh
         List<PhoneImage> images = phoneImageRepository.findByPhoneId(id);
         images.forEach(img -> {
             try {
+                if (r2StorageService != null) r2StorageService.deleteImage(img.getImageUrl());
                 cloudinaryService.deleteImage(img.getImageUrl());
             } catch (Exception e) {
-                log.warn("Failed to delete Cloudinary image {}: {}", img.getImageUrl(), e.getMessage());
+                log.warn("Failed to delete remote image {}: {}", img.getImageUrl(), e.getMessage());
             }
         });
         phoneImageRepository.deleteAll(images);
@@ -303,7 +305,9 @@ public class AdminPhoneService {
         Phone phone = phoneRepository.findById(phoneId)
                 .orElseThrow(() -> new ResourceNotFoundException("Phone", "id", phoneId));
 
-        String imageUrl = cloudinaryService.uploadImage(file, "greenphone/phones");
+        String imageUrl = (r2StorageService != null)
+                ? r2StorageService.uploadImage(file, "greenphone/phones")
+                : cloudinaryService.uploadImage(file, "greenphone/phones");
         List<PhoneImage> existing = phoneImageRepository.findByPhoneIdOrderBySortOrderAscIdAsc(phoneId);
         boolean isMain = existing.isEmpty();
         int nextSort = existing.stream()
@@ -379,6 +383,9 @@ public class AdminPhoneService {
         PhoneImage image = phoneImageRepository.findById(imageId)
                 .orElseThrow(() -> new ResourceNotFoundException("PhoneImage", "id", imageId));
         Long phoneId = image.getPhone().getId();
+        if (r2StorageService != null) {
+            r2StorageService.deleteImage(image.getImageUrl());
+        }
         cloudinaryService.deleteImage(image.getImageUrl());
         phoneImageRepository.delete(image);
 

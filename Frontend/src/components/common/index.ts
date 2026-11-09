@@ -1,5 +1,6 @@
 export { default as BrandLogo } from './BrandLogo';
 export { default as ProductCard } from './ProductCard';
+export { default as ProductCardSkeleton } from './ProductCardSkeleton';
 export { default as CategoryCard } from './CategoryCard';
 export { default as VoucherCard } from './VoucherCard';
 export { default as TestimonialCard } from './TestimonialCard';

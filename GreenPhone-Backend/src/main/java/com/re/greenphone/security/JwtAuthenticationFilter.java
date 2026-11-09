@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -25,9 +26,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
+    private final StringRedisTemplate redisTemplate;
+
+    public static final String BLACKLIST_TOKEN_PREFIX = "blacklist:";
 
     private static final String[] PUBLIC_PATHS = {
-            "/api/auth/",
+            "/api/auth/login",
+            "/api/auth/register",
+            "/api/auth/verify-otp",
+            "/api/auth/resend-otp",
+            "/api/auth/forgot-password",
+            "/api/auth/reset-password",
+            "/api/auth/refresh",
             "/api/phones",
             "/api/brands",
             "/api/banners",
@@ -55,12 +65,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String jwt = extractToken(request);
             if (StringUtils.hasText(jwt)) {
+                // 1. Check blacklist in Redis (revoked tokens)
+                if (Boolean.TRUE.equals(redisTemplate.hasKey(BLACKLIST_TOKEN_PREFIX + jwt))) {
+                    response.setContentType("application/json");
+                    response.setCharacterEncoding("UTF-8");
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.getWriter().write("{\"code\":401,\"message\":\"Token has been revoked\",\"data\":null}");
+                    return;
+                }
+
                 if (jwtTokenProvider.validateToken(jwt)) {
                     String username = jwtTokenProvider.getUsernameFromToken(jwt);
                     Optional<User> userOpt = userRepository.findByEmail(username);
 
                     if (userOpt.isPresent()) {
                         User user = userOpt.get();
+
+                        if (!"ACTIVE".equals(user.getStatus())) {
+                            response.setContentType("application/json");
+                            response.setCharacterEncoding("UTF-8");
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            response.getWriter().write("{\"code\":403,\"message\":\"User account is not active\",\"data\":null}");
+                            return;
+                        }
+
                         UserPrincipal userPrincipal = UserPrincipal.create(user);
 
                         UsernamePasswordAuthenticationToken authentication =
@@ -74,6 +102,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 } else {
                     // Token present but invalid/expired — return 401 so client can clear it
                     response.setContentType("application/json");
+                    response.setCharacterEncoding("UTF-8");
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.getWriter().write("{\"code\":401,\"message\":\"Token expired or invalid\",\"data\":null}");
                     return;
