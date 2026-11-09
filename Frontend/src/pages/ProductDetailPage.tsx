@@ -12,6 +12,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { addCartItem, addToCart } from '@/store/slices/cartSlice';
 import { formatVND, calculateBestVoucherForPrice } from '@/utils';
 import { useMyPromotions } from '@/hooks/useMyPromotions';
+import WishlistButton from '@/components/common/WishlistButton';
 import type { PhoneDetailDTO, PhoneVariantDTO, PhoneImageDTO } from '@/types/api';
 import type { Product } from '@/types';
 
@@ -233,17 +234,30 @@ export default function ProductDetailPage() {
               </div>
             )}
 
-            {/* Add to cart button */}
-            <Button
-              type="primary"
-              size="large"
-              disabled={!selectedVariant || selectedVariant.stockQuantity <= 0}
-              onClick={handleAddToCart}
-              icon={<ShoppingCart className="h-5 w-5" />}
-              className="mb-2 !h-12 !w-full !rounded-full !bg-green-600 !text-base !font-semibold hover:!bg-green-700"
-            >
-              {selectedVariant && selectedVariant.stockQuantity > 0 ? 'Thêm vào giỏ hàng' : 'Hết hàng'}
-            </Button>
+            {/* Add to cart & Wishlist buttons */}
+            <div className="mb-2 flex items-center gap-3">
+              <Button
+                type="primary"
+                size="large"
+                disabled={!selectedVariant || selectedVariant.stockQuantity <= 0}
+                onClick={handleAddToCart}
+                icon={<ShoppingCart className="h-5 w-5" />}
+                className="!h-12 !flex-1 !rounded-full !bg-green-600 !text-base !font-semibold hover:!bg-green-700"
+              >
+                {selectedVariant && selectedVariant.stockQuantity > 0 ? 'Thêm vào giỏ hàng' : 'Hết hàng'}
+              </Button>
+              <WishlistButton
+                productId={String(phone.id)}
+                name={phone.name}
+                price={selectedVariant?.discountPrice ?? selectedVariant?.price}
+                originalPrice={selectedVariant?.discountPrice ? selectedVariant?.price : undefined}
+                imageUrl={phone.images?.[0]?.imageUrl || phone.mainImageUrl || ''}
+                brandName={phone.brandName || ''}
+                inStock={selectedVariant ? selectedVariant.stockQuantity > 0 : true}
+                className="!h-12 !w-12 shrink-0 border border-gray-200 bg-white shadow-sm hover:border-red-200 hover:bg-red-50"
+                iconSize={22}
+              />
+            </div>
           </div>
         </div>
 

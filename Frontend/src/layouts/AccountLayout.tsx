@@ -3,6 +3,7 @@ import {
   UserOutlined,
   ShoppingOutlined,
   LockOutlined,
+  HeartOutlined,
   ArrowLeftOutlined,
   StarOutlined,
   HomeOutlined,
@@ -16,6 +17,7 @@ const links = [
   { to: '/tai-khoan/thong-tin', label: 'Hồ sơ cá nhân', icon: <UserOutlined /> },
   { to: '/tai-khoan/dia-chi', label: 'Sổ địa chỉ', icon: <HomeOutlined /> },
   { to: '/tai-khoan/don-hang', label: 'Đơn hàng của tôi', icon: <ShoppingOutlined /> },
+  { to: '/tai-khoan/yeu-thich', label: 'Sản phẩm yêu thích', icon: <HeartOutlined /> },
   { to: '/tai-khoan/danh-gia', label: 'Đánh giá sản phẩm', icon: <StarOutlined /> },
   { to: '/tai-khoan/doi-mat-khau', label: 'Đổi mật khẩu', icon: <LockOutlined /> },
 ];

@@ -61,4 +61,6 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   '/dang-ky': 'Đăng ký',
   '/quen-mat-khau': 'Quên mật khẩu',
   '/tai-khoan': 'Tài khoản',
+  '/yeu-thich': 'Sản phẩm yêu thích',
+  '/tai-khoan/yeu-thich': 'Sản phẩm yêu thích',
 };

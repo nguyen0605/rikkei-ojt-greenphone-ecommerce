@@ -2,6 +2,7 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { Badge, Dropdown, type MenuProps } from 'antd';
 import {
   ShoppingCart,
+  Heart,
   LogOut,
   Package,
   UserCircle,
@@ -24,6 +25,7 @@ import { ROUTES } from '@/routes/routePaths';
 
 export default function Header() {
   const cartCount = useAppSelector(selectCartTotalItems);
+  const wishlistCount = useAppSelector((state) => state.wishlist?.items?.length ?? 0);
   const { user, isAuthenticated } = useAppSelector((s) => s.auth);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -70,6 +72,11 @@ export default function Header() {
           label: <Link to={ROUTES.ACCOUNT_ORDERS}>Đơn hàng của tôi</Link>,
         },
         {
+          key: 'wishlist',
+          icon: <Heart className="h-4 w-4" />,
+          label: <Link to={ROUTES.WISHLIST}>Sản phẩm yêu thích</Link>,
+        },
+        {
           key: 'reviews',
           icon: <Star className="h-4 w-4" />,
           label: <Link to={ROUTES.ACCOUNT_REVIEWS}>Đánh giá sản phẩm</Link>,
@@ -99,8 +106,20 @@ export default function Header() {
           <HeaderSearch className="mx-auto block w-full max-w-xl" />
         </div>
 
-        {/* Actions — order: Cart → Login/User */}
-        <div className="flex items-center gap-2">
+        {/* Actions — order: Wishlist → Cart → Login/User */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Wishlist */}
+          <Link
+            to={ROUTES.WISHLIST}
+            className="relative rounded-full p-2 text-gray-700 transition-colors hover:bg-red-50 hover:text-red-500"
+            aria-label="Sản phẩm yêu thích"
+            title="Sản phẩm yêu thích"
+          >
+            <Badge count={wishlistCount} size="small" offset={[-2, 2]} color="#ef4444">
+              <Heart className="h-5 w-5" />
+            </Badge>
+          </Link>
+
           {/* Cart */}
           <Link
             to="/gio-hang"
