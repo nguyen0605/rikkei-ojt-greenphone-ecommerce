@@ -147,6 +147,8 @@ export interface BannerDTO {
   imageUrl: string;
   linkUrl: string;
   status: string;
+  sortOrder?: number;
+  position?: string;
 }
 
 // Review
@@ -296,6 +298,8 @@ export interface PromotionDTO {
   maxDiscountAmount: number;
   minOrderValue: number;
   quantity: number;
+  claimedQuantity?: number;
+  usedQuantity?: number;
   startDate: string;
   endDate: string;
   status: string;
@@ -338,6 +342,7 @@ export interface UserDTO {
   email: string;
   phone: string;
   address: string;
+  avatar?: string;
   role: string;
   status: string;
 }
@@ -345,12 +350,37 @@ export interface UserDTO {
 export interface UserProfileRequest {
   fullName: string;
   phone: string;
-  address: string;
+  address?: string;
+  avatar?: string;
 }
 
 export interface ChangePasswordRequest {
   oldPassword: string;
   newPassword: string;
+}
+
+export interface AddressItem {
+  id: string | number;
+  receiverName: string;
+  receiverPhone: string;
+  province: string;
+  district?: string;
+  ward?: string;
+  streetAddress: string;
+  note?: string;
+  isDefault: boolean;
+  createdAt?: string;
+}
+
+export interface AddressRequest {
+  receiverName: string;
+  receiverPhone: string;
+  province: string;
+  district?: string;
+  ward?: string;
+  streetAddress: string;
+  note?: string;
+  isDefault?: boolean;
 }
 
 // Statistics
@@ -449,6 +479,9 @@ export interface BannerRequest {
   title: string;
   imageUrl: string;
   linkUrl: string;
+  status?: string;
+  sortOrder?: number;
+  position?: string;
 }
 
 export interface PromotionRequest {
@@ -462,6 +495,7 @@ export interface PromotionRequest {
   quantity: number;
   startDate: string;
   endDate: string;
+  status?: string;
 }
 
 // Settings

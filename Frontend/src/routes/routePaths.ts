@@ -25,6 +25,7 @@ export const ROUTES = {
   // Customer account
   ACCOUNT: '/tai-khoan',
   ACCOUNT_PROFILE: '/tai-khoan/thong-tin',
+  ACCOUNT_ADDRESSES: '/tai-khoan/dia-chi',
   ACCOUNT_ORDERS: '/tai-khoan/don-hang',
   ACCOUNT_REVIEWS: '/tai-khoan/danh-gia',
   ACCOUNT_WISHLIST: '/tai-khoan/yeu-thich',
@@ -40,7 +41,9 @@ export const ROUTES = {
   ADMIN_CUSTOMERS: '/admin/khach-hang',
   ADMIN_REVIEWS: '/admin/danh-gia',
   ADMIN_PROMOTIONS: '/admin/khuyen-mai',
+  ADMIN_VOUCHERS: '/admin/vouchers',
   ADMIN_BANNERS: '/admin/banner',
+  ADMIN_BANNERS_ALT: '/admin/banners',
   ADMIN_SETTINGS: '/admin/cai-dat',
   NOT_FOUND: '*',
 } as const;

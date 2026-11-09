@@ -50,7 +50,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     long countByOrderStatusAndCreatedAtBetween(String orderStatus, LocalDateTime from, LocalDateTime to);
 
-    List<Order> findByOrderStatusAndPaymentStatusAndCreatedAtBefore(String orderStatus, String paymentStatus, LocalDateTime dateTime);
+    List<Order> findByOrderStatusAndPaymentStatusAndPaymentMethodInAndCreatedAtBefore(
+            String orderStatus, String paymentStatus, List<String> paymentMethods, LocalDateTime dateTime);
 
     @Query("SELECT o FROM Order o LEFT JOIN FETCH o.orderDetails WHERE o.id = :id")
     Optional<Order> findByIdWithDetails(@Param("id") Long id);

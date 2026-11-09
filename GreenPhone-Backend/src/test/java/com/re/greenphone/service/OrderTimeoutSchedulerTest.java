@@ -3,70 +3,193 @@ package com.re.greenphone.service;
 import com.re.greenphone.entity.Order;
 import com.re.greenphone.entity.OrderDetail;
 import com.re.greenphone.entity.PhoneVariant;
+import com.re.greenphone.entity.UserPromotion;
 import com.re.greenphone.repository.OrderRepository;
 import com.re.greenphone.repository.PhoneVariantRepository;
+import com.re.greenphone.repository.UserPromotionRepository;
 import com.re.greenphone.service.admin.InventoryStockHistoryService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
+import jakarta.persistence.OptimisticLockException;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class OrderTimeoutSchedulerTest {
-    @Mock private OrderRepository orderRepository;
-    @Mock private PhoneVariantRepository phoneVariantRepository;
-    @Mock private InventoryStockHistoryService historyService;
-    @Mock private EntityManager entityManager;
-    @InjectMocks private OrderTimeoutScheduler scheduler;
+
+    @Mock
+    private OrderRepository orderRepository;
+
+    @Mock
+    private PhoneVariantRepository phoneVariantRepository;
+
+    @Mock
+    private InventoryStockHistoryService historyService;
+
+    @Mock
+    private UserPromotionRepository userPromotionRepository;
+
+    @Mock
+    private EntityManager entityManager;
+
+    @InjectMocks
+    private OrderTimeoutScheduler scheduler;
 
     @Test
-    void restoresStockAndAuditsUsingLockedVariant() {
-        PhoneVariant stale = PhoneVariant.builder().stockQuantity(10).build();
-        stale.setId(2L);
-        PhoneVariant locked = PhoneVariant.builder().stockQuantity(6).build();
-        locked.setId(2L);
-        Order order = Order.builder().orderStatus("PENDING").paymentStatus("UNPAID").build();
+    @DisplayName("Case 1: Quá hạn 15 phút - Hủy đơn VietQR/Sepay, hoàn trả tồn kho, hoàn voucher và ghi log lịch sử kho")
+    void cancelExpiredPendingOrders_ShouldCancelAndRestoreStockAndVoucher() {
+        ReflectionTestUtils.setField(scheduler, "timeoutMinutes", 15);
+
+        PhoneVariant variant = PhoneVariant.builder()
+                .price(new BigDecimal("10000000"))
+                .stockQuantity(8)
+                .build();
+        variant.setId(100L);
+
+        UserPromotion userPromotion = UserPromotion.builder()
+                .status("USED")
+                .usedAt(LocalDateTime.now())
+                .build();
+        userPromotion.setId(50L);
+
+        Order order = Order.builder()
+                .orderStatus("PENDING")
+                .paymentStatus("UNPAID")
+                .paymentMethod("VIETQR")
+                .userPromotion(userPromotion)
+                .orderDetails(new ArrayList<>())
+                .build();
         order.setId(1L);
-        order.setOrderDetails(List.of(OrderDetail.builder().phoneVariant(stale).quantity(2).build()));
-        when(orderRepository.findByOrderStatusAndPaymentStatusAndCreatedAtBefore(eq("PENDING"), eq("UNPAID"), any()))
+
+        OrderDetail detail = OrderDetail.builder()
+                .order(order)
+                .phoneVariant(variant)
+                .quantity(2)
+                .build();
+        order.getOrderDetails().add(detail);
+
+        when(orderRepository.findByOrderStatusAndPaymentStatusAndPaymentMethodInAndCreatedAtBefore(
+                eq("PENDING"), eq("UNPAID"), eq(List.of("VIETQR", "SEPAY")), any(LocalDateTime.class)))
                 .thenReturn(List.of(order));
+
         when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
-        when(phoneVariantRepository.findByIdWithLock(2L)).thenReturn(Optional.of(locked));
+        when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(variant));
+        when(phoneVariantRepository.save(any(PhoneVariant.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
         scheduler.cancelExpiredPendingOrders();
 
-        assertThat(locked.getStockQuantity()).isEqualTo(8);
-        assertThat(stale.getStockQuantity()).isEqualTo(10);
+        assertEquals("CANCELLED", order.getOrderStatus());
+        assertEquals("UNPAID", order.getPaymentStatus());
+        assertEquals("Quá hạn thanh toán 15 phút", order.getNote());
+        assertEquals(10, variant.getStockQuantity()); // 8 + 2
+
+        // Verify hoàn voucher
+        assertEquals("AVAILABLE", userPromotion.getStatus());
+        assertNull(userPromotion.getUsedAt());
+        verify(userPromotionRepository).save(userPromotion);
+
         var inOrder = inOrder(phoneVariantRepository, entityManager, historyService);
-        inOrder.verify(phoneVariantRepository).findByIdWithLock(2L);
-        inOrder.verify(entityManager).refresh(locked, LockModeType.PESSIMISTIC_WRITE);
-        inOrder.verify(historyService).record(eq(locked), eq(6), eq(2), eq("IMPORT"), anyString());
-        inOrder.verify(phoneVariantRepository).save(locked);
-        assertThat(order.getOrderStatus()).isEqualTo("CANCELLED");
+        inOrder.verify(phoneVariantRepository).findByIdWithLock(100L);
+        inOrder.verify(entityManager).refresh(variant, LockModeType.PESSIMISTIC_WRITE);
+        inOrder.verify(historyService).record(eq(variant), eq(8), eq(2), eq("IMPORT"), anyString());
+        inOrder.verify(phoneVariantRepository).save(variant);
+
         verify(orderRepository).save(order);
     }
 
     @Test
-    void skipsOrdersThatAreAlreadyPaid() {
-        Order order = Order.builder().orderStatus("PENDING").paymentStatus("PAID").build();
-        order.setId(1L);
-        when(orderRepository.findByOrderStatusAndPaymentStatusAndCreatedAtBefore(eq("PENDING"), eq("UNPAID"), any()))
-                .thenReturn(List.of(order));
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+    @DisplayName("Case 2: Đơn đã thanh toán (PAID) - Không bao giờ bị hủy")
+    void cancelExpiredPendingOrders_WhenPaid_ShouldNotCancel() {
+        ReflectionTestUtils.setField(scheduler, "timeoutMinutes", 15);
+
+        Order paidOrder = Order.builder()
+                .orderStatus("CONFIRMED")
+                .paymentStatus("PAID")
+                .paymentMethod("VIETQR")
+                .build();
+        paidOrder.setId(10L);
+
+        Order staleOrder = Order.builder()
+                .orderStatus("PENDING")
+                .paymentStatus("UNPAID")
+                .paymentMethod("VIETQR")
+                .build();
+        staleOrder.setId(10L);
+
+        when(orderRepository.findByOrderStatusAndPaymentStatusAndPaymentMethodInAndCreatedAtBefore(
+                eq("PENDING"), eq("UNPAID"), eq(List.of("VIETQR", "SEPAY")), any(LocalDateTime.class)))
+                .thenReturn(List.of(staleOrder));
+
+        when(orderRepository.findById(10L)).thenReturn(Optional.of(paidOrder));
 
         scheduler.cancelExpiredPendingOrders();
 
-        verifyNoInteractions(phoneVariantRepository, historyService);
-        verify(orderRepository, never()).save(any());
+        verifyNoInteractions(phoneVariantRepository, historyService, userPromotionRepository);
+        verify(orderRepository, never()).save(paidOrder);
+    }
+
+    @Test
+    @DisplayName("Case 3: Đơn thanh toán khi nhận hàng (COD) - Tuyệt đối không hủy")
+    void cancelExpiredPendingOrders_CODOrder_ShouldNotCancel() {
+        ReflectionTestUtils.setField(scheduler, "timeoutMinutes", 15);
+
+        Order codOrder = Order.builder()
+                .orderStatus("PENDING")
+                .paymentStatus("UNPAID")
+                .paymentMethod("COD")
+                .build();
+        codOrder.setId(20L);
+
+        when(orderRepository.findByOrderStatusAndPaymentStatusAndPaymentMethodInAndCreatedAtBefore(
+                eq("PENDING"), eq("UNPAID"), eq(List.of("VIETQR", "SEPAY")), any(LocalDateTime.class)))
+                .thenReturn(List.of(codOrder));
+
+        when(orderRepository.findById(20L)).thenReturn(Optional.of(codOrder));
+
+        scheduler.cancelExpiredPendingOrders();
+
+        verify(orderRepository, never()).save(codOrder);
+        verify(phoneVariantRepository, never()).save(any());
+        verifyNoInteractions(historyService, userPromotionRepository);
+    }
+
+    @Test
+    @DisplayName("Case 4: Xung đột OptimisticLockException - Không crash tiến trình, bỏ qua để round sau xử lý")
+    void cancelExpiredPendingOrders_ConcurrentModification_ShouldCatchAndNotThrow() {
+        ReflectionTestUtils.setField(scheduler, "timeoutMinutes", 15);
+
+        Order order = Order.builder()
+                .orderStatus("PENDING")
+                .paymentStatus("UNPAID")
+                .paymentMethod("SEPAY")
+                .build();
+        order.setId(30L);
+
+        when(orderRepository.findByOrderStatusAndPaymentStatusAndPaymentMethodInAndCreatedAtBefore(
+                eq("PENDING"), eq("UNPAID"), eq(List.of("VIETQR", "SEPAY")), any(LocalDateTime.class)))
+                .thenReturn(List.of(order));
+
+        when(orderRepository.findById(30L)).thenThrow(new OptimisticLockException("Row modified concurrently"));
+
+        scheduler.cancelExpiredPendingOrders();
+
+        verify(orderRepository).findById(30L);
     }
 }

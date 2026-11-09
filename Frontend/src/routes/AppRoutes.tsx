@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ComponentType, type LazyExoticComponent } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Spin } from 'antd';
 import DefaultLayout from '@/layouts/DefaultLayout';
 import CheckoutLayout from '@/layouts/CheckoutLayout';
@@ -24,6 +24,7 @@ const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage'));
 const ForgotPasswordPage = lazy(() => import('@/pages/auth/ForgotPasswordPage'));
 const VerifyOTPPage = lazy(() => import('@/pages/auth/VerifyOTPPage'));
 const AccountProfilePage = lazy(() => import('@/pages/account/AccountProfilePage'));
+const AddressBookPage = lazy(() => import('@/pages/account/AddressBookPage'));
 const AccountOrdersPage = lazy(() => import('@/pages/account/AccountOrdersPage'));
 const AccountOrderDetailPage = lazy(() => import('@/pages/account/AccountOrderDetailPage'));
 const AccountReviewsPage = lazy(() => import('@/pages/account/AccountReviewsPage'));
@@ -36,8 +37,8 @@ const AdminOptionsPage = lazy(() => import('@/pages/admin/AdminOptionsPage'));
 const AdminOrdersPage = lazy(() => import('@/pages/admin/AdminOrdersPage'));
 const AdminUsersPage = lazy(() => import('@/pages/admin/AdminUsersPage'));
 const AdminReviewsPage = lazy(() => import('@/pages/admin/AdminReviewsPage'));
-const AdminPromotionsPage = lazy(() => import('@/pages/admin/AdminPromotionsPage'));
-const AdminBannersPage = lazy(() => import('@/pages/admin/AdminBannersPage'));
+const AdminPromotionsPage = lazy(() => import('@/pages/admin/marketing/AdminVoucherPage'));
+const AdminBannersPage = lazy(() => import('@/pages/admin/marketing/AdminBannerPage'));
 const AdminSettingsPage = lazy(() => import('@/pages/admin/AdminSettingsPage'));
 
 const PageLoader = () => (
@@ -77,6 +78,7 @@ export default function AppRoutes() {
       {/* Auth Layout */}
       <Route element={<AuthLayout />}>
         <Route path={ROUTES.LOGIN} element={withSuspense(LoginPage)} />
+        <Route path={ROUTES.ADMIN_LOGIN} element={withSuspense(LoginPage)} />
         <Route path={ROUTES.REGISTER} element={withSuspense(RegisterPage)} />
         <Route path={ROUTES.FORGOT_PASSWORD} element={withSuspense(ForgotPasswordPage)} />
         <Route path={ROUTES.VERIFY_OTP} element={withSuspense(VerifyOTPPage)} />
@@ -84,11 +86,19 @@ export default function AppRoutes() {
 
       {/* Account Layout */}
       <Route element={<AccountLayout />}>
+        <Route path={ROUTES.ACCOUNT} element={<Navigate to={ROUTES.ACCOUNT_PROFILE} replace />} />
         <Route path={ROUTES.ACCOUNT_PROFILE} element={withSuspense(AccountProfilePage)} />
+        <Route path={ROUTES.ACCOUNT_ADDRESSES} element={withSuspense(AddressBookPage)} />
         <Route path={ROUTES.ACCOUNT_ORDERS} element={withSuspense(AccountOrdersPage)} />
         <Route path="/tai-khoan/don-hang/:id" element={withSuspense(AccountOrderDetailPage)} />
         <Route path={ROUTES.ACCOUNT_REVIEWS} element={withSuspense(AccountReviewsPage)} />
         <Route path={ROUTES.ACCOUNT_CHANGE_PASSWORD} element={withSuspense(AccountPasswordPage)} />
+        {/* Aliases for English /account routes */}
+        <Route path="/account" element={<Navigate to={ROUTES.ACCOUNT_PROFILE} replace />} />
+        <Route path="/account/profile" element={<Navigate to={ROUTES.ACCOUNT_PROFILE} replace />} />
+        <Route path="/account/addresses" element={<Navigate to={ROUTES.ACCOUNT_ADDRESSES} replace />} />
+        <Route path="/account/orders" element={<Navigate to={ROUTES.ACCOUNT_ORDERS} replace />} />
+        <Route path="/account/change-password" element={<Navigate to={ROUTES.ACCOUNT_CHANGE_PASSWORD} replace />} />
       </Route>
 
       {/* Admin Layout */}
@@ -102,7 +112,9 @@ export default function AppRoutes() {
         <Route path={ROUTES.ADMIN_CUSTOMERS} element={withSuspense(AdminUsersPage)} />
         <Route path={ROUTES.ADMIN_REVIEWS} element={withSuspense(AdminReviewsPage)} />
         <Route path={ROUTES.ADMIN_PROMOTIONS} element={withSuspense(AdminPromotionsPage)} />
+        <Route path={ROUTES.ADMIN_VOUCHERS} element={withSuspense(AdminPromotionsPage)} />
         <Route path={ROUTES.ADMIN_BANNERS} element={withSuspense(AdminBannersPage)} />
+        <Route path={ROUTES.ADMIN_BANNERS_ALT} element={withSuspense(AdminBannersPage)} />
         <Route path={ROUTES.ADMIN_SETTINGS} element={withSuspense(AdminSettingsPage)} />
       </Route>
     </Routes>
