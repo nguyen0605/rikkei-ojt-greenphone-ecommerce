@@ -177,6 +177,20 @@ describe('ProductGallery Component', () => {
       expect(screen.getByTestId('lightbox-modal')).toBeInTheDocument();
     });
 
+    it('mở lightbox khi nhấn phím Enter trên ảnh chính', () => {
+      render(
+        <ProductGallery
+          images={mockImages}
+          productName="iPhone 15 Pro Max"
+        />
+      );
+
+      const mainContainer = screen.getByTestId('main-image-container');
+      fireEvent.keyDown(mainContainer, { key: 'Enter' });
+
+      expect(screen.getByTestId('lightbox-modal')).toBeInTheDocument();
+    });
+
     it('đóng lightbox khi bấm nút X hoặc phím Escape và phục hồi cuộn trang', () => {
       render(
         <ProductGallery

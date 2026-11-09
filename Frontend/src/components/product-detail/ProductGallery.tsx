@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Maximize2, X, ImageOff } from 'lucide-react';
 import type { PhoneImageDTO } from '@/types/api';
 import { cn } from '@/utils';
 
 export interface ProductGalleryProps {
-  images: (string | PhoneImageDTO)[];
+  images: (string | PhoneImageDTO | { id?: number | string; imageUrl: string })[];
   thumbnail?: string;
   productName: string;
   selectedIndex?: number;
@@ -32,7 +32,7 @@ export default function ProductGallery({
   className,
 }: ProductGalleryProps) {
   // ── Chuẩn hóa danh sách ảnh (string hoặc PhoneImageDTO) ──
-  const normalizedImages: NormalizedImage[] = (() => {
+  const normalizedImages: NormalizedImage[] = useMemo(() => {
     const list: NormalizedImage[] = [];
     if (images && images.length > 0) {
       images.forEach((img, idx) => {
@@ -50,7 +50,7 @@ export default function ProductGallery({
       list.push({ id: 'placeholder', url: '' });
     }
     return list;
-  })();
+  }, [images, thumbnail]);
 
   // ── Quản lý active index ──
   const [internalActive, setInternalActive] = useState(0);
@@ -116,13 +116,13 @@ export default function ProductGallery({
   const touchStartXRef = useRef<number | null>(null);
   const touchEndXRef = useRef<number | null>(null);
 
-  const openLightbox = (e?: React.MouseEvent) => {
+  const openLightbox = useCallback((e?: React.SyntheticEvent<HTMLElement>) => {
     if (e) {
       e.stopPropagation();
-      triggerRef.current = e.currentTarget as HTMLElement;
+      triggerRef.current = e.currentTarget;
     }
     setIsLightboxOpen(true);
-  };
+  }, []);
 
   const closeLightbox = useCallback(() => {
     setIsLightboxOpen(false);
@@ -209,7 +209,7 @@ export default function ProductGallery({
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            openLightbox();
+            openLightbox(e);
           }
         }}
       >
