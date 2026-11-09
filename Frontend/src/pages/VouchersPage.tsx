@@ -32,6 +32,7 @@ export default function VouchersPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('all');
+  const [justClaimedCodes, setJustClaimedCodes] = useState<string[]>([]);
 
   const { data: promos, isLoading } = useQuery<PublicPromo[]>({
     queryKey: ['promotions', 'public'],
@@ -56,8 +57,13 @@ export default function VouchersPage() {
       .filter(Boolean),
   );
 
-  const isClaimed = (p: PublicPromo) =>
-    claimedPromotionIds.has(p.id) || claimedCodes.has(p.code?.trim().toUpperCase());
+  const isClaimed = (p: PublicPromo) => {
+    const codeUpper = p.code?.trim().toUpperCase();
+    return (
+      claimedPromotionIds.has(p.id) ||
+      (codeUpper ? claimedCodes.has(codeUpper) || justClaimedCodes.includes(codeUpper) : false)
+    );
+  };
 
   // Lọc các voucher chưa nhận để hiển thị trong tab "Tất cả ưu đãi"
   const availablePromos = (promos || []).filter(
@@ -66,15 +72,21 @@ export default function VouchersPage() {
 
   const claimMutation = useMutation({
     mutationFn: (code: string) => promotionService.claim(code),
-    onSuccess: () => {
+    onSuccess: (_data, code) => {
       message.success('Nhận voucher thành công!');
+      if (code) {
+        setJustClaimedCodes((prev) => [...prev, code.trim().toUpperCase()]);
+      }
       queryClient.invalidateQueries({ queryKey: ['promotions', 'my'] });
       queryClient.invalidateQueries({ queryKey: ['promotions', 'public'] });
     },
-    onError: (err: Error) => {
+    onError: (err: Error, code) => {
       let msg = err.message || 'Không thể nhận voucher';
       if (msg.includes('already claimed') || msg.includes('đã nhận')) {
         msg = 'Bạn đã nhận mã khuyến mãi này rồi!';
+        if (code) {
+          setJustClaimedCodes((prev) => [...prev, code.trim().toUpperCase()]);
+        }
         queryClient.invalidateQueries({ queryKey: ['promotions', 'my'] });
       } else if (msg.includes('claim limit') || msg.includes('hết lượt')) {
         msg = 'Mã khuyến mãi đã hết lượt nhận!';
