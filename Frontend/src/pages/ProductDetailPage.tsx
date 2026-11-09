@@ -123,7 +123,12 @@ export default function ProductDetailPage() {
               thumbnail={phone.mainImageUrl}
               productName={phone.name}
               selectedIndex={activeImageIndex}
-              onSelectIndex={setActiveImageIndex}
+              onSelectIndex={(index) => {
+                setActiveImageIndex(index);
+                if (phone.variants && index < phone.variants.length) {
+                  setSelectedVariantId(phone.variants[index].id);
+                }
+              }}
             />
           </div>
 
@@ -172,12 +177,17 @@ export default function ProductDetailPage() {
               <div className="mb-6 rounded-xl bg-gray-50 p-4">
                 <h3 className="mb-3 text-sm font-semibold text-gray-900">Chọn phiên bản:</h3>
                 <div className="flex flex-wrap gap-2.5">
-                  {phone.variants.map((v) => (
+                  {phone.variants.map((v, idx) => (
                     <Radio.Button
                       key={v.id}
                       value={v.id}
-                      checked={selectedVariantId === v.id}
-                      onClick={() => setSelectedVariantId(v.id)}
+                      checked={(selectedVariantId ?? phone.variants?.[0]?.id) === v.id}
+                      onClick={() => {
+                        setSelectedVariantId(v.id);
+                        if (idx < images.length) {
+                          setActiveImageIndex(idx);
+                        }
+                      }}
                       disabled={v.stockQuantity <= 0}
                       className="!m-0 !rounded-lg !px-3.5 !py-2 !h-auto"
                     >

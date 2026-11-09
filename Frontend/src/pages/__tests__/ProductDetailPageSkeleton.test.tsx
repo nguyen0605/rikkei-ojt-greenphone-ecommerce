@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
@@ -122,6 +122,67 @@ describe('ProductDetailPage Skeleton & Gallery Integration', () => {
       expect(screen.getByTestId('main-product-image')).toBeInTheDocument();
       expect(screen.getByTestId('thumbnail-strip')).toBeInTheDocument();
       expect(screen.getByText('Thêm vào giỏ hàng')).toBeInTheDocument();
+    });
+  });
+
+  it('chuyển đổi hình ảnh lớn khi người dùng bấm chọn biến thể khác', async () => {
+    vi.mocked(phoneService.detail).mockResolvedValue({
+      id: 149,
+      name: 'Samsung Galaxy S24 Ultra',
+      brandId: 2,
+      brandName: 'Samsung',
+      screen: '6.8 inch Dynamic AMOLED 2X',
+      chip: 'Snapdragon 8 Gen 3',
+      rearCamera: '200MP + 50MP',
+      frontCamera: '12MP',
+      battery: '5000 mAh',
+      os: 'Android 14',
+      warranty: '12 tháng',
+      description: 'Samsung AI Flagship.',
+      mainImageUrl: 'https://example.com/gold.jpg',
+      images: [
+        { id: 1, phoneId: 149, imageUrl: 'https://example.com/gold.jpg', isMain: true },
+        { id: 2, phoneId: 149, imageUrl: 'https://example.com/gray.jpg', isMain: false },
+        { id: 3, phoneId: 149, imageUrl: 'https://example.com/black.jpg', isMain: false },
+      ],
+      variants: [
+        {
+          id: 644,
+          phoneId: 149,
+          ram: '12GB',
+          storage: '256GB',
+          color: 'Vàng Titan',
+          price: 26990000,
+          stockQuantity: 50,
+        },
+        {
+          id: 645,
+          phoneId: 149,
+          ram: '12GB',
+          storage: '512GB',
+          color: 'Xám Titan',
+          price: 31990000,
+          stockQuantity: 50,
+        },
+      ],
+      avgRating: 5.0,
+      reviewCount: 0,
+    } as any);
+
+    renderPDP('149');
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Samsung Galaxy S24 Ultra' })).toBeInTheDocument();
+    });
+
+    const mainImg = screen.getByTestId('main-product-image');
+    expect(mainImg).toHaveAttribute('src', 'https://example.com/gold.jpg');
+
+    const grayVariantBtn = screen.getByText(/Xám Titan/);
+    fireEvent.click(grayVariantBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('main-product-image')).toHaveAttribute('src', 'https://example.com/gray.jpg');
     });
   });
 });
