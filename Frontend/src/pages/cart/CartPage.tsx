@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Empty, App, Popconfirm, Checkbox } from 'antd';
 import { DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, ShoppingOutlined, TagOutlined, CloseOutlined, RightOutlined } from '@ant-design/icons';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { removeCartItem, updateCartItem, removeFromCart, updateQuantity, clearCart, moveItem as moveCartItem, clearCartRemote } from '@/store/slices/cartSlice';
+import { removeCartItem, updateCartItem, removeFromCart, updateQuantity, clearCart, moveItem as moveCartItem, clearCartRemote, applyVoucher, removeVoucher } from '@/store/slices/cartSlice';
 import { selectCartSummary } from '@/store/selectors/cartSelectors';
 import type { CartItem } from '@/types';
+import type { AvailablePromotionDTO } from '@/types/api';
 import { formatVND } from '@/utils';
-import { phoneService, brandService } from '@/services';
+import { phoneService, brandService, promotionService } from '@/services';
 import { useQuery } from '@tanstack/react-query';
 import { ROUTES } from '@/routes/routePaths';
 
@@ -20,6 +21,31 @@ export default function CartPage() {
   const isAuthenticated = useAppSelector((s) => s.auth.isAuthenticated);
   const appliedVoucher = useAppSelector((s) => s.cart.appliedVoucher);
   const summary = useAppSelector(selectCartSummary);
+  const [cartDismissedVoucher, setCartDismissedVoucher] = useState(false);
+
+  const { data: availableVouchers } = useQuery<AvailablePromotionDTO[]>({
+    queryKey: ['promotions', 'available', summary.subtotal],
+    queryFn: () => promotionService.available(summary.subtotal),
+    enabled: isAuthenticated && summary.subtotal > 0,
+  });
+
+  // Tự động áp dụng voucher cao nhất cho giỏ hàng nếu chưa có voucher
+  useEffect(() => {
+    if (cartDismissedVoucher) return;
+    if (!appliedVoucher && availableVouchers && availableVouchers.length > 0) {
+      const eligible = availableVouchers.filter((p) => p.eligible && p.calculatedDiscount > 0);
+      if (eligible.length > 0) {
+        const best = [...eligible].sort((a, b) => b.calculatedDiscount - a.calculatedDiscount)[0];
+        dispatch(
+          applyVoucher({
+            code: best.code,
+            discountAmount: best.calculatedDiscount,
+            title: best.name || best.code,
+          }),
+        );
+      }
+    }
+  }, [appliedVoucher, availableVouchers, cartDismissedVoucher, dispatch]);
 
   // ── Select all ──
   const [selected, setSelected] = useState<Set<string> | null>(null);
@@ -154,11 +180,24 @@ export default function CartPage() {
                   Săn voucher →
                 </Link>
               </div>
-              <p className="mt-1 text-gray-500">
-                {appliedVoucher
-                  ? `Đang áp dụng mã ${appliedVoucher.code}`
-                  : 'Mã giảm giá sẽ được áp dụng tại bước thanh toán'}
-              </p>
+              <div className="mt-1 flex items-center justify-between">
+                <p className="text-gray-500">
+                  {appliedVoucher
+                    ? `Đã áp dụng mã ${appliedVoucher.code} (-${formatVND(appliedVoucher.discountAmount)})`
+                    : 'Mã giảm giá sẽ được tự động áp dụng tại bước thanh toán'}
+                </p>
+                {appliedVoucher && (
+                  <button
+                    onClick={() => {
+                      setCartDismissedVoucher(true);
+                      dispatch(removeVoucher());
+                    }}
+                    className="ml-2 flex-shrink-0 text-xs text-red-500 hover:underline"
+                  >
+                    Bỏ chọn
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Price breakdown */}

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { CheckCircle2, Truck, ShieldCheck, RefreshCw, Headphones, Ticket } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { App } from 'antd';
@@ -19,6 +19,7 @@ export default function OrderSummary() {
   const voucherCode = useAppSelector((s) => s.checkout.voucherCode);
   const voucherDiscount = useAppSelector((s) => s.checkout.voucherDiscount);
   const isAuthenticated = useAppSelector((s) => s.auth.isAuthenticated);
+  const [userDismissedVoucher, setUserDismissedVoucher] = useState(false);
 
   const { data: myPromos } = useQuery<AvailablePromotionDTO[]>({
     queryKey: ['promotions', 'available', summary.subtotal],
@@ -26,21 +27,46 @@ export default function OrderSummary() {
     enabled: isAuthenticated,
   });
 
-  // Auto-sync cart voucher into checkout if already present
+  // Auto-sync cart voucher or auto-apply best eligible voucher
   useEffect(() => {
-    if (!voucherCode && cartVoucher?.code && myPromos) {
-      const match = myPromos.find((p) => p.code === cartVoucher.code);
-      if (match && match.eligible) {
+    if (userDismissedVoucher) return;
+
+    if (!voucherCode && myPromos && myPromos.length > 0) {
+      if (cartVoucher?.code) {
+        const match = myPromos.find((p) => p.code === cartVoucher.code);
+        if (match && match.eligible) {
+          dispatch(
+            applyCheckoutVoucher({
+              userPromotionId: match.id,
+              code: match.code,
+              discount: match.calculatedDiscount,
+            }),
+          );
+          return;
+        }
+      }
+
+      // Auto-apply best eligible voucher with highest calculated discount
+      const eligiblePromos = myPromos.filter((p) => p.eligible && p.calculatedDiscount > 0);
+      if (eligiblePromos.length > 0) {
+        const best = [...eligiblePromos].sort((a, b) => b.calculatedDiscount - a.calculatedDiscount)[0];
         dispatch(
           applyCheckoutVoucher({
-            userPromotionId: match.id,
-            code: match.code,
-            discount: match.calculatedDiscount,
+            userPromotionId: best.id,
+            code: best.code,
+            discount: best.calculatedDiscount,
+          }),
+        );
+        dispatch(
+          applyVoucher({
+            code: best.code,
+            discountAmount: best.calculatedDiscount,
+            title: best.name || best.code,
           }),
         );
       }
     }
-  }, [cartVoucher, voucherCode, myPromos, dispatch]);
+  }, [cartVoucher, voucherCode, myPromos, userDismissedVoucher, dispatch]);
 
   // Keep discount updated or remove if subtotal changes and makes voucher ineligible
   useEffect(() => {
@@ -71,6 +97,7 @@ export default function OrderSummary() {
 
   const handleSelectVoucher = (promo: AvailablePromotionDTO) => {
     if (promo.eligible) {
+      setUserDismissedVoucher(false);
       dispatch(
         applyCheckoutVoucher({
           userPromotionId: promo.id,
@@ -145,6 +172,7 @@ export default function OrderSummary() {
             <div className="text-xs text-gray-600">Mã <strong>{voucherCode}</strong> đã được áp dụng</div>
             <button
               onClick={() => {
+                setUserDismissedVoucher(true);
                 dispatch(removeCheckoutVoucher());
                 dispatch(removeVoucher());
               }}

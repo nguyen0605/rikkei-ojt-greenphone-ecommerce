@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Radio, App } from 'antd';
-import { ShoppingCart, CheckCircle, Star } from 'lucide-react';
+import { ShoppingCart, CheckCircle, Star, Ticket } from 'lucide-react';
 import { Breadcrumb, ProductCard } from '@/components/common';
 import ProductGallery from '@/components/product-detail/ProductGallery';
 import ProductDetailSkeleton from '@/components/product-detail/ProductDetailSkeleton';
@@ -10,7 +10,8 @@ import { ProductReviewsSection } from '@/components/product/detail';
 import { phoneService } from '@/services';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { addCartItem, addToCart } from '@/store/slices/cartSlice';
-import { formatVND } from '@/utils';
+import { formatVND, calculateBestVoucherForPrice } from '@/utils';
+import { useMyPromotions } from '@/hooks/useMyPromotions';
 import type { PhoneDetailDTO, PhoneVariantDTO, PhoneImageDTO } from '@/types/api';
 import type { Product } from '@/types';
 
@@ -49,6 +50,7 @@ export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
+  const { data: myPromotions } = useMyPromotions();
   const { message } = App.useApp();
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
   // Ảnh lớn đang hiển thị — bấm ảnh nhỏ để đổi
@@ -83,6 +85,9 @@ export default function ProductDetailPage() {
 
   const selectedVariant = phone.variants?.find((v) => v.id === selectedVariantId) || phone.variants?.[0];
   const images = phone.images?.length ? phone.images : phone.mainImageUrl ? [{ id: 0, phoneId: phone.id, imageUrl: phone.mainImageUrl, isMain: true } as PhoneImageDTO] : [];
+
+  const currentVariantPrice = selectedVariant?.discountPrice ?? selectedVariant?.price;
+  const bestVoucher = calculateBestVoucherForPrice(currentVariantPrice, myPromotions);
 
   const handleAddToCart = async () => {
     if (!selectedVariant) return;
@@ -161,6 +166,20 @@ export default function ProductDetailPage() {
                   </div>
                 ) : (
                   <span className="text-2xl font-bold text-red-600">{formatVND(selectedVariant.price)}</span>
+                )}
+
+                {/* Best Voucher deal badge */}
+                {bestVoucher && (
+                  <div className="mt-2.5 inline-flex flex-wrap items-center gap-2 rounded-xl border border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 px-3.5 py-2 text-xs">
+                    <div className="flex items-center gap-1.5 font-semibold text-green-800">
+                      <Ticket className="h-4 w-4 text-green-600" />
+                      <span>Giá sau voucher tốt nhất:</span>
+                      <span className="text-base font-bold text-red-600">{formatVND(bestVoucher.finalPrice)}</span>
+                    </div>
+                    <span className="rounded-full bg-green-600 px-2.5 py-0.5 text-[11px] font-medium text-white shadow-sm">
+                      Mã {bestVoucher.code} (-{formatVND(bestVoucher.discountAmount)})
+                    </span>
+                  </div>
                 )}
               </div>
             )}
