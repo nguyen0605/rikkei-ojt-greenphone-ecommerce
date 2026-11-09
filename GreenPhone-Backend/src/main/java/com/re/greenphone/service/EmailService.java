@@ -75,6 +75,32 @@ public class EmailService {
         send(toEmail, subject, body);
     }
 
+    @Async("mailTaskExecutor")
+    public void sendRefundConfirmation(String toEmail, String orderId, BigDecimal amount, String reason) {
+        String subject = "Xác nhận hoàn tiền đơn hàng #" + orderId + " - GreenPhone";
+        String formattedAmount = NumberFormat.getCurrencyInstance(new Locale("vi", "VN")).format(amount != null ? amount : BigDecimal.ZERO);
+        String body = """
+            <!DOCTYPE html>
+            <html lang="vi">
+            <head><meta charset="UTF-8"></head>
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f3f4f6; margin: 0; padding: 24px 0;">
+                <div style="max-width: 500px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb; padding: 24px;">
+                    <h2 style="color: #16a34a; margin-top: 0;">GreenPhone</h2>
+                    <p style="font-size: 14px; color: #374151;">Xin chào quý khách,</p>
+                    <p style="font-size: 14px; color: #4b5563; line-height: 1.6;">Yêu cầu hoàn tiền cho đơn hàng <strong>#%s</strong> của bạn đã được <strong>xử lý thành công</strong>.</p>
+                    <div style="background: #f0fdf4; padding: 16px; border-radius: 8px; margin: 16px 0; border: 1px solid #bbf7d0;">
+                        <p style="margin: 0 0 6px; color: #166534; font-size: 14px;">Số tiền hoàn: <strong>%s</strong></p>
+                        <p style="margin: 0; color: #374151; font-size: 13px;">Lý do hoàn tiền: <em>%s</em></p>
+                    </div>
+                    <p style="font-size: 14px; color: #4b5563;">Khoản tiền đã được chuyển về tài khoản của bạn. Vui lòng kiểm tra số dư trong vòng 24 giờ tới.</p>
+                    <p style="color: #9ca3af; font-size: 12px; margin-top: 24px; text-align: center;">GreenPhone - Chăm sóc khách hàng tận tâm</p>
+                </div>
+            </body>
+            </html>
+            """.formatted(orderId, formattedAmount, reason != null ? reason : "Hoàn tiền theo yêu cầu");
+        send(toEmail, subject, body);
+    }
+
     private void send(String to, String subject, String htmlBody) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
