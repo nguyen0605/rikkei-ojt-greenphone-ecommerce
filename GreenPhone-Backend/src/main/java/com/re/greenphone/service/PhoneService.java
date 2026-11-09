@@ -108,13 +108,15 @@ public class PhoneService {
         // Fast Full-Text Search pathway when searching pure keywords (no advanced facet filters)
         if (query != null && !query.trim().isEmpty() && !hasAdvancedFilters) {
             String fullTextTerm = toBooleanSearchTerm(query.trim());
-            Page<Phone> phonePage = phoneRepository.searchFullText(fullTextTerm, pageable);
-            List<PhoneDTO> dtos = phonePage.getContent().stream()
-                    .map(this::toListingDto)
-                    .toList();
+            if (!fullTextTerm.isBlank()) {
+                Page<Phone> phonePage = phoneRepository.searchFullText(fullTextTerm, pageable);
+                List<PhoneDTO> dtos = phonePage.getContent().stream()
+                        .map(this::toListingDto)
+                        .toList();
 
-            return new PageResponse<>(dtos, phonePage.getNumber(), phonePage.getSize(),
-                    phonePage.getTotalElements(), phonePage.getTotalPages(), phonePage.isLast());
+                return new PageResponse<>(dtos, phonePage.getNumber(), phonePage.getSize(),
+                        phonePage.getTotalElements(), phonePage.getTotalPages(), phonePage.isLast());
+            }
         }
 
         Specification<Phone> spec = PhoneSpecification.filterPhones(

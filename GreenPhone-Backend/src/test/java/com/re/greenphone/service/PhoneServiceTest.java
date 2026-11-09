@@ -258,5 +258,24 @@ class PhoneServiceTest {
         assertThat(PhoneService.toBooleanSearchTerm("iPhone 15")).isEqualTo("+iPhone* +15*");
         assertThat(PhoneService.toBooleanSearchTerm("  ")).isEqualTo("");
         assertThat(PhoneService.toBooleanSearchTerm("+Titan*~<>()@")).isEqualTo("+Titan*");
+        assertThat(PhoneService.toBooleanSearchTerm("+++ *** ~~~")).isEqualTo("");
+    }
+
+    @Test
+    @DisplayName("BE3-03: Tìm kiếm với toàn ký tự đặc biệt sẽ fallback về JPA specification")
+    void search_specialCharactersOnly_fallbacksToSpecification() {
+        Page<Phone> page = new PageImpl<>(List.of(phone15Pro));
+        when(phoneRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
+        when(phoneMapper.toDto(phone15Pro)).thenReturn(PhoneDTO.builder().id(10L).name("iPhone 15 Pro Max").build());
+
+        PageRequest pageRequest = new PageRequest();
+        pageRequest.setPage(0);
+        pageRequest.setSize(10);
+
+        PageResponse<PhoneDTO> res = phoneService.search("+++ ***", null, null, null, null, null, null, null, null, pageRequest);
+
+        assertThat(res).isNotNull();
+        verify(phoneRepository, never()).searchFullText(anyString(), any(Pageable.class));
+        verify(phoneRepository).findAll(any(Specification.class), any(Pageable.class));
     }
 }
