@@ -42,6 +42,7 @@ public class SecurityConfig {
                         "/api/promotions/public/**",
                         "/api/settings/**",
                         "/api/options/**",
+                        "/api/shipments/track/**",
                         "/swagger-ui/**",
                         "/v3/api-docs/**",
                         "/actuator/health/**"
