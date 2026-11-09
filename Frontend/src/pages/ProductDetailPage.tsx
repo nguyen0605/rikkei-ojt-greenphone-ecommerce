@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Radio, App, Rate, Progress } from 'antd';
-import { ShoppingCart, Truck, ShieldCheck, RefreshCw, Headphones, CheckCircle, Star } from 'lucide-react';
+import { Button, Radio, App } from 'antd';
+import { ShoppingCart, CheckCircle, Star } from 'lucide-react';
 import { Breadcrumb, ProductCard } from '@/components/common';
-import { phoneService, reviewService } from '@/services';
+import { ProductReviewsSection } from '@/components/product/detail';
+import { phoneService } from '@/services';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { addCartItem, addToCart } from '@/store/slices/cartSlice';
 import { formatVND } from '@/utils';
-import type { PhoneDetailDTO, PhoneVariantDTO, PhoneImageDTO, ReviewDTO, ReviewSummary } from '@/types/api';
+import type { PhoneDetailDTO, PhoneVariantDTO, PhoneImageDTO } from '@/types/api';
 import type { Product } from '@/types';
 
 function toProduct(phone: PhoneDetailDTO, variant: PhoneVariantDTO): Product {
@@ -45,29 +46,26 @@ function toProduct(phone: PhoneDetailDTO, variant: PhoneVariantDTO): Product {
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const dispatch = useAppDispatch();
-  const navigate = useNavigate();
-  const location = useLocation();
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const { message } = App.useApp();
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
   // Ảnh lớn đang hiển thị — bấm ảnh nhỏ để đổi
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [prevId, setPrevId] = useState(id);
+
+  if (id !== prevId) {
+    setPrevId(id);
+    setActiveImageIndex(0);
+    setSelectedVariantId(null);
+  }
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [id]);
 
   const { data: phone, isLoading } = useQuery<PhoneDetailDTO>({
     queryKey: ['phone', id],
     queryFn: () => phoneService.detail(Number(id)),
-    enabled: !!id,
-  });
-
-  const { data: reviews } = useQuery<ReviewDTO[]>({
-    queryKey: ['reviews', id],
-    queryFn: () => reviewService.byPhone(Number(id)).then((r) => (r as { content: ReviewDTO[] }).content || []),
-    enabled: !!id,
-  });
-
-  const { data: reviewSummary } = useQuery<ReviewSummary>({
-    queryKey: ['reviews', 'summary', id],
-    queryFn: () => reviewService.summary(Number(id)),
     enabled: !!id,
   });
 
@@ -77,15 +75,6 @@ export default function ProductDetailPage() {
     queryFn: () => phoneService.list({ brandIds: String(phone?.brandId), size: '5' }),
     enabled: !!phone,
   });
-
-  // Auto-select first variant
-  useEffect(() => {
-    if (phone?.variants?.length && !selectedVariantId) {
-      setSelectedVariantId(phone.variants[0].id);
-    }
-  }, [phone, selectedVariantId]);
-
-  useEffect(() => { window.scrollTo(0, 0); setActiveImageIndex(0); }, [id]);
 
   if (isLoading) return <div className="p-8 text-center text-gray-500">Đang tải...</div>;
   if (!phone) return <div className="p-8 text-center text-gray-500">Không tìm thấy sản phẩm</div>;
@@ -283,56 +272,8 @@ export default function ProductDetailPage() {
           </div>
         </div>
 
-        {/* Reviews */}
-        <div id="danh-gia" className="mt-12">
-          <h2 className="mb-4 text-xl font-bold text-gray-900">Đánh giá ({reviewSummary?.totalReviews ?? reviews?.length ?? 0})</h2>
-
-          {/* Rating summary card */}
-          {reviewSummary && reviewSummary.totalReviews > 0 && (
-            <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-              <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-                {/* Big number + stars */}
-                <div className="text-center sm:w-52 sm:shrink-0">
-                  <div className="text-5xl font-extrabold text-gray-900">{reviewSummary.averageRating.toFixed(1)}</div>
-                  <div className="mt-1 text-sm text-gray-500">trên 5</div>
-                  <Rate disabled allowHalf value={reviewSummary.averageRating} className="mt-2 !text-base" />
-                  <div className="mt-1 text-sm text-gray-500">{reviewSummary.totalReviews} đánh giá</div>
-                </div>
-
-                {/* Distribution bars 5 → 1 */}
-                <div className="flex-1 space-y-1.5">
-                  {[5, 4, 3, 2, 1].map((star) => {
-                    const count = reviewSummary.distribution[star] || 0;
-                    const pct = reviewSummary.totalReviews > 0 ? (count / reviewSummary.totalReviews) * 100 : 0;
-                    return (
-                      <div key={star} className="flex items-center gap-2 text-sm">
-                        <span className="w-8 shrink-0 text-gray-600">{star} ★</span>
-                        <Progress percent={Math.round(pct)} size="small" className="!flex-1" strokeColor="#f59e0b" />
-                        <span className="w-6 shrink-0 text-right text-gray-500">{count}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Review list */}
-          {reviews && reviews.length > 0 && (
-            <div className="space-y-3">
-              {reviews.slice(0, 5).map((r) => (
-                <div key={r.id} className="rounded-xl border border-gray-100 p-4">
-                  <div className="mb-1 flex items-center gap-2">
-                    <span className="text-sm font-semibold text-gray-900">{r.userName || `User #${r.userId}`}</span>
-                    <Rate disabled value={r.rating} className="!text-sm" />
-                  </div>
-                  <p className="text-sm text-gray-600">{r.content}</p>
-                  <p className="mt-1 text-xs text-gray-400">{new Date(r.createdAt).toLocaleDateString('vi-VN')}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Reviews Section */}
+        <ProductReviewsSection phoneId={phone.id} phoneName={phone.name} />
 
         {/* Related products */}
         {related?.content && (
