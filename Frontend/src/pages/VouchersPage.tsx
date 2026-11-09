@@ -59,11 +59,17 @@ export default function VouchersPage() {
   const isClaimed = (p: PublicPromo) =>
     claimedPromotionIds.has(p.id) || claimedCodes.has(p.code?.trim().toUpperCase());
 
+  // Lọc các voucher chưa nhận để hiển thị trong tab "Tất cả ưu đãi"
+  const availablePromos = (promos || []).filter(
+    (p) => !isAuthenticated || !isClaimed(p),
+  );
+
   const claimMutation = useMutation({
     mutationFn: (code: string) => promotionService.claim(code),
     onSuccess: () => {
       message.success('Nhận voucher thành công!');
       queryClient.invalidateQueries({ queryKey: ['promotions', 'my'] });
+      queryClient.invalidateQueries({ queryKey: ['promotions', 'public'] });
     },
     onError: (err: Error) => {
       let msg = err.message || 'Không thể nhận voucher';
@@ -97,8 +103,7 @@ export default function VouchersPage() {
         <>
           {isLoading && <p className="py-8 text-center text-gray-500">Đang tải...</p>}
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {(promos || []).map((p) => {
-              const claimed = isClaimed(p);
+            {availablePromos.map((p) => {
               const isOut =
                 p.quantity != null &&
                 p.quantity > 0 &&
@@ -149,21 +154,6 @@ export default function VouchersPage() {
                         );
                       }
 
-                      if (claimed) {
-                        return (
-                          <Button
-                            size="small"
-                            className="mt-3 !rounded-full !border-gray-200 !bg-gray-100 !text-gray-500 hover:!bg-gray-100 cursor-default"
-                            disabled
-                          >
-                            <span className="flex items-center gap-1">
-                              <Check className="h-3.5 w-3.5 text-green-600" />
-                              Đã lưu vào ví
-                            </span>
-                          </Button>
-                        );
-                      }
-
                       if (isOut) {
                         return (
                           <Button
@@ -193,8 +183,16 @@ export default function VouchersPage() {
               );
             })}
           </div>
-          {(promos || []).length === 0 && !isLoading && (
-            <p className="rounded-xl bg-yellow-50 p-4 text-center text-sm text-yellow-700">Hiện chưa có khuyến mãi nào.</p>
+          {availablePromos.length === 0 && !isLoading && (
+            (promos || []).length > 0 ? (
+              <p className="rounded-xl bg-blue-50 p-4 text-center text-sm text-blue-700">
+                Bạn đã lưu tất cả ưu đãi hiện có vào ví. Hãy kiểm tra tại mục &quot;Ưu đãi của tôi&quot; nhé!
+              </p>
+            ) : (
+              <p className="rounded-xl bg-yellow-50 p-4 text-center text-sm text-yellow-700">
+                Hiện chưa có khuyến mãi nào.
+              </p>
+            )
           )}
         </>
       ),
