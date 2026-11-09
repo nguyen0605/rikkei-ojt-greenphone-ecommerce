@@ -118,7 +118,12 @@ public class OrderService {
 
         // Process items under pessimistic lock per variant — concurrent orders
         // serialize on the row lock, so stock is never decremented twice and no retry is needed.
-        for (var itemReq : request.getItems()) {
+        // Sort items by phoneVariantId to strictly prevent deadlocks when locking multiple rows.
+        var sortedItems = request.getItems().stream()
+                .sorted(java.util.Comparator.comparing(com.re.greenphone.dto.request.OrderItemRequest::getPhoneVariantId))
+                .toList();
+
+        for (var itemReq : sortedItems) {
             PhoneVariant variant = phoneVariantRepository.findByIdWithLock(itemReq.getPhoneVariantId())
                     .orElseThrow(() -> new ResourceNotFoundException("PhoneVariant", "id", itemReq.getPhoneVariantId()));
 
@@ -303,7 +308,13 @@ public class OrderService {
         }
 
         // Restore stock (pessimistic lock per variant — no double-restore with concurrent cancels)
-        for (OrderDetail detail : order.getOrderDetails()) {
+        // Sort details by phoneVariantId to strictly prevent deadlocks.
+        var sortedDetails = order.getOrderDetails().stream()
+                .filter(d -> d.getPhoneVariant() != null)
+                .sorted(java.util.Comparator.comparing(d -> d.getPhoneVariant().getId()))
+                .toList();
+
+        for (OrderDetail detail : sortedDetails) {
             PhoneVariant variant = detail.getPhoneVariant();
             if (variant.getStockQuantity() != null) {
                 PhoneVariant locked = phoneVariantRepository.findByIdWithLock(variant.getId())
