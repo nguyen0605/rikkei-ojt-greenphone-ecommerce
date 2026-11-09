@@ -60,4 +60,26 @@ class JwtTokenProviderTest {
         assertThat(jwtTokenProvider.getRemainingExpiration("invalid.token.here")).isEqualTo(0L);
         assertThat(jwtTokenProvider.getUserIdFromToken("invalid.token.here")).isNull();
     }
+
+    @Test
+    void getUserIdFromToken_ExpiredToken_StillExtractsUserId() {
+        when(jwtConfig.getExpiration()).thenReturn(-1000L); // Expired immediately
+
+        User user = new User();
+        user.setId(200L);
+        user.setEmail("expired@example.com");
+        user.setPassword("secret");
+        user.setFullName("Expired User");
+        user.setStatus("ACTIVE");
+        Role role = new Role();
+        role.setName("CUSTOMER");
+        user.setRole(role);
+
+        UserPrincipal principal = UserPrincipal.create(user);
+        String expiredToken = jwtTokenProvider.generateToken(principal);
+
+        assertThat(jwtTokenProvider.validateToken(expiredToken)).isFalse();
+        assertThat(jwtTokenProvider.getRemainingExpiration(expiredToken)).isEqualTo(0L);
+        assertThat(jwtTokenProvider.getUserIdFromToken(expiredToken)).isEqualTo(200L);
+    }
 }

@@ -44,15 +44,25 @@ public class JwtTokenProvider {
     public Long getUserIdFromToken(String token) {
         try {
             Claims claims = parseClaims(token);
-            Object userId = claims.get("userId");
-            if (userId instanceof Number) {
-                return ((Number) userId).longValue();
-            }
-            return null;
+            return extractUserId(claims);
+        } catch (ExpiredJwtException e) {
+            log.debug("Token is expired, extracting userId from expired claims: {}", e.getMessage());
+            return extractUserId(e.getClaims());
         } catch (Exception e) {
             log.error("Failed to extract userId from token: {}", e.getMessage());
             return null;
         }
+    }
+
+    private Long extractUserId(Claims claims) {
+        if (claims == null) {
+            return null;
+        }
+        Object userId = claims.get("userId");
+        if (userId instanceof Number) {
+            return ((Number) userId).longValue();
+        }
+        return null;
     }
 
     public long getRemainingExpiration(String token) {

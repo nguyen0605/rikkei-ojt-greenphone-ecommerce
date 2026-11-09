@@ -364,6 +364,18 @@ class AuthServiceTest {
         verify(redisTemplate).delete("user_refresh_token:1");
     }
 
+    @Test void logout_ExpiredAccessToken_StillRemovesRefreshToken() {
+        when(jwtTokenProvider.getRemainingExpiration("expired_token")).thenReturn(0L);
+        when(jwtTokenProvider.getUserIdFromToken("expired_token")).thenReturn(1L);
+        when(valueOperations.get("user_refresh_token:1")).thenReturn("old_refresh_token");
+
+        authService.logout("Bearer expired_token");
+
+        verify(valueOperations, never()).set(startsWith("blacklist:"), anyString(), anyLong(), any(TimeUnit.class));
+        verify(redisTemplate).delete("refresh_token:old_refresh_token");
+        verify(redisTemplate).delete("user_refresh_token:1");
+    }
+
     @Test void logout_BlankToken_NoOp() {
         authService.logout("");
         authService.logout(null);
