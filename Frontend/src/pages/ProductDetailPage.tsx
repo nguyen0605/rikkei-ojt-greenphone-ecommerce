@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Button, Radio, App } from 'antd';
 import { ShoppingCart, CheckCircle, Star } from 'lucide-react';
 import { Breadcrumb, ProductCard } from '@/components/common';
+import ProductGallery from '@/components/product-detail/ProductGallery';
+import ProductDetailSkeleton from '@/components/product-detail/ProductDetailSkeleton';
 import { ProductReviewsSection } from '@/components/product/detail';
 import { phoneService } from '@/services';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -76,12 +78,11 @@ export default function ProductDetailPage() {
     enabled: !!phone,
   });
 
-  if (isLoading) return <div className="p-8 text-center text-gray-500">Đang tải...</div>;
+  if (isLoading) return <ProductDetailSkeleton />;
   if (!phone) return <div className="p-8 text-center text-gray-500">Không tìm thấy sản phẩm</div>;
 
   const selectedVariant = phone.variants?.find((v) => v.id === selectedVariantId) || phone.variants?.[0];
   const images = phone.images?.length ? phone.images : phone.mainImageUrl ? [{ id: 0, phoneId: phone.id, imageUrl: phone.mainImageUrl, isMain: true } as PhoneImageDTO] : [];
-  const activeImage = images[Math.min(activeImageIndex, images.length - 1)]?.imageUrl || phone.mainImageUrl;
 
   const handleAddToCart = async () => {
     if (!selectedVariant) return;
@@ -115,45 +116,15 @@ export default function ProductDetailPage() {
         <Breadcrumb items={[{ label: 'Trang chủ', href: '/' }, { label: 'Sản phẩm', href: '/san-pham' }, { label: phone.name }]} className="mb-6" />
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-          {/* Left — Images */}
+          {/* Left — Images (Gallery với Hover Zoom & Lightbox) */}
           <div>
-            {/* Ảnh lớn — cố định khung, không nhảy khi load */}
-            <div className="aspect-square w-full overflow-hidden rounded-2xl border border-gray-100 bg-gray-50">
-              <img
-                src={activeImage}
-                alt={phone.name}
-                width={600}
-                height={600}
-                loading="eager"
-                className="h-full w-full object-cover"
-              />
-            </div>
-            {/* Ảnh nhỏ — bấm để hiện lên ảnh lớn */}
-            {images.length > 1 && (
-              <div className="mt-3 flex gap-2">
-                {images.map((img, i) => (
-                  <button
-                    key={img.id}
-                    type="button"
-                    onClick={() => setActiveImageIndex(i)}
-                    aria-label={`Xem ảnh ${i + 1}`}
-                    className={`overflow-hidden rounded-lg border-2 transition ${
-                      i === activeImageIndex ? 'border-green-500' : 'border-gray-200 hover:border-green-300'
-                    }`}
-                  >
-                    <img
-                      src={img.imageUrl}
-                      alt=""
-                      width={64}
-                      height={64}
-                      loading="lazy"
-                      decoding="async"
-                      className="h-16 w-16 object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
+            <ProductGallery
+              images={images}
+              thumbnail={phone.mainImageUrl}
+              productName={phone.name}
+              selectedIndex={activeImageIndex}
+              onSelectIndex={setActiveImageIndex}
+            />
           </div>
 
           {/* Right — Info */}
