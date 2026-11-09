@@ -44,6 +44,10 @@ export default function ProductCard({ product, className }: Props) {
   const imgUrl = getOptimizedImageUrl(product.mainImageUrl || '', { width: 400, height: 400 });
 
   const bestVoucher = calculateBestVoucherForPrice(product.lowestPrice, myPromotions);
+  const discountPercent =
+    bestVoucher && product.lowestPrice && product.lowestPrice > 0
+      ? Math.max(1, Math.round((bestVoucher.discountAmount / product.lowestPrice) * 100))
+      : 0;
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -83,6 +87,11 @@ export default function ProductCard({ product, className }: Props) {
     <div className={cn('group relative block overflow-hidden rounded-xl border border-gray-100 bg-white transition-all hover:-translate-y-1 hover:border-green-200 hover:shadow-lg', className)}>
       <Link to={`/san-pham/${product.id}`}>
         <div className="relative aspect-square overflow-hidden bg-gray-50">
+          {discountPercent > 0 && (
+            <div className="absolute left-2 top-2 z-10 rounded bg-green-600 px-2 py-0.5 text-xs font-semibold text-white shadow-sm">
+              Giảm {discountPercent}%
+            </div>
+          )}
           <img
             src={imgUrl}
             alt={product.name}
@@ -99,18 +108,13 @@ export default function ProductCard({ product, className }: Props) {
           {product.lowestPrice != null && (
             <div className="mb-1">
               {bestVoucher ? (
-                <div>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-sm font-bold text-red-600">
-                      {formatVND(bestVoucher.finalPrice)}
-                    </span>
-                    <span className="text-[11px] text-gray-400 line-through">
-                      {formatVND(product.lowestPrice)}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 inline-flex items-center gap-1 rounded bg-green-50 px-1.5 py-0.5 text-[10px] font-semibold text-green-700 border border-green-200">
-                    <span>Áp mã {bestVoucher.code}: -{formatVND(bestVoucher.discountAmount)}</span>
-                  </div>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-sm font-bold text-red-600">
+                    {formatVND(bestVoucher.finalPrice)}
+                  </span>
+                  <span className="text-[11px] text-gray-400 line-through">
+                    {formatVND(product.lowestPrice)}
+                  </span>
                 </div>
               ) : (
                 <div className="text-sm font-bold text-red-600">{formatVND(product.lowestPrice)}</div>
