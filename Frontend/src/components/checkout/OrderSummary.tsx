@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { App } from 'antd';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectCartSummary } from '@/store/selectors/cartSelectors';
-import { formatVND } from '@/utils';
+import { formatVND, cn } from '@/utils';
 import { promotionService } from '@/services';
 import type { AvailablePromotionDTO } from '@/types/api';
 import { applyCheckoutVoucher, removeCheckoutVoucher } from '@/store/slices/checkoutSlice';
@@ -96,26 +96,36 @@ export default function OrderSummary() {
   }, [myPromos, voucherCode, voucherDiscount, dispatch, message]);
 
   const handleSelectVoucher = (promo: AvailablePromotionDTO) => {
-    if (promo.eligible) {
-      setUserDismissedVoucher(false);
-      dispatch(
-        applyCheckoutVoucher({
-          userPromotionId: promo.id,
-          code: promo.code,
-          discount: promo.calculatedDiscount,
-        }),
-      );
-      dispatch(
-        applyVoucher({
-          code: promo.code,
-          discountAmount: promo.calculatedDiscount,
-          title: promo.name || promo.code,
-        }),
-      );
-      message.success(`Đã áp dụng ${promo.code}`);
-    } else {
+    if (!promo.eligible) {
       message.warning('Voucher này không đủ điều kiện áp dụng');
+      return;
     }
+
+    // Nhấp vào voucher đang áp dụng -> Hủy chọn
+    if (voucherCode === promo.code) {
+      setUserDismissedVoucher(true);
+      dispatch(removeCheckoutVoucher());
+      dispatch(removeVoucher());
+      message.info(`Đã bỏ chọn mã ${promo.code}`);
+      return;
+    }
+
+    setUserDismissedVoucher(false);
+    dispatch(
+      applyCheckoutVoucher({
+        userPromotionId: promo.id,
+        code: promo.code,
+        discount: promo.calculatedDiscount,
+      }),
+    );
+    dispatch(
+      applyVoucher({
+        code: promo.code,
+        discountAmount: promo.calculatedDiscount,
+        title: promo.name || promo.code,
+      }),
+    );
+    message.success(`Đã áp dụng mã ${promo.code}`);
   };
 
   const availableVouchers = myPromos || [];
@@ -185,40 +195,81 @@ export default function OrderSummary() {
       )}
 
       {/* Saved vouchers — card list */}
-      {availableVouchers.length > 0 && voucherDiscount === 0 && (
+      {availableVouchers.length > 0 && (
         <div className="rounded-2xl border border-gray-100 bg-white p-5">
-          <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900">
-            <Ticket className="h-4 w-4 text-green-600" />
-            Mã giảm giá của bạn ({availableVouchers.length})
-          </h4>
-          <div className="max-h-64 space-y-2 overflow-y-auto">
-            {availableVouchers.map((v) => (
-              <button
-                key={v.id}
-                onClick={() => handleSelectVoucher(v)}
-                disabled={!v.eligible}
-                className={`w-full rounded-xl border px-4 py-3 text-left transition-all ${
-                  v.eligible
-                    ? 'border-dashed border-green-300 bg-green-50/60 hover:border-green-500 hover:bg-green-100'
-                    : 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-50'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="rounded bg-green-200 px-2 py-0.5 font-mono text-xs font-semibold text-green-800">{v.code}</span>
-                    <span className="ml-2 text-sm font-medium text-gray-900">{v.name || v.code}</span>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-green-700">
-                      {v.discountType === 'PERCENT' ? `Giảm ${v.discountValue}%` : formatVND(v.discountValue)}
+          <div className="mb-3 flex items-center justify-between">
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+              <Ticket className="h-4 w-4 text-green-600" />
+              Mã giảm giá của bạn ({availableVouchers.length})
+            </h4>
+            {voucherCode && (
+              <span className="text-[11px] text-gray-400">
+                Nhấp vào mã khác để đổi
+              </span>
+            )}
+          </div>
+          <div className="max-h-64 space-y-2.5 overflow-y-auto pr-1">
+            {availableVouchers.map((v) => {
+              const isSelected = v.code === voucherCode;
+              const hasSelection = !!voucherCode;
+
+              return (
+                <button
+                  key={v.id}
+                  onClick={() => handleSelectVoucher(v)}
+                  disabled={!v.eligible}
+                  className={cn(
+                    'group relative w-full rounded-xl border p-3 text-left transition-all duration-200',
+                    !v.eligible
+                      ? 'cursor-not-allowed border-gray-200 bg-gray-50/70 opacity-35'
+                      : isSelected
+                        ? 'border-2 border-green-600 bg-green-50/90 shadow-sm ring-2 ring-green-500/10 opacity-100'
+                        : hasSelection
+                          ? 'border-gray-200 bg-white opacity-40 hover:opacity-100 hover:border-green-400 hover:shadow-sm'
+                          : 'border-dashed border-green-300 bg-green-50/50 hover:border-green-500 hover:bg-green-100/60 opacity-100',
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            'rounded px-2 py-0.5 font-mono text-xs font-semibold',
+                            isSelected
+                              ? 'bg-green-600 text-white'
+                              : 'bg-green-200 text-green-800',
+                          )}
+                        >
+                          {v.code}
+                        </span>
+                        <span className="truncate text-sm font-medium text-gray-900">
+                          {v.name || v.code}
+                        </span>
+                        {isSelected && (
+                          <span className="inline-flex items-center gap-0.5 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-800">
+                            <CheckCircle2 className="h-3 w-3 text-green-600" />
+                            Đang dùng
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500">
-                      {v.eligible ? '✔ Có thể dùng' : `✘ Đơn tối thiểu ${formatVND(v.minOrderValue)}`}
+                    <div className="ml-3 flex-shrink-0 text-right">
+                      <div
+                        className={cn(
+                          'text-sm font-bold',
+                          isSelected ? 'text-green-700' : 'text-gray-900 group-hover:text-green-700',
+                        )}
+                      >
+                        {v.discountType === 'PERCENT' ? `Giảm ${v.discountValue}%` : formatVND(v.discountValue)}
+                      </div>
+                      <div className="text-[11px] text-gray-500">
+                        {v.eligible ? '✔ Có thể dùng' : `✘ Đơn tối thiểu ${formatVND(v.minOrderValue)}`}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
