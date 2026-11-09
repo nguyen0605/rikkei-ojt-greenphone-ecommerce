@@ -35,6 +35,14 @@ public class AdminPhoneController {
                 adminPhoneService.getPhones(keyword, brandId, status, lowStock, pageRequest)));
     }
 
+    @GetMapping("/low-stock")
+    public ResponseEntity<ApiResponse<?>> getLowStock(
+            @RequestParam(defaultValue = "5") int threshold,
+            PageRequest pageRequest) {
+        return ResponseEntity.ok(ApiResponse.success(
+                adminPhoneService.getLowStockPhones(threshold, pageRequest)));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<?>> getDetail(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(adminPhoneService.getPhoneDetail(id)));

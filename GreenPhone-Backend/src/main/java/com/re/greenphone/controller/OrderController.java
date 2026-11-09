@@ -3,10 +3,12 @@ package com.re.greenphone.controller;
 import com.re.greenphone.common.dto.ApiResponse;
 import com.re.greenphone.common.pagination.PageRequest;
 import com.re.greenphone.dto.request.OrderRequest;
+import com.re.greenphone.dto.response.OrderCreationResult;
 import com.re.greenphone.service.OrderService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,8 +31,15 @@ public class OrderController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<?>> create(@Valid @RequestBody OrderRequest request) {
-        return ResponseEntity.status(201).body(ApiResponse.created(orderService.createOrder(request)));
+    public ResponseEntity<ApiResponse<?>> create(
+            @Valid @RequestBody OrderRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        OrderCreationResult result = orderService.createOrderWithIdempotency(request, idempotencyKey);
+        if (result.isNewlyCreated()) {
+            return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(result.getOrder()));
+        } else {
+            return ResponseEntity.ok(ApiResponse.success(result.getOrder()));
+        }
     }
 
     @PostMapping("/{id}/cancel")

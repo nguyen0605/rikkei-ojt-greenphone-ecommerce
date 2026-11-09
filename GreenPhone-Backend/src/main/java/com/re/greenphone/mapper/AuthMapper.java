@@ -26,6 +26,16 @@ public interface AuthMapper {
     @Mapping(source = "user.fullName", target = "fullName")
     @Mapping(source = "user.role.name", target = "role")
     @Mapping(source = "token", target = "token")
+    @Mapping(target = "refreshToken", ignore = true)
     @Mapping(source = "expiresIn", target = "expiresIn")
     AuthResponse toAuthResponse(User user, String token, long expiresIn);
+
+    @Mapping(source = "user.id", target = "userId")
+    @Mapping(source = "user.email", target = "email")
+    @Mapping(source = "user.fullName", target = "fullName")
+    @Mapping(source = "user.role.name", target = "role")
+    @Mapping(source = "token", target = "token")
+    @Mapping(source = "refreshToken", target = "refreshToken")
+    @Mapping(source = "expiresIn", target = "expiresIn")
+    AuthResponse toAuthResponse(User user, String token, String refreshToken, long expiresIn);
 }

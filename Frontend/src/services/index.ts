@@ -1,10 +1,11 @@
 export { authService } from "./authService";
 export { userService, formatFullAddress } from "./userService";
+export { reviewService } from './reviewService';
 import { get, post, put, del } from './api';
 import type {
-  CartDTO, CartItemRequest, CartSyncRequest, OrderDTO, OrderRequest,
+  CartDTO, CartItemRequest, CartSyncRequest, OrderDTO,
   PaymentDTO, PaymentQRInfo, PromotionDTO, UserPromotionDTO, AvailablePromotionDTO, ReviewDTO,
-  ReviewSummary, PageResponse, PhoneDTO, PhoneDetailDTO,
+  PageResponse, PhoneDTO, PhoneDetailDTO,
   PhoneVariantDTO, PhoneImageDTO, BrandDTO, BannerDTO,
   PhoneRequest, PhoneVariantRequest, BrandRequest, InventoryStockMovementRequest,
   BannerRequest, PromotionRequest, RevenueStats,
@@ -31,17 +32,6 @@ export const bannerService = {
   active: () => get<BannerDTO[]>('/banners'),
 };
 
-// Review
-export const reviewService = {
-  byPhone: (phoneId: number, params?: Record<string, string>) => get<PageResponse<ReviewDTO>>('/reviews/phone/' + phoneId, { params }),
-  summary: (phoneId: number) => get<ReviewSummary>('/reviews/phone/' + phoneId + '/summary'),
-  create: (data: { orderDetailId: number; rating: number; content: string }) => post<ReviewDTO>('/reviews', data),
-  update: (id: number, data: { rating: number; content: string }) => put<ReviewDTO>('/reviews/' + id, data),
-  remove: (id: number) => del<void>('/reviews/' + id),
-  myReviews: (params?: Record<string, string>) => get<PageResponse<ReviewDTO>>('/reviews/me', { params }),
-  eligible: (params?: Record<string, string>) => get<PageResponse<OrderDTO>>('/reviews/eligible', { params }),
-};
-
 // Cart
 export const cartService = {
   get: () => get<CartDTO>('/cart'),
@@ -53,13 +43,7 @@ export const cartService = {
 };
 
 // Order
-export const orderService = {
-  create: (data: OrderRequest) => post<OrderDTO>('/orders', data),
-  list: (params?: Record<string, string>) => get<PageResponse<OrderDTO>>('/orders', { params }),
-  detail: (id: number) => get<OrderDTO>('/orders/' + id),
-  cancel: (id: number, reason?: string) => post<OrderDTO>('/orders/' + id + '/cancel', reason ? { reason } : {}),
-  applyPromotion: (id: number, userPromotionId: number) => put<OrderDTO>('/orders/' + id + '/promotion', { userPromotionId }),
-};
+export { orderService, default as defaultOrderService } from './orderService';
 
 // Payment
 export const paymentService = {

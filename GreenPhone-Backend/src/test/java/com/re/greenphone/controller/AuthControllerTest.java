@@ -2,6 +2,7 @@ package com.re.greenphone.controller;
 
 import com.re.greenphone.common.dto.ApiResponse;
 import com.re.greenphone.dto.request.ForgotPasswordRequest;
+import com.re.greenphone.dto.request.RefreshTokenRequest;
 import com.re.greenphone.dto.request.ResendOtpRequest;
 import com.re.greenphone.dto.request.ResetPasswordRequest;
 import com.re.greenphone.dto.request.VerifyOtpRequest;
@@ -118,5 +119,38 @@ class AuthControllerTest {
         assertThat(violations).hasSize(2);
         assertThat(violations).anyMatch(v -> v.getPropertyPath().toString().equals("otp"));
         assertThat(violations).anyMatch(v -> v.getPropertyPath().toString().equals("newPassword"));
+    }
+
+    @Test
+    void refreshToken_Success_DelegatesToAuthService() {
+        var req = RefreshTokenRequest.builder().refreshToken("valid-refresh-token").build();
+        var authResponse = new AuthResponse(1L, "new_jwt", "new_refresh", "User Name", "user@example.com", "CUSTOMER", 1800000L);
+        when(authService.refreshToken("valid-refresh-token")).thenReturn(authResponse);
+
+        ResponseEntity<ApiResponse<AuthResponse>> response = controller.refreshToken(req);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getData()).isSameAs(authResponse);
+        verify(authService).refreshToken("valid-refresh-token");
+    }
+
+    @Test
+    void refreshToken_Validation_RejectsBlankToken() {
+        var invalidReq = RefreshTokenRequest.builder().refreshToken("").build();
+        Set<ConstraintViolation<RefreshTokenRequest>> violations = validator.validate(invalidReq);
+
+        assertThat(violations).hasSize(1);
+        assertThat(violations).anyMatch(v -> v.getPropertyPath().toString().equals("refreshToken"));
+    }
+
+    @Test
+    void logout_Success_DelegatesToAuthService() {
+        ResponseEntity<ApiResponse<String>> response = controller.logout("Bearer some_token");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getData()).isEqualTo("Logged out successfully");
+        verify(authService).logout("Bearer some_token");
     }
 }

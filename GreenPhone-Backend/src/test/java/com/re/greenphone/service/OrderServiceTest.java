@@ -5,6 +5,7 @@ import com.re.greenphone.common.exception.ConflictException;
 import com.re.greenphone.common.exception.ResourceNotFoundException;
 import com.re.greenphone.dto.request.OrderItemRequest;
 import com.re.greenphone.dto.request.OrderRequest;
+import com.re.greenphone.dto.response.OrderCreationResult;
 import com.re.greenphone.dto.response.OrderDTO;
 import com.re.greenphone.entity.*;
 import com.re.greenphone.mapper.OrderMapper;
@@ -16,10 +17,13 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -37,6 +41,8 @@ class OrderServiceTest {
     @Mock private EmailService emailService;
     @Mock private SettingsService settingsService;
     @Mock private InventoryStockHistoryService inventoryStockHistoryService;
+    @Mock private RedisTemplate<String, Object> redisTemplate;
+    @Mock private ValueOperations<String, Object> valueOperations;
 
     @InjectMocks
     private OrderService orderService;
@@ -220,5 +226,98 @@ class OrderServiceTest {
         when(orderRepository.findById(3L)).thenReturn(Optional.of(shippingOrder));
 
         assertThrows(BadRequestException.class, () -> orderService.cancelOrder(3L, "Lý do"));
+    }
+
+    @Test
+    @DisplayName("BE2-03: Request đầu tiên có Idempotency-Key sẽ chiếm khóa SETNX và lưu cache khi tạo đơn xong")
+    void createOrderWithIdempotency_NewKey_AcquiresLockAndCachesResult() {
+        stubUser();
+        String idempotencyKey = "key-test-123";
+        String redisKey = "idempotency:" + idempotencyKey;
+
+        PhoneVariant v = createVariant(100L, new BigDecimal("1000.00"), null, 10);
+        OrderRequest req = createOrderReq(List.of(createItemReq(100L, 2)), null);
+
+        OrderDTO createdDto = OrderDTO.builder().id(88L).totalAmount(new BigDecimal("2000.00")).build();
+
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(eq(redisKey), eq("PROCESSING"), eq(60L), eq(TimeUnit.SECONDS))).thenReturn(true);
+        when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(v));
+        when(cartRepository.findByUserId(USER_ID)).thenReturn(Optional.empty());
+        when(orderMapper.toDto(any())).thenReturn(createdDto);
+        when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderCreationResult result = orderService.createOrderWithIdempotency(req, idempotencyKey);
+
+        assertTrue(result.isNewlyCreated());
+        assertEquals(88L, result.getOrder().getId());
+        verify(valueOperations).setIfAbsent(eq(redisKey), eq("PROCESSING"), eq(60L), eq(TimeUnit.SECONDS));
+        verify(valueOperations).set(eq(redisKey), eq(createdDto), eq(60L), eq(TimeUnit.SECONDS));
+        verify(orderRepository, times(1)).save(any());
+    }
+
+    @Test
+    @DisplayName("BE2-03: Request thứ 2 cùng Idempotency-Key trả về đơn ban đầu, KHÔNG tạo đơn mới trong DB")
+    void createOrderWithIdempotency_DuplicateKey_ReturnsCachedOrderWithoutCreating() {
+        String idempotencyKey = "key-test-duplicate";
+        String redisKey = "idempotency:" + idempotencyKey;
+
+        OrderRequest req = createOrderReq(List.of(createItemReq(100L, 2)), null);
+        OrderDTO existingOrder = OrderDTO.builder().id(88L).receiverName("John Doe").build();
+
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        // Lần gọi SETNX trả về false vì khóa đã tồn tại
+        when(valueOperations.setIfAbsent(eq(redisKey), eq("PROCESSING"), eq(60L), eq(TimeUnit.SECONDS))).thenReturn(false);
+        // Đọc giá trị cached đã tạo thành công
+        when(valueOperations.get(redisKey)).thenReturn(existingOrder);
+
+        OrderCreationResult result = orderService.createOrderWithIdempotency(req, idempotencyKey);
+
+        assertFalse(result.isNewlyCreated());
+        assertEquals(88L, result.getOrder().getId());
+        // Đảm bảo TUYỆT ĐỐI không gọi save đơn hàng mới trong DB
+        verify(orderRepository, never()).save(any());
+        verify(phoneVariantRepository, never()).findByIdWithLock(any());
+    }
+
+    @Test
+    @DisplayName("BE2-03: CẤM giữ khóa vĩnh viễn nếu tạo đơn thất bại, tự động xóa key để client có thể thử lại")
+    void createOrderWithIdempotency_OnError_DeletesKeyFromRedis() {
+        stubUser();
+        String idempotencyKey = "key-test-error";
+        String redisKey = "idempotency:" + idempotencyKey;
+
+        // Yêu cầu mua 5 cái nhưng chỉ còn 1 cái -> gây lỗi Insufficient stock
+        PhoneVariant v = createVariant(100L, new BigDecimal("1000.00"), null, 1);
+        OrderRequest req = createOrderReq(List.of(createItemReq(100L, 5)), null);
+
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(eq(redisKey), eq("PROCESSING"), eq(60L), eq(TimeUnit.SECONDS))).thenReturn(true);
+        when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(v));
+
+        assertThrows(BadRequestException.class, () ->
+                orderService.createOrderWithIdempotency(req, idempotencyKey));
+
+        // Kiểm tra xóa khóa ngay lập tức khi gặp exception
+        verify(redisTemplate).delete(eq(redisKey));
+    }
+
+    @Test
+    @DisplayName("BE2-03: Request không truyền Idempotency-Key vẫn tạo đơn bình thường không qua Redis")
+    void createOrderWithIdempotency_NoKey_CreatesOrderNormally() {
+        stubUser();
+        PhoneVariant v = createVariant(100L, new BigDecimal("1000.00"), null, 10);
+        OrderRequest req = createOrderReq(List.of(createItemReq(100L, 1)), null);
+
+        when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(v));
+        when(cartRepository.findByUserId(USER_ID)).thenReturn(Optional.empty());
+        when(orderMapper.toDto(any())).thenReturn(OrderDTO.builder().id(101L).build());
+        when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderCreationResult result = orderService.createOrderWithIdempotency(req, null);
+
+        assertTrue(result.isNewlyCreated());
+        assertEquals(101L, result.getOrder().getId());
+        verifyNoInteractions(redisTemplate);
     }
 }

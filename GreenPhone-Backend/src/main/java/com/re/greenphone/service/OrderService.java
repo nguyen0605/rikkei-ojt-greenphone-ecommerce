@@ -1,10 +1,14 @@
 package com.re.greenphone.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.re.greenphone.common.exception.BadRequestException;
+import com.re.greenphone.common.exception.ConflictException;
 import com.re.greenphone.common.exception.ResourceNotFoundException;
 import com.re.greenphone.common.pagination.PageRequest;
 import com.re.greenphone.common.pagination.PageResponse;
 import com.re.greenphone.dto.request.OrderRequest;
+import com.re.greenphone.dto.response.OrderCreationResult;
 import com.re.greenphone.dto.response.OrderDTO;
 import com.re.greenphone.entity.*;
 import com.re.greenphone.mapper.OrderMapper;
@@ -16,11 +20,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -37,8 +43,61 @@ public class OrderService {
     private final EmailService emailService;
     private final SettingsService settingsService;
     private final InventoryStockHistoryService inventoryStockHistoryService;
+    private final RedisTemplate<String, Object> redisTemplate;
+
+    public OrderCreationResult createOrderWithIdempotency(OrderRequest request, String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            OrderDTO order = executeCreateOrder(request);
+            return new OrderCreationResult(order, true);
+        }
+
+        String redisKey = "idempotency:" + idempotencyKey.trim();
+
+        // 1. Sử dụng Redis SETNX: lưu trạng thái key trong 60 giây
+        Boolean acquired = Boolean.FALSE;
+        try {
+            acquired = redisTemplate.opsForValue().setIfAbsent(redisKey, "PROCESSING", 60, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.warn("Redis không khả dụng khi kiểm tra idempotency key {}: {}", redisKey, e.getMessage());
+            OrderDTO order = executeCreateOrder(request);
+            return new OrderCreationResult(order, true);
+        }
+
+        if (Boolean.TRUE.equals(acquired)) {
+            // Request đầu tiên nhận được lock: Xử lý tạo đơn hàng
+            try {
+                OrderDTO order = executeCreateOrder(request);
+                try {
+                    redisTemplate.opsForValue().set(redisKey, order, 60, TimeUnit.SECONDS);
+                } catch (Exception ex) {
+                    log.warn("Không thể lưu cache đơn hàng cho key {}: {}", redisKey, ex.getMessage());
+                }
+                return new OrderCreationResult(order, true);
+            } catch (Exception e) {
+                // QUY TẮC: CẤM giữ khóa vĩnh viễn nếu request gặp lỗi không mong muốn
+                try {
+                    redisTemplate.delete(redisKey);
+                } catch (Exception ex) {
+                    log.warn("Không thể xóa idempotency key {} sau khi gặp lỗi: {}", redisKey, ex.getMessage());
+                }
+                throw e;
+            }
+        } else {
+            // Request trùng lặp: Đọc đơn hàng đã tạo hoặc chờ request đầu tiên hoàn tất
+            OrderDTO existingOrder = waitForExistingOrder(redisKey);
+            if (existingOrder != null) {
+                log.info("Phát hiện request trùng lặp idempotency key {}. Trả về đơn hàng #{} đã tạo", redisKey, existingOrder.getId());
+                return new OrderCreationResult(existingOrder, false);
+            }
+            throw new ConflictException("Đơn hàng đang được xử lý, vui lòng chờ trong giây lát");
+        }
+    }
 
     public OrderDTO createOrder(OrderRequest request) {
+        return createOrderWithIdempotency(request, null).getOrder();
+    }
+
+    private OrderDTO executeCreateOrder(OrderRequest request) {
         Long userId = SecurityUtils.getCurrentUserId();
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
@@ -59,7 +118,12 @@ public class OrderService {
 
         // Process items under pessimistic lock per variant — concurrent orders
         // serialize on the row lock, so stock is never decremented twice and no retry is needed.
-        for (var itemReq : request.getItems()) {
+        // Sort items by phoneVariantId to strictly prevent deadlocks when locking multiple rows.
+        var sortedItems = request.getItems().stream()
+                .sorted(java.util.Comparator.comparing(com.re.greenphone.dto.request.OrderItemRequest::getPhoneVariantId))
+                .toList();
+
+        for (var itemReq : sortedItems) {
             PhoneVariant variant = phoneVariantRepository.findByIdWithLock(itemReq.getPhoneVariantId())
                     .orElseThrow(() -> new ResourceNotFoundException("PhoneVariant", "id", itemReq.getPhoneVariantId()));
 
@@ -152,6 +216,53 @@ public class OrderService {
         return orderMapper.toDto(order);
     }
 
+    private OrderDTO waitForExistingOrder(String redisKey) {
+        int maxAttempts = 30; // 30 * 100ms = 3 giây
+        for (int i = 0; i < maxAttempts; i++) {
+            try {
+                Object cached = redisTemplate.opsForValue().get(redisKey);
+                if (cached != null && !"PROCESSING".equals(cached)) {
+                    OrderDTO dto = convertToOrderDto(cached);
+                    if (dto != null) {
+                        return dto;
+                    }
+                }
+                if (cached == null) {
+                    return null;
+                }
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
+                log.warn("Lỗi khi đọc idempotency key từ Redis {}: {}", redisKey, e.getMessage());
+                break;
+            }
+        }
+        return null;
+    }
+
+    private OrderDTO convertToOrderDto(Object cached) {
+        if (cached instanceof OrderDTO dto) {
+            return dto;
+        }
+        if (cached instanceof java.util.Map<?, ?> map) {
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+                mapper.registerModule(new JavaTimeModule());
+                return mapper.convertValue(map, OrderDTO.class);
+            } catch (Exception e) {
+                log.warn("Không thể parse dữ liệu cached sang OrderDTO: {}", e.getMessage());
+            }
+        }
+        if (cached instanceof Number num) {
+            return orderRepository.findById(num.longValue())
+                    .map(orderMapper::toDto)
+                    .orElse(null);
+        }
+        return null;
+    }
+
     @Transactional(readOnly = true)
     public PageResponse<OrderDTO> getOrders(PageRequest pageRequest) {
         Long userId = SecurityUtils.getCurrentUserId();
@@ -197,7 +308,13 @@ public class OrderService {
         }
 
         // Restore stock (pessimistic lock per variant — no double-restore with concurrent cancels)
-        for (OrderDetail detail : order.getOrderDetails()) {
+        // Sort details by phoneVariantId to strictly prevent deadlocks.
+        var sortedDetails = order.getOrderDetails().stream()
+                .filter(d -> d.getPhoneVariant() != null)
+                .sorted(java.util.Comparator.comparing(d -> d.getPhoneVariant().getId()))
+                .toList();
+
+        for (OrderDetail detail : sortedDetails) {
             PhoneVariant variant = detail.getPhoneVariant();
             if (variant.getStockQuantity() != null) {
                 PhoneVariant locked = phoneVariantRepository.findByIdWithLock(variant.getId())

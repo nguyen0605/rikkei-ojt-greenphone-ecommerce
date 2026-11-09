@@ -8,6 +8,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.Cache;
+import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.context.annotation.Bean;
@@ -28,7 +29,7 @@ import java.util.Map;
 @Slf4j
 @Configuration
 @EnableCaching
-public class RedisConfig {
+public class RedisConfig implements CachingConfigurer {
 
     @Value("${spring.cache.redis.time-to-live:1800000}")
     private long defaultTtlMillis;
@@ -110,6 +111,7 @@ public class RedisConfig {
     }
 
     @Bean
+    @Override
     public CacheErrorHandler errorHandler() {
         return new CacheErrorHandler() {
             @Override

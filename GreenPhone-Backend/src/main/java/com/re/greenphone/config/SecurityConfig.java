@@ -22,52 +22,59 @@ import org.springframework.http.HttpMethod;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final CorsConfigurationSource corsConfigurationSource;
+        private final JwtAuthenticationFilter jwtAuthenticationFilter;
+        private final CorsConfigurationSource corsConfigurationSource;
 
-    private static final String[] PUBLIC_PATHS = {
-            "/api/auth/**",
-            "/api/phones/**",
-            "/api/brands/**",
-            "/api/banners/**",
-            "/api/reviews/phone/**",
-            "/api/webhooks/**",
-            "/api/promotions/public/**",
-            "/api/settings/**",
-            "/api/options/**",
-            "/swagger-ui/**",
-            "/v3/api-docs/**",
-            "/actuator/health/**"
-    };
+        private static final String[] PUBLIC_PATHS = {
+                        "/api/auth/login",
+                        "/api/auth/register",
+                        "/api/auth/verify-otp",
+                        "/api/auth/resend-otp",
+                        "/api/auth/forgot-password",
+                        "/api/auth/reset-password",
+                        "/api/auth/refresh",
+                        "/api/auth/logout",
+                        "/api/phones/**",
+                        "/api/brands/**",
+                        "/api/banners/**",
+                        "/api/reviews/phone/**",
+                        "/api/webhooks/**",
+                        "/api/promotions/public/**",
+                        "/api/settings/**",
+                        "/api/options/**",
+                        "/api/shipments/track/**",
+                        "/swagger-ui/**",
+                        "/v3/api-docs/**",
+                        "/actuator/health/**"
+        };
 
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
-        return authConfig.getAuthenticationManager();
-    }
+        @Bean
+        public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
+                return authConfig.getAuthenticationManager();
+        }
 
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource))
-                .csrf(AbstractHttpConfigurer::disable)
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        // Public endpoints
-                        .requestMatchers(PUBLIC_PATHS).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/phones/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/brands/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/banners/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/reviews/phone/**").permitAll()
-                        // Admin endpoints
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        // All other API endpoints require authentication
-                        .requestMatchers("/api/**").authenticated()
-                        .anyRequest().permitAll()
-                )
-                .addFilterBefore(jwtAuthenticationFilter,
-                        UsernamePasswordAuthenticationFilter.class);
+        @Bean
+        public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+                http
+                                .cors(cors -> cors.configurationSource(corsConfigurationSource))
+                                .csrf(AbstractHttpConfigurer::disable)
+                                .sessionManagement(session -> session
+                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .authorizeHttpRequests(auth -> auth
+                                                // Public endpoints
+                                                .requestMatchers(PUBLIC_PATHS).permitAll()
+                                                .requestMatchers(HttpMethod.GET, "/api/phones/**").permitAll()
+                                                .requestMatchers(HttpMethod.GET, "/api/brands/**").permitAll()
+                                                .requestMatchers(HttpMethod.GET, "/api/banners/**").permitAll()
+                                                .requestMatchers(HttpMethod.GET, "/api/reviews/phone/**").permitAll()
+                                                // Admin endpoints
+                                                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                                                // All other API endpoints require authentication
+                                                .requestMatchers("/api/**").authenticated()
+                                                .anyRequest().permitAll())
+                                .addFilterBefore(jwtAuthenticationFilter,
+                                                UsernamePasswordAuthenticationFilter.class);
 
-        return http.build();
-    }
+                return http.build();
+        }
 }

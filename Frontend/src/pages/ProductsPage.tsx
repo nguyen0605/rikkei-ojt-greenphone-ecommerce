@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { Breadcrumb, NewsletterCTA } from '@/components/common';
+import { Breadcrumb, NewsletterCTA, ProductCardSkeleton } from '@/components/common';
 import ProductFilters from '@/components/products/ProductFilters';
 import ProductsToolbar, { ProductsPagination, ProductGrid } from '@/components/products/ProductsToolbar';
 import { phoneService } from '@/services';
@@ -80,7 +80,19 @@ export default function ProductsPage() {
           <div className="lg:col-span-1"><ProductFilters /></div>
           <div className="lg:col-span-3">
             <ProductsToolbar total={total} current={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
-            {isLoading ? <p className="text-center text-gray-500 py-8">Đang tải...</p> : <ProductGrid products={phones} />}
+            {isLoading ? (
+              <div
+                role="status"
+                aria-label="Đang tải danh sách sản phẩm"
+                className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"
+              >
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <ProductCardSkeleton key={i} />
+                ))}
+              </div>
+            ) : (
+              <ProductGrid products={phones} />
+            )}
             <ProductsPagination current={page} total={total} pageSize={PAGE_SIZE} onChange={setPage} />
           </div>
         </div>
