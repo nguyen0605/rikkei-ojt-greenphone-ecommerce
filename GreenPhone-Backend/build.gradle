@@ -50,6 +50,9 @@ dependencies {
     // Cloudinary - image uploads
     implementation 'com.cloudinary:cloudinary-http44:1.38.0'
 
+    // Cloudflare R2 / AWS S3 SDK
+    implementation 'software.amazon.awssdk:s3:2.25.16'
+
     // Dotenv - load .env files
     implementation 'io.github.cdimascio:dotenv-java:3.0.0'
 

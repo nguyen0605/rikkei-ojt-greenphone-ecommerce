@@ -4,6 +4,8 @@ import com.re.greenphone.dto.response.BrandFilterDTO;
 import com.re.greenphone.entity.Phone;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -15,6 +17,13 @@ import java.util.Optional;
 
 @Repository
 public interface PhoneRepository extends JpaRepository<Phone, Long>, JpaSpecificationExecutor<Phone> {
+
+    /**
+     * Eagerly loads brand in a single query via EntityGraph, preventing N+1 queries.
+     */
+    @Override
+    @EntityGraph(attributePaths = {"brand"})
+    Page<Phone> findAll(Specification<Phone> spec, Pageable pageable);
 
     /**
      * Load phones with brand in a single query via JOIN FETCH (ManyToOne — no row duplication).

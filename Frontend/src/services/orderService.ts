@@ -22,8 +22,10 @@ export const orderService = {
   /**
    * Khách hàng yêu cầu hủy đơn hàng (áp dụng cho đơn PENDING/CONFIRMED)
    */
-  cancel: (id: number) => {
-    return put<OrderDTO>(`/orders/${id}/cancel`);
+  cancel: (id: number, reason?: string) => {
+    return reason
+      ? put<OrderDTO>(`/orders/${id}/cancel`, { reason })
+      : put<OrderDTO>(`/orders/${id}/cancel`);
   },
 
   /**

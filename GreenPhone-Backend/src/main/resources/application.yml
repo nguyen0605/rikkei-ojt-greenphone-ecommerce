@@ -54,9 +54,24 @@ server:
 
 jwt:
   secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION:86400000}
+  expiration: ${JWT_EXPIRATION:1800000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
 
 logging:
   level:
     com.re.greenphone: ${LOG_LEVEL:DEBUG}
+
+app:
+  order:
+    timeout-minutes: ${ORDER_TIMEOUT_MINUTES:15}
+
+cloudflare:
+  r2:
+    account-id: ${R2_ACCOUNT_ID:}
+    access-key: ${R2_ACCESS_KEY_ID:}
+    secret-key: ${R2_SECRET_ACCESS_KEY:}
+    bucket-name: ${R2_BUCKET_NAME:greenphone-media}
+    public-url: ${R2_PUBLIC_URL:}
+
+
 

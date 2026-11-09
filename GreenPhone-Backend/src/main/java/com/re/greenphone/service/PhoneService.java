@@ -12,6 +12,7 @@ import com.re.greenphone.mapper.PhoneImageMapper;
 import com.re.greenphone.mapper.PhoneMapper;
 import com.re.greenphone.mapper.PhoneVariantMapper;
 import com.re.greenphone.repository.PhoneRepository;
+import com.re.greenphone.specification.PhoneSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
@@ -43,18 +44,21 @@ public class PhoneService {
                                             List<String> colors, List<String> features,
                                             BigDecimal minPrice, BigDecimal maxPrice,
                                             String sort, PageRequest pageRequest) {
-        Specification<Phone> spec = buildSpec(null, brandIds, rams, storages, colors, features, minPrice, maxPrice, sort);
-        Pageable pageable = org.springframework.data.domain.PageRequest.of(
-                pageRequest.getPage(), pageRequest.getSize());
+        Specification<Phone> spec = PhoneSpecification.filterPhones(
+                null, brandIds, rams, storages, colors, features, minPrice, maxPrice, sort);
 
-        // Images/variants/reviews batch-loaded via hibernate.default_batch_fetch_size.
-        Page<Phone> page = phoneRepository.findAll(spec, pageable);
-        List<PhoneDTO> dtos = page.getContent().stream()
+        int page = Math.max(0, pageRequest.getPage());
+        int size = pageRequest.getSize() <= 0 ? 10 : Math.min(pageRequest.getSize(), 100);
+        Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
+
+        // N+1 eliminated: Brand fetched via EntityGraph, variants/images batch-loaded via BatchSize
+        Page<Phone> phonePage = phoneRepository.findAll(spec, pageable);
+        List<PhoneDTO> dtos = phonePage.getContent().stream()
                 .map(this::toListingDto)
                 .toList();
 
-        return new PageResponse<>(dtos, page.getNumber(), page.getSize(),
-                page.getTotalElements(), page.getTotalPages(), page.isLast());
+        return new PageResponse<>(dtos, phonePage.getNumber(), phonePage.getSize(),
+                phonePage.getTotalElements(), phonePage.getTotalPages(), phonePage.isLast());
     }
 
     @Cacheable(value = "phones", key = "#id")
@@ -77,7 +81,6 @@ public class PhoneService {
         dto.setBattery(phone.getBattery());
         dto.setWarranty(phone.getWarranty());
         dto.setStatus(phone.getStatus());
-        // Detail page uses full-size images (gallery) — no resize
         dto.setImages(phoneImageMapper.toDtoList(phone.getImages()));
         dto.setVariants(phoneVariantMapper.toDtoList(phone.getVariants()));
         dto.setAvgRating(calculateAvgRating(phone));
@@ -89,98 +92,20 @@ public class PhoneService {
                                          List<String> storages, List<String> colors, List<String> features,
                                          BigDecimal minPrice, BigDecimal maxPrice,
                                          String sort, PageRequest pageRequest) {
-        Pageable pageable = org.springframework.data.domain.PageRequest.of(
-                pageRequest.getPage(), pageRequest.getSize());
+        int page = Math.max(0, pageRequest.getPage());
+        int size = pageRequest.getSize() <= 0 ? 10 : Math.min(pageRequest.getSize(), 100);
+        Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
 
-        Specification<Phone> spec = buildSpec(query, brandIds, rams, storages, colors, features, minPrice, maxPrice, sort);
+        Specification<Phone> spec = PhoneSpecification.filterPhones(
+                query, brandIds, rams, storages, colors, features, minPrice, maxPrice, sort);
 
-        // With default_batch_fetch_size=16, images/variants/reviews batch load
-        // in one extra query each — no N+1
-        Page<Phone> page = phoneRepository.findAll(spec, pageable);
-        List<PhoneDTO> dtos = page.getContent().stream()
+        Page<Phone> phonePage = phoneRepository.findAll(spec, pageable);
+        List<PhoneDTO> dtos = phonePage.getContent().stream()
                 .map(this::toListingDto)
                 .toList();
 
-        return new PageResponse<>(dtos, page.getNumber(), page.getSize(),
-                page.getTotalElements(), page.getTotalPages(), page.isLast());
-    }
-
-    /**
-     * Unified filter Specification shared by /phones and /phones/search.
-     * RAM/storage/color filter through a variants join (distinct mandatory),
-     * features through description LIKE, price through coalesce(discountPrice, price).
-     * Sort (price-asc/price-desc/name) is applied inside the spec because a plain
-     * Sort.by cannot reference the joined collection.
-     */
-    private Specification<Phone> buildSpec(String query, List<Long> brandIds, List<String> rams,
-                                           List<String> storages, List<String> colors, List<String> features,
-                                           BigDecimal minPrice, BigDecimal maxPrice, String sort) {
-        return (root, cq, cb) -> {
-            jakarta.persistence.criteria.Join<Phone, com.re.greenphone.entity.PhoneVariant> variants = null;
-            var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
-
-            // Chỉ hiển thị sản phẩm đang hoạt động (admin toggle ACTIVE/INACTIVE)
-            predicates.add(cb.equal(root.get("status"), "ACTIVE"));
-
-            if (query != null && !query.isBlank()) {
-                predicates.add(cb.like(cb.lower(root.get("name")), "%" + query.toLowerCase() + "%"));
-            }
-            if (brandIds != null && !brandIds.isEmpty()) {
-                predicates.add(root.get("brand").get("id").in(brandIds));
-            }
-            if (rams != null && !rams.isEmpty()) {
-                variants = variants != null ? variants : root.join("variants");
-                predicates.add(variants.join("ramItem").get("value").in(rams));
-            }
-            if (storages != null && !storages.isEmpty()) {
-                variants = variants != null ? variants : root.join("variants");
-                predicates.add(variants.join("storageItem").get("value").in(storages));
-            }
-            if (colors != null && !colors.isEmpty()) {
-                variants = variants != null ? variants : root.join("variants");
-                predicates.add(variants.join("colorItem").get("value").in(colors));
-            }
-            if (features != null && !features.isEmpty()) {
-                for (String f : features) {
-                    predicates.add(cb.like(cb.lower(root.get("description")), "%" + f.toLowerCase() + "%"));
-                }
-            }
-            if (minPrice != null) {
-                variants = variants != null ? variants : root.join("variants");
-                predicates.add(cb.greaterThanOrEqualTo(
-                        cb.coalesce(variants.get("discountPrice"), variants.get("price")), minPrice));
-            }
-            if (maxPrice != null) {
-                variants = variants != null ? variants : root.join("variants");
-                predicates.add(cb.lessThanOrEqualTo(
-                        cb.coalesce(variants.get("discountPrice"), variants.get("price")), maxPrice));
-            }
-
-            if (variants != null) cq.distinct(true);
-
-            if (sort != null && !sort.isBlank()) {
-                jakarta.persistence.criteria.Expression<?> sortExpr;
-                boolean asc = true;
-                switch (sort) {
-                    case "price-asc" -> { sortExpr = variants != null ? variants.get("price") : root.get("id"); }
-                    case "price-desc" -> { sortExpr = variants != null ? variants.get("price") : root.get("id"); asc = false; }
-                    case "name" -> { sortExpr = root.get("name"); }
-                    case "discount" -> {
-                        // Giảm dần theo mức giảm giá: (giá gốc - giá hiện tại), không chia % để tránh divide-by-zero
-                        variants = variants != null ? variants : root.join("variants");
-                        sortExpr = cb.diff(variants.get("price"),
-                                cb.coalesce(variants.get("discountPrice"), variants.get("price")));
-                        asc = false;
-                    }
-                    default -> { sortExpr = root.get("id"); asc = false; }
-                }
-                cq.orderBy(asc ? cb.asc(sortExpr) : cb.desc(sortExpr));
-            } else {
-                cq.orderBy(cb.desc(root.get("id")));
-            }
-
-            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
-        };
+        return new PageResponse<>(dtos, phonePage.getNumber(), phonePage.getSize(),
+                phonePage.getTotalElements(), phonePage.getTotalPages(), phonePage.isLast());
     }
 
     public Map<String, Object> getFilters() {
@@ -215,16 +140,10 @@ public class PhoneService {
                 .orElse(null);
     }
 
-    /**
-     * Returns the main image URL optimized for listing cards.
-     * For Pexels images: appends auto=compress + w/h resize params.
-     * For other sources (Cloudinary, etc.): returns as-is.
-     */
     private String getMainImageUrl(Phone phone) {
         List<PhoneImage> images = phone.getImages();
         if (images.isEmpty()) return null;
 
-        // Prefer the explicit main image; fall back to the first by sort order
         PhoneImage main = images.stream()
                 .filter(img -> Boolean.TRUE.equals(img.getIsMain()))
                 .findFirst()
@@ -232,7 +151,6 @@ public class PhoneService {
         String url = main.getImageUrl();
         if (url == null || url.isBlank()) return null;
 
-        // Pexels: append resize params to reduce image weight
         if (url.contains("pexels.com")) {
             String sep = url.contains("?") ? "&" : "?";
             return url + sep + "auto=compress&w=" + LISTING_IMAGE_WIDTH + "&h=" + LISTING_IMAGE_WIDTH + "&fit=crop";

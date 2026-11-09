@@ -3,14 +3,17 @@ package com.re.greenphone.service;
 import com.re.greenphone.entity.Order;
 import com.re.greenphone.entity.OrderDetail;
 import com.re.greenphone.entity.PhoneVariant;
+import com.re.greenphone.entity.UserPromotion;
 import com.re.greenphone.repository.OrderRepository;
 import com.re.greenphone.repository.PhoneVariantRepository;
+import com.re.greenphone.repository.UserPromotionRepository;
 import com.re.greenphone.service.admin.InventoryStockHistoryService;
-import jakarta.persistence.OptimisticLockException;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
+import jakarta.persistence.OptimisticLockException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,31 +22,38 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * Auto-cancels PENDING orders that have been unpaid for more than 10 minutes.
+ * Auto-cancels PENDING orders that have been unpaid for more than configured timeout minutes (default 15).
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class OrderTimeoutScheduler {
 
+    private static final List<String> EXPIRABLE_PAYMENT_METHODS = List.of("VIETQR", "SEPAY");
+
     private final OrderRepository orderRepository;
     private final PhoneVariantRepository phoneVariantRepository;
     private final InventoryStockHistoryService inventoryStockHistoryService;
+    private final UserPromotionRepository userPromotionRepository;
     private final EntityManager entityManager;
 
+    @Value("${app.order.timeout-minutes:15}")
+    private int timeoutMinutes = 15;
+
     /**
-     * Runs every 60 seconds. Cancels orders that are PENDING + UNPAID for > 10 minutes.
+     * Runs every 60 seconds. Cancels orders that are PENDING + UNPAID for > timeoutMinutes
+     * with payment methods VIETQR / SEPAY. COD orders are strictly excluded.
      */
-    @Scheduled(fixedRate = 60_000)
+    @Scheduled(cron = "0 * * * * *")
     @Transactional
     public void cancelExpiredPendingOrders() {
-        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(10);
-        List<Order> expiredOrders = orderRepository.findByOrderStatusAndPaymentStatusAndCreatedAtBefore(
-                "PENDING", "UNPAID", cutoff);
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(timeoutMinutes);
+        List<Order> expiredOrders = orderRepository.findByOrderStatusAndPaymentStatusAndPaymentMethodInAndCreatedAtBefore(
+                "PENDING", "UNPAID", EXPIRABLE_PAYMENT_METHODS, cutoff);
 
         if (expiredOrders.isEmpty()) return;
 
-        log.info("Auto-cancelling {} expired PENDING orders (older than 10 min)", expiredOrders.size());
+        log.info("Auto-cancelling {} expired PENDING orders (older than {} min)", expiredOrders.size(), timeoutMinutes);
 
         for (Order order : expiredOrders) {
             try {
@@ -66,6 +76,11 @@ public class OrderTimeoutScheduler {
             return; // paid or otherwise changed — leave it alone
         }
 
+        // Strictly do not cancel COD orders
+        if (!EXPIRABLE_PAYMENT_METHODS.contains(fresh.getPaymentMethod())) {
+            return;
+        }
+
         // Restore stock
         for (OrderDetail detail : fresh.getOrderDetails()) {
             PhoneVariant variant = detail.getPhoneVariant();
@@ -81,9 +96,19 @@ public class OrderTimeoutScheduler {
                 phoneVariantRepository.save(locked);
             }
         }
+
+        // Restore voucher/promotion if applied
+        UserPromotion up = fresh.getUserPromotion();
+        if (up != null) {
+            up.setStatus("AVAILABLE");
+            up.setUsedAt(null);
+            userPromotionRepository.save(up);
+        }
+
         fresh.setOrderStatus("CANCELLED");
         fresh.setPaymentStatus("UNPAID");
+        fresh.setNote("Quá hạn thanh toán " + timeoutMinutes + " phút");
         orderRepository.save(fresh);
-        log.info("Order #{} auto-cancelled (timeout)", fresh.getId());
+        log.info("Cancelled expired order #{} and restored stock", fresh.getId());
     }
 }
