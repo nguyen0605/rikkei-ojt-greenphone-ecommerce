@@ -45,6 +45,10 @@ public class PhoneVariant extends BaseEntity {
     @Builder.Default
     private Integer stockQuantity = 0;
 
+    @Column(name = "RESERVED_QUANTITY", nullable = false)
+    @Builder.Default
+    private Integer reservedQuantity = 0;
+
     @Column(name = "SKU", unique = true, length = 100)
     private String sku;
 
