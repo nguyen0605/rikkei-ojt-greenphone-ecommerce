@@ -13,11 +13,13 @@ import com.re.greenphone.repository.UserRepository;
 import com.re.greenphone.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -43,13 +45,15 @@ public class PromotionService {
         return promotions.stream()
                 .map(up -> {
                     Promotion promo = up.getPromotion();
-                    boolean eligible = promo.getStartDate().isBefore(now)
+                    boolean eligible = "ACTIVE".equals(promo.getStatus())
+                            && promo.getStartDate().isBefore(now)
                             && promo.getEndDate().isAfter(now)
                             && (promo.getMinOrderValue() == null || orderAmount.compareTo(promo.getMinOrderValue()) >= 0);
 
                     BigDecimal discountValue;
                     if ("PERCENT".equals(promo.getDiscountType())) {
-                        BigDecimal pctDiscount = orderAmount.multiply(promo.getDiscountValue().divide(BigDecimal.valueOf(100)));
+                        BigDecimal rate = promo.getDiscountValue().divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
+                        BigDecimal pctDiscount = orderAmount.multiply(rate).setScale(0, RoundingMode.HALF_UP);
                         discountValue = promo.getMaxDiscountAmount() != null
                                 && pctDiscount.compareTo(promo.getMaxDiscountAmount()) > 0
                                 ? promo.getMaxDiscountAmount() : pctDiscount;
@@ -74,32 +78,53 @@ public class PromotionService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<UserPromotionDTO> getMyPromotions() {
         Long userId = SecurityUtils.getCurrentUserId();
         return userPromotionMapper.toDtoList(
                 userPromotionRepository.findByUserIdOrderByReceivedAtDesc(userId));
     }
 
+    @CacheEvict(value = "promotions", allEntries = true)
     public UserPromotionDTO claimPromotion(String code) {
         Long userId = SecurityUtils.getCurrentUserId();
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
-        Promotion promo = promotionRepository.findByCode(code)
-                .orElseThrow(() -> new ResourceNotFoundException("Promotion code not found: " + code));
+        if (code == null || code.trim().isEmpty()) {
+            throw new BadRequestException("Mã khuyến mãi không được để trống");
+        }
+        String normalizedCode = code.trim().toUpperCase();
 
-        if (promo.getStartDate().isAfter(LocalDateTime.now()) || promo.getEndDate().isBefore(LocalDateTime.now())) {
-            throw new BadRequestException("Promotion is not active");
+        // Khóa bi quan (PESSIMISTIC_WRITE) để tuần tự hóa các request claim tranh chấp đồng thời
+        Promotion promo = promotionRepository.findByCodeWithLock(normalizedCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Promotion code not found: " + normalizedCode));
+
+        LocalDateTime now = LocalDateTime.now();
+        if (!"ACTIVE".equals(promo.getStatus())
+                || (promo.getStartDate() != null && promo.getStartDate().isAfter(now))
+                || (promo.getEndDate() != null && promo.getEndDate().isBefore(now))) {
+            throw new BadRequestException("Chương trình khuyến mãi không hoạt động hoặc đã hết hạn (Promotion is not active)");
         }
 
         if (userPromotionRepository.existsByUserIdAndPromotionId(userId, promo.getId())) {
-            throw new BadRequestException("You have already claimed this promotion");
+            throw new BadRequestException("Bạn đã nhận mã khuyến mãi này rồi (You have already claimed this promotion)");
         }
+
+        // Kiểm tra số lượng phát hành tối đa
+        int currentClaimed = promo.getClaimedQuantity() != null ? promo.getClaimedQuantity() : 0;
+        if (promo.getQuantity() != null && promo.getQuantity() > 0 && currentClaimed >= promo.getQuantity()) {
+            throw new BadRequestException("Mã khuyến mãi đã hết lượt nhận (Promotion has reached claim limit)");
+        }
+
+        promo.setClaimedQuantity(currentClaimed + 1);
+        promotionRepository.save(promo);
 
         UserPromotion up = UserPromotion.builder()
                 .user(user)
                 .promotion(promo)
                 .status("AVAILABLE")
+                .receivedAt(now)
                 .build();
 
         up = userPromotionRepository.save(up);
@@ -125,6 +150,8 @@ public class PromotionService {
                     m.put("discountValue", p.getDiscountValue());
                     m.put("maxDiscountAmount", p.getMaxDiscountAmount());
                     m.put("minOrderValue", p.getMinOrderValue());
+                    m.put("quantity", p.getQuantity());
+                    m.put("claimedQuantity", p.getClaimedQuantity());
                     m.put("startDate", p.getStartDate() != null ? p.getStartDate().toString() : null);
                     m.put("endDate", p.getEndDate() != null ? p.getEndDate().toString() : null);
                     return m;

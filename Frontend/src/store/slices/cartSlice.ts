@@ -85,14 +85,17 @@ export const loadCart = createAsyncThunk('cart/load', async (_, thunkAPI) => {
   if (getAuth()?.user?.id !== auth?.user?.id || getAuth()?.token !== auth?.token) {
     return thunkAPI.rejectWithValue('Cart session changed');
   }
-  return cart;
+  const state = thunkAPI.getState() as { cart?: CartState };
+  return { ...cart, appliedVoucher: state.cart?.appliedVoucher ?? null };
 });
 
 export const addCartItem = createAsyncThunk(
   'cart/addItem',
-  async (data: { phoneVariantId: number; quantity: number }) => {
+  async (data: { phoneVariantId: number; quantity: number }, thunkAPI) => {
+    const state = thunkAPI.getState() as { cart?: CartState };
     await cartService.addItem(data);
-    return fetchCartState();
+    const cart = await fetchCartState();
+    return { ...cart, appliedVoucher: state.cart?.appliedVoucher ?? null };
   },
 );
 
@@ -107,7 +110,8 @@ export const updateCartItem = createAsyncThunk(
       return { items, appliedVoucher: state.cart.appliedVoucher };
     }
     await cartService.updateItem(Number(data.id), data.quantity);
-    return fetchCartState();
+    const cart = await fetchCartState();
+    return { ...cart, appliedVoucher: state.cart.appliedVoucher };
   },
 );
 
@@ -120,7 +124,8 @@ export const removeCartItem = createAsyncThunk(
       return { items, appliedVoucher: state.cart.appliedVoucher };
     }
     await cartService.removeItem(Number(id));
-    return fetchCartState();
+    const cart = await fetchCartState();
+    return { ...cart, appliedVoucher: state.cart.appliedVoucher };
   },
 );
 
@@ -176,6 +181,9 @@ const cartSlice = createSlice({
 
     removeFromCart: (state, action: PayloadAction<string>) => {
       state.items = state.items.filter((item) => item.id !== action.payload);
+      if (state.items.length === 0) {
+        state.appliedVoucher = null;
+      }
     },
 
     updateQuantity: (
@@ -213,7 +221,11 @@ const cartSlice = createSlice({
   extraReducers: (builder) => {
     const replaceCart = (state: CartState, action: { payload: CartState }) => {
       state.items = action.payload.items;
-      state.appliedVoucher = action.payload.appliedVoucher;
+      if (action.payload.items.length === 0) {
+        state.appliedVoucher = null;
+      } else if (action.payload.appliedVoucher) {
+        state.appliedVoucher = action.payload.appliedVoucher;
+      }
     };
 
     builder

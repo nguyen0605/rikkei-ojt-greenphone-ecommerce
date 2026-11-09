@@ -8,6 +8,7 @@ import com.re.greenphone.dto.request.OrderRequest;
 import com.re.greenphone.dto.response.OrderCreationResult;
 import com.re.greenphone.dto.response.OrderDTO;
 import com.re.greenphone.entity.*;
+import com.re.greenphone.entity.Order;
 import com.re.greenphone.mapper.OrderMapper;
 import com.re.greenphone.repository.*;
 import com.re.greenphone.security.SecurityUtils;
@@ -36,6 +37,7 @@ class OrderServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private PhoneVariantRepository phoneVariantRepository;
     @Mock private UserPromotionRepository userPromotionRepository;
+    @Mock private PromotionRepository promotionRepository;
     @Mock private CartRepository cartRepository;
     @Mock private OrderMapper orderMapper;
     @Mock private EmailService emailService;
@@ -135,9 +137,10 @@ class OrderServiceTest {
 
     @Test void createOrder_WithPromotion() {
         stubUser();
+        User user = createUser(); user.setId(USER_ID);
         PhoneVariant v = createVariant(100L, new BigDecimal("1000.00"), null, 10);
-        Promotion promo = Promotion.builder().discountType("FIXED").discountValue(new BigDecimal("500.00")).build();
-        UserPromotion up = UserPromotion.builder().promotion(promo).status("AVAILABLE").build(); up.setId(10L);
+        Promotion promo = Promotion.builder().discountType("FIXED").discountValue(new BigDecimal("500.00")).status("ACTIVE").build();
+        UserPromotion up = UserPromotion.builder().user(user).promotion(promo).status("AVAILABLE").build(); up.setId(10L);
         OrderRequest req = createOrderReq(List.of(createItemReq(100L, 2)), 10L);
 
         when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(v));
@@ -152,10 +155,11 @@ class OrderServiceTest {
 
     @Test void createOrder_DiscountCappedAtMax() {
         stubUser();
+        User user = createUser(); user.setId(USER_ID);
         PhoneVariant v = createVariant(100L, new BigDecimal("1000.00"), null, 10);
         Promotion promo = Promotion.builder().discountType("PERCENT")
-                .discountValue(new BigDecimal("50.00")).maxDiscountAmount(new BigDecimal("500.00")).build();
-        UserPromotion up = UserPromotion.builder().promotion(promo).status("AVAILABLE").build(); up.setId(10L);
+                .discountValue(new BigDecimal("50.00")).maxDiscountAmount(new BigDecimal("500.00")).status("ACTIVE").build();
+        UserPromotion up = UserPromotion.builder().user(user).promotion(promo).status("AVAILABLE").build(); up.setId(10L);
         OrderRequest req = createOrderReq(List.of(createItemReq(100L, 5)), 10L);
 
         when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(v));
@@ -169,12 +173,93 @@ class OrderServiceTest {
         verify(orderRepository).save(any());
     }
 
+    @Test void createOrder_PromotionNotOwnedByUser_ThrowsBadRequest() {
+        stubUser();
+        User otherUser = createUser(); otherUser.setId(999L);
+        PhoneVariant v = createVariant(100L, new BigDecimal("1000.00"), null, 10);
+        Promotion promo = Promotion.builder().discountType("FIXED").discountValue(new BigDecimal("100.00")).status("ACTIVE").build();
+        UserPromotion up = UserPromotion.builder().user(otherUser).promotion(promo).status("AVAILABLE").build(); up.setId(10L);
+        OrderRequest req = createOrderReq(List.of(createItemReq(100L, 2)), 10L);
+
+        when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(v));
+        when(userPromotionRepository.findById(10L)).thenReturn(Optional.of(up));
+
+        assertThrows(BadRequestException.class, () -> orderService.createOrder(req));
+    }
+
+    @Test void applyPromotionToOrder_NotOwnerOfOrder_ThrowsBadRequest() {
+        stubUser();
+        User orderOwner = createUser(); orderOwner.setId(999L);
+        Order order = Order.builder().orderStatus("PENDING").totalAmount(new BigDecimal("1000.00")).build();
+        order.setUser(orderOwner);
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+
+        assertThrows(BadRequestException.class, () -> orderService.applyPromotionToOrder(1L, 10L));
+    }
+
+    @Test void applyPromotionToOrder_NotOwnerOfVoucher_ThrowsBadRequest() {
+        stubUser();
+        User orderOwner = createUser(); orderOwner.setId(USER_ID);
+        Order order = Order.builder().orderStatus("PENDING").totalAmount(new BigDecimal("1000.00")).build();
+        order.setUser(orderOwner);
+
+        User otherUser = createUser(); otherUser.setId(999L);
+        Promotion promo = Promotion.builder().discountType("FIXED").discountValue(new BigDecimal("100.00")).status("ACTIVE").build();
+        UserPromotion up = UserPromotion.builder().user(otherUser).promotion(promo).status("AVAILABLE").build(); up.setId(10L);
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+        when(userPromotionRepository.findById(10L)).thenReturn(Optional.of(up));
+
+        assertThrows(BadRequestException.class, () -> orderService.applyPromotionToOrder(1L, 10L));
+    }
+
+    @Test void applyPromotionToOrder_PreservesShippingFeeAndRollsBackPreviousVoucher() {
+        stubUser();
+        User user = createUser(); user.setId(USER_ID);
+        Promotion promo1 = Promotion.builder().discountType("FIXED").discountValue(new BigDecimal("100.00")).status("ACTIVE").build();
+        UserPromotion oldUp = UserPromotion.builder().user(user).promotion(promo1).status("USED").build(); oldUp.setId(10L);
+
+        Order order = Order.builder()
+                .orderStatus("PENDING")
+                .totalAmount(new BigDecimal("1000.00"))
+                .discountAmount(new BigDecimal("100.00"))
+                .userPromotion(oldUp)
+                .build();
+        order.setUser(user);
+
+        Promotion promo2 = Promotion.builder().discountType("FIXED").discountValue(new BigDecimal("200.00")).status("ACTIVE").build();
+        UserPromotion newUp = UserPromotion.builder().user(user).promotion(promo2).status("AVAILABLE").build(); newUp.setId(20L);
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+        when(userPromotionRepository.findById(20L)).thenReturn(Optional.of(newUp));
+        when(settingsService.getShippingFee()).thenReturn(new BigDecimal("30.00"));
+        when(settingsService.getFreeShippingThreshold()).thenReturn(new BigDecimal("5000.00"));
+        when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(orderMapper.toDto(any())).thenReturn(new OrderDTO());
+
+        orderService.applyPromotionToOrder(1L, 20L);
+
+        // Old voucher restored
+        assertEquals("AVAILABLE", oldUp.getStatus());
+        assertNull(oldUp.getUsedAt());
+
+        // New voucher marked USED
+        assertEquals("USED", newUp.getStatus());
+        assertNotNull(newUp.getUsedAt());
+
+        // Total 1000 - discount 200 + shipping 30 = 830
+        assertEquals(new BigDecimal("830.00"), order.getFinalAmount());
+        assertEquals(new BigDecimal("200.00"), order.getDiscountAmount());
+    }
+
     @Test void cancelOrder_RestoresStockAndVoucherAndRecordsReason() {
         User u = createUser(); u.setId(USER_ID);
         securityUtilsMock.when(SecurityUtils::getCurrentUserId).thenReturn(USER_ID);
 
         PhoneVariant v = createVariant(100L, new BigDecimal("15000000"), null, 5);
-        UserPromotion up = UserPromotion.builder().status("USED").usedAt(java.time.LocalDateTime.now()).build();
+        Promotion promo = Promotion.builder().code("VOUCHER").status("ACTIVE").endDate(java.time.LocalDateTime.now().plusDays(5)).usedQuantity(1).build();
+        UserPromotion up = UserPromotion.builder().promotion(promo).status("USED").usedAt(java.time.LocalDateTime.now()).build();
         up.setId(77L);
 
         com.re.greenphone.entity.Order order = com.re.greenphone.entity.Order.builder()
@@ -198,8 +283,36 @@ class OrderServiceTest {
         assertEquals("AVAILABLE", up.getStatus());
         assertNull(up.getUsedAt());
         verify(userPromotionRepository).save(up);
+        verify(promotionRepository).save(argThat(p -> p.getUsedQuantity() == 0));
         assertEquals("CANCELLED", order.getOrderStatus());
         assertEquals("[Lý do hủy: Đặt nhầm màu]", order.getNote());
+    }
+
+    @Test void cancelOrder_SetsVoucherExpired_WhenPromotionExpired() {
+        User u = createUser(); u.setId(USER_ID);
+        securityUtilsMock.when(SecurityUtils::getCurrentUserId).thenReturn(USER_ID);
+
+        Promotion expiredPromo = Promotion.builder().code("EXPIRED_VOUCHER").status("ACTIVE")
+                .endDate(java.time.LocalDateTime.now().minusDays(1)).usedQuantity(1).build();
+        UserPromotion up = UserPromotion.builder().promotion(expiredPromo).status("USED").usedAt(java.time.LocalDateTime.now()).build();
+        up.setId(78L);
+
+        com.re.greenphone.entity.Order order = com.re.greenphone.entity.Order.builder()
+                .user(u).totalAmount(new BigDecimal("1000000")).finalAmount(new BigDecimal("900000"))
+                .orderStatus("PENDING").paymentStatus("UNPAID").userPromotion(up).build();
+        order.setId(3L);
+        order.setOrderDetails(List.of());
+
+        when(orderRepository.findById(3L)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any())).thenReturn(order);
+        when(orderMapper.toDto(any())).thenReturn(new OrderDTO());
+
+        orderService.cancelOrder(3L, "Đổi ý");
+
+        assertEquals("EXPIRED", up.getStatus());
+        assertNull(up.getUsedAt());
+        verify(userPromotionRepository).save(up);
+        verify(promotionRepository).save(argThat(p -> p.getUsedQuantity() == 0));
     }
 
     @Test void cancelOrder_ThrowsWhenAnotherUserOrder() {

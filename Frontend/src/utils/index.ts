@@ -5,3 +5,4 @@ export * from './image';
 export * from './jwt';
 export * from './privacy';
 export * from './reviewUtils';
+export * from './voucherUtils';

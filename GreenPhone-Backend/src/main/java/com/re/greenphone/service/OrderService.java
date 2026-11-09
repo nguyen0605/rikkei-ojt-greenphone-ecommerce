@@ -25,6 +25,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -38,6 +40,7 @@ public class OrderService {
     private final UserRepository userRepository;
     private final PhoneVariantRepository phoneVariantRepository;
     private final UserPromotionRepository userPromotionRepository;
+    private final PromotionRepository promotionRepository;
     private final CartRepository cartRepository;
     private final OrderMapper orderMapper;
     private final EmailService emailService;
@@ -167,21 +170,39 @@ public class OrderService {
             UserPromotion up = userPromotionRepository.findById(request.getUserPromotionId())
                     .orElseThrow(() -> new ResourceNotFoundException("UserPromotion", "id", request.getUserPromotionId()));
 
-            if (!up.getStatus().equals("AVAILABLE")) {
-                throw new BadRequestException("Promotion no longer available");
+            // Chống IDOR: Chỉ chủ sở hữu mới được dùng voucher này
+            if (up.getUser() == null || !up.getUser().getId().equals(userId)) {
+                throw new BadRequestException("Mã khuyến mãi không thuộc sở hữu của bạn");
+            }
+
+            if (!"AVAILABLE".equals(up.getStatus())) {
+                throw new BadRequestException("Mã khuyến mãi không còn khả dụng");
             }
 
             Promotion promo = up.getPromotion();
+            LocalDateTime now = LocalDateTime.now();
+
+            if (!"ACTIVE".equals(promo.getStatus())
+                    || (promo.getStartDate() != null && promo.getStartDate().isAfter(now))
+                    || (promo.getEndDate() != null && promo.getEndDate().isBefore(now))) {
+                throw new BadRequestException("Chương trình khuyến mãi đã hết hạn hoặc không còn hiệu lực");
+            }
+
             BigDecimal minOrder = promo.getMinOrderValue();
             if (minOrder != null && total.compareTo(minOrder) < 0) {
-                throw new BadRequestException("Order amount does not meet promotion minimum");
+                throw new BadRequestException("Giá trị đơn hàng chưa đạt mức tối thiểu để áp dụng mã khuyến mãi");
             }
 
             BigDecimal discount = calculateDiscount(total, promo);
             order.setUserPromotion(up);
             order.setDiscountAmount(discount);
             up.setStatus("USED");
+            up.setUsedAt(now);
             userPromotionRepository.save(up);
+
+            int currentUsed = promo.getUsedQuantity() != null ? promo.getUsedQuantity() : 0;
+            promo.setUsedQuantity(currentUsed + 1);
+            promotionRepository.save(promo);
         }
 
         order.setTotalAmount(total);
@@ -326,11 +347,28 @@ public class OrderService {
             }
         }
 
-        // Restore the promotion so the voucher can be reused
+        // Restore the promotion so the voucher can be reused (only if not expired)
         if (order.getUserPromotion() != null) {
-            order.getUserPromotion().setStatus("AVAILABLE");
-            order.getUserPromotion().setUsedAt(null);
-            userPromotionRepository.save(order.getUserPromotion());
+            UserPromotion up = order.getUserPromotion();
+            Promotion promo = up.getPromotion();
+            LocalDateTime now = LocalDateTime.now();
+
+            if (promo != null && "ACTIVE".equals(promo.getStatus())
+                    && (promo.getEndDate() == null || promo.getEndDate().isAfter(now))) {
+                up.setStatus("AVAILABLE");
+            } else {
+                up.setStatus("EXPIRED");
+            }
+            up.setUsedAt(null);
+            userPromotionRepository.save(up);
+
+            if (promo != null && promo.getUsedQuantity() != null && promo.getUsedQuantity() > 0) {
+                promo.setUsedQuantity(promo.getUsedQuantity() - 1);
+                promotionRepository.save(promo);
+            }
+
+            // Gỡ liên kết userPromotion khỏi đơn đã hủy để giải phóng khóa UNIQUE và trả lại voucher
+            order.setUserPromotion(null);
         }
 
         order.setOrderStatus("CANCELLED");
@@ -348,22 +386,88 @@ public class OrderService {
     }
 
     public OrderDTO applyPromotionToOrder(Long orderId, Long userPromotionId) {
+        Long userId = SecurityUtils.getCurrentUserId();
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
+        // 1. Chống IDOR: Chỉ chủ sở hữu đơn hàng mới được gắn mã
+        if (!order.getUser().getId().equals(userId)) {
+            throw new BadRequestException("Bạn không có quyền chỉnh sửa đơn hàng của người khác");
+        }
+
         if (!"PENDING".equals(order.getOrderStatus())) {
-            throw new BadRequestException("Can only apply promotion to pending orders");
+            throw new BadRequestException("Chỉ có thể áp dụng mã khuyến mãi cho đơn hàng đang chờ xử lý");
         }
 
         UserPromotion up = userPromotionRepository.findById(userPromotionId)
                 .orElseThrow(() -> new ResourceNotFoundException("UserPromotion", "id", userPromotionId));
 
-        BigDecimal discount = calculateDiscount(order.getTotalAmount(), up.getPromotion());
+        // 2. Chống IDOR: Chỉ chủ sở hữu mã mới được sử dụng
+        if (up.getUser() == null || !up.getUser().getId().equals(userId)) {
+            throw new BadRequestException("Mã khuyến mãi không thuộc sở hữu của bạn");
+        }
+
+        // 3. Kiểm tra trạng thái khả dụng
+        if (!"AVAILABLE".equals(up.getStatus())) {
+            throw new BadRequestException("Mã khuyến mãi không còn khả dụng");
+        }
+
+        Promotion promo = up.getPromotion();
+        LocalDateTime now = LocalDateTime.now();
+
+        // 4. Kiểm tra thời hạn và trạng thái chiến dịch
+        if (!"ACTIVE".equals(promo.getStatus())
+                || (promo.getStartDate() != null && promo.getStartDate().isAfter(now))
+                || (promo.getEndDate() != null && promo.getEndDate().isBefore(now))) {
+            throw new BadRequestException("Chương trình khuyến mãi đã hết hạn hoặc không còn hiệu lực");
+        }
+
+        // 5. Kiểm tra giá trị đơn hàng tối thiểu
+        BigDecimal minOrder = promo.getMinOrderValue();
+        if (minOrder != null && order.getTotalAmount().compareTo(minOrder) < 0) {
+            throw new BadRequestException("Giá trị đơn hàng chưa đạt mức tối thiểu để áp dụng mã khuyến mãi");
+        }
+
+        // 6. Hoàn lại voucher cũ nếu đơn hàng đã gắn voucher khác trước đó
+        if (order.getUserPromotion() != null && !order.getUserPromotion().getId().equals(up.getId())) {
+            UserPromotion oldUp = order.getUserPromotion();
+            Promotion oldPromo = oldUp.getPromotion();
+            if (oldPromo != null && "ACTIVE".equals(oldPromo.getStatus())
+                    && (oldPromo.getEndDate() == null || oldPromo.getEndDate().isAfter(now))) {
+                oldUp.setStatus("AVAILABLE");
+            } else {
+                oldUp.setStatus("EXPIRED");
+            }
+            oldUp.setUsedAt(null);
+            userPromotionRepository.save(oldUp);
+
+            if (oldPromo != null && oldPromo.getUsedQuantity() != null && oldPromo.getUsedQuantity() > 0) {
+                oldPromo.setUsedQuantity(oldPromo.getUsedQuantity() - 1);
+                promotionRepository.save(oldPromo);
+            }
+        }
+
+        BigDecimal discount = calculateDiscount(order.getTotalAmount(), promo);
         order.setUserPromotion(up);
         order.setDiscountAmount(discount);
-        order.setFinalAmount(order.getTotalAmount().subtract(discount));
+
+        // 7. Tính lại finalAmount chuẩn xác bao gồm cả phí vận chuyển
+        BigDecimal finalAmount = order.getTotalAmount().subtract(discount);
+        BigDecimal shippingFee = settingsService.getShippingFee();
+        BigDecimal freeThreshold = settingsService.getFreeShippingThreshold();
+        if (shippingFee.signum() > 0
+                && (freeThreshold.signum() <= 0 || finalAmount.compareTo(freeThreshold) < 0)) {
+            finalAmount = finalAmount.add(shippingFee);
+        }
+        order.setFinalAmount(finalAmount);
+
         up.setStatus("USED");
+        up.setUsedAt(now);
         userPromotionRepository.save(up);
+
+        int currentUsed = promo.getUsedQuantity() != null ? promo.getUsedQuantity() : 0;
+        promo.setUsedQuantity(currentUsed + 1);
+        promotionRepository.save(promo);
 
         order = orderRepository.save(order);
         return orderMapper.toDto(order);
@@ -386,7 +490,8 @@ public class OrderService {
     private BigDecimal calculateDiscount(BigDecimal total, Promotion promo) {
         BigDecimal discount;
         if ("PERCENT".equals(promo.getDiscountType())) {
-            discount = total.multiply(promo.getDiscountValue().divide(BigDecimal.valueOf(100)));
+            BigDecimal rate = promo.getDiscountValue().divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
+            discount = total.multiply(rate).setScale(0, RoundingMode.HALF_UP);
         } else {
             discount = promo.getDiscountValue();
         }

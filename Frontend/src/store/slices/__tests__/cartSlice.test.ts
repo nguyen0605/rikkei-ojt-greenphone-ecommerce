@@ -195,6 +195,35 @@ describe('cartSlice', () => {
 
       expect(store.getState().cart.items).toEqual([]);
     });
+
+    it('should clear appliedVoucher when removing the last item', () => {
+      const store = createTestStore();
+      const product = makeProduct();
+      store.dispatch(addToCart({ product, quantity: 1 }));
+      store.dispatch(applyVoucher({ code: 'V1', discountAmount: 50_000, title: 'V1' }));
+      expect(store.getState().cart.appliedVoucher).not.toBeNull();
+
+      const itemId = store.getState().cart.items[0].id;
+      store.dispatch(removeFromCart(itemId));
+
+      expect(store.getState().cart.items).toHaveLength(0);
+      expect(store.getState().cart.appliedVoucher).toBeNull();
+    });
+
+    it('should retain appliedVoucher when items still remain after removal', () => {
+      const store = createTestStore();
+      const p1 = makeProduct({ id: 'p-1' });
+      const p2 = makeProduct({ id: 'p-2' });
+      store.dispatch(addToCart({ product: p1, quantity: 1 }));
+      store.dispatch(addToCart({ product: p2, quantity: 1 }));
+      store.dispatch(applyVoucher({ code: 'V1', discountAmount: 50_000, title: 'V1' }));
+
+      const itemId = store.getState().cart.items[0].id;
+      store.dispatch(removeFromCart(itemId));
+
+      expect(store.getState().cart.items).toHaveLength(1);
+      expect(store.getState().cart.appliedVoucher?.code).toBe('V1');
+    });
   });
 
   describe('updateQuantity', () => {

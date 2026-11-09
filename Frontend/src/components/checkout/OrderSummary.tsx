@@ -1,21 +1,25 @@
+import { useState, useEffect } from 'react';
 import { CheckCircle2, Truck, ShieldCheck, RefreshCw, Headphones, Ticket } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { App } from 'antd';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectCartSummary } from '@/store/selectors/cartSelectors';
-import { formatVND } from '@/utils';
+import { formatVND, cn } from '@/utils';
 import { promotionService } from '@/services';
 import type { AvailablePromotionDTO } from '@/types/api';
 import { applyCheckoutVoucher, removeCheckoutVoucher } from '@/store/slices/checkoutSlice';
+import { applyVoucher, removeVoucher } from '@/store/slices/cartSlice';
 
 export default function OrderSummary() {
   const dispatch = useAppDispatch();
   const { message } = App.useApp();
   const cartItems = useAppSelector((s) => s.cart.items);
+  const cartVoucher = useAppSelector((s) => s.cart.appliedVoucher);
   const summary = useAppSelector(selectCartSummary);
   const voucherCode = useAppSelector((s) => s.checkout.voucherCode);
   const voucherDiscount = useAppSelector((s) => s.checkout.voucherDiscount);
   const isAuthenticated = useAppSelector((s) => s.auth.isAuthenticated);
+  const [userDismissedVoucher, setUserDismissedVoucher] = useState(false);
 
   const { data: myPromos } = useQuery<AvailablePromotionDTO[]>({
     queryKey: ['promotions', 'available', summary.subtotal],
@@ -23,20 +27,117 @@ export default function OrderSummary() {
     enabled: isAuthenticated,
   });
 
+  // Auto-sync cart voucher or auto-apply best eligible voucher
+  useEffect(() => {
+    if (userDismissedVoucher) return;
+
+    if (!voucherCode && myPromos && myPromos.length > 0) {
+      if (cartVoucher?.code) {
+        const match = myPromos.find((p) => p.code === cartVoucher.code);
+        if (match && match.eligible) {
+          dispatch(
+            applyCheckoutVoucher({
+              userPromotionId: match.id,
+              code: match.code,
+              discount: match.calculatedDiscount,
+            }),
+          );
+          return;
+        }
+      }
+
+      // Auto-apply best eligible voucher with highest calculated discount
+      const eligiblePromos = myPromos.filter((p) => p.eligible && p.calculatedDiscount > 0);
+      if (eligiblePromos.length > 0) {
+        const best = [...eligiblePromos].sort((a, b) => b.calculatedDiscount - a.calculatedDiscount)[0];
+        dispatch(
+          applyCheckoutVoucher({
+            userPromotionId: best.id,
+            code: best.code,
+            discount: best.calculatedDiscount,
+          }),
+        );
+        dispatch(
+          applyVoucher({
+            code: best.code,
+            discountAmount: best.calculatedDiscount,
+            title: best.name || best.code,
+          }),
+        );
+      }
+    }
+  }, [cartVoucher, voucherCode, myPromos, userDismissedVoucher, dispatch]);
+
+  // Keep discount updated or remove if subtotal changes and makes voucher ineligible
+  useEffect(() => {
+    if (voucherCode && myPromos) {
+      const current = myPromos.find((p) => p.code === voucherCode);
+      if (current && !current.eligible) {
+        dispatch(removeCheckoutVoucher());
+        dispatch(removeVoucher());
+        message.warning(`Voucher ${voucherCode} không còn đủ điều kiện áp dụng`);
+      } else if (current && current.calculatedDiscount !== voucherDiscount) {
+        dispatch(
+          applyCheckoutVoucher({
+            userPromotionId: current.id,
+            code: current.code,
+            discount: current.calculatedDiscount,
+          }),
+        );
+        dispatch(
+          applyVoucher({
+            code: current.code,
+            discountAmount: current.calculatedDiscount,
+            title: current.name || current.code,
+          }),
+        );
+      }
+    }
+  }, [myPromos, voucherCode, voucherDiscount, dispatch, message]);
+
   const handleSelectVoucher = (promo: AvailablePromotionDTO) => {
-    if (promo.eligible) {
-      dispatch(applyCheckoutVoucher({
+    if (!promo.eligible) {
+      message.warning('Voucher này không đủ điều kiện áp dụng');
+      return;
+    }
+
+    // Nhấp vào voucher đang áp dụng -> Hủy chọn
+    if (voucherCode === promo.code) {
+      setUserDismissedVoucher(true);
+      dispatch(removeCheckoutVoucher());
+      dispatch(removeVoucher());
+      message.info(`Đã bỏ chọn mã ${promo.code}`);
+      return;
+    }
+
+    setUserDismissedVoucher(false);
+    dispatch(
+      applyCheckoutVoucher({
         userPromotionId: promo.id,
         code: promo.code,
         discount: promo.calculatedDiscount,
-      }));
-      message.success(`Đã áp dụng ${promo.code}`);
-    } else {
-      message.warning('Voucher này không đủ điều kiện áp dụng');
-    }
+      }),
+    );
+    dispatch(
+      applyVoucher({
+        code: promo.code,
+        discountAmount: promo.calculatedDiscount,
+        title: promo.name || promo.code,
+      }),
+    );
+    message.success(`Đã áp dụng mã ${promo.code}`);
   };
 
-  const availableVouchers = myPromos || [];
+  // Lọc bỏ hoàn toàn các voucher đã hết hạn khỏi danh sách thanh toán
+  const availableVouchers = (myPromos || []).filter((v) => {
+    if (v.endDate) {
+      const endTimestamp = new Date(String(v.endDate)).getTime();
+      if (!isNaN(endTimestamp) && endTimestamp < Date.now()) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   if (cartItems.length === 0) {
     return (
@@ -88,46 +189,100 @@ export default function OrderSummary() {
           <div className="flex-1">
             <div className="text-sm font-semibold text-gray-900">Bạn tiết kiệm được {formatVND(voucherDiscount)}</div>
             <div className="text-xs text-gray-600">Mã <strong>{voucherCode}</strong> đã được áp dụng</div>
-            <button onClick={() => dispatch(removeCheckoutVoucher())} className="mt-1 text-xs text-red-500 hover:underline">Bỏ chọn</button>
+            <button
+              onClick={() => {
+                setUserDismissedVoucher(true);
+                dispatch(removeCheckoutVoucher());
+                dispatch(removeVoucher());
+              }}
+              className="mt-1 text-xs text-red-500 hover:underline"
+            >
+              Bỏ chọn
+            </button>
           </div>
         </div>
       )}
 
       {/* Saved vouchers — card list */}
-      {availableVouchers.length > 0 && voucherDiscount === 0 && (
+      {availableVouchers.length > 0 && (
         <div className="rounded-2xl border border-gray-100 bg-white p-5">
-          <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900">
-            <Ticket className="h-4 w-4 text-green-600" />
-            Mã giảm giá của bạn ({availableVouchers.length})
-          </h4>
-          <div className="max-h-64 space-y-2 overflow-y-auto">
-            {availableVouchers.map((v) => (
-              <button
-                key={v.id}
-                onClick={() => handleSelectVoucher(v)}
-                disabled={!v.eligible}
-                className={`w-full rounded-xl border px-4 py-3 text-left transition-all ${
-                  v.eligible
-                    ? 'border-dashed border-green-300 bg-green-50/60 hover:border-green-500 hover:bg-green-100'
-                    : 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-50'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="rounded bg-green-200 px-2 py-0.5 font-mono text-xs font-semibold text-green-800">{v.code}</span>
-                    <span className="ml-2 text-sm font-medium text-gray-900">{v.name || v.code}</span>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-green-700">
-                      {v.discountType === 'PERCENT' ? `Giảm ${v.discountValue}%` : formatVND(v.discountValue)}
+          <div className="mb-3 flex items-center justify-between">
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+              <Ticket className="h-4 w-4 text-green-600" />
+              Mã giảm giá của bạn ({availableVouchers.length})
+            </h4>
+            {voucherCode && (
+              <span className="text-[11px] text-gray-400">
+                Nhấp vào mã khác để đổi
+              </span>
+            )}
+          </div>
+          <div className="max-h-64 space-y-2.5 overflow-y-auto pr-1">
+            {availableVouchers.map((v) => {
+              const isSelected = v.code === voucherCode;
+              const hasSelection = !!voucherCode;
+
+              return (
+                <button
+                  key={v.id}
+                  onClick={() => handleSelectVoucher(v)}
+                  disabled={!v.eligible}
+                  className={cn(
+                    'group relative w-full rounded-xl border p-3 text-left transition-all duration-200',
+                    !v.eligible
+                      ? 'cursor-not-allowed border-gray-200 bg-gray-50/70 opacity-35'
+                      : isSelected
+                        ? 'border-2 border-green-600 bg-green-50/90 shadow-sm ring-2 ring-green-500/10 opacity-100'
+                        : hasSelection
+                          ? 'border-gray-200 bg-white opacity-40 hover:opacity-100 hover:border-green-400 hover:shadow-sm'
+                          : 'border-dashed border-green-300 bg-green-50/50 hover:border-green-500 hover:bg-green-100/60 opacity-100',
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            'rounded px-2 py-0.5 font-mono text-xs font-semibold',
+                            isSelected
+                              ? 'bg-green-600 text-white'
+                              : 'bg-green-200 text-green-800',
+                          )}
+                        >
+                          {v.code}
+                        </span>
+                        <span className="truncate text-sm font-medium text-gray-900">
+                          {v.name || v.code}
+                        </span>
+                        {isSelected && (
+                          <span className="inline-flex items-center gap-0.5 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-800">
+                            <CheckCircle2 className="h-3 w-3 text-green-600" />
+                            Đang dùng
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500">
-                      {v.eligible ? '✔ Có thể dùng' : `✘ Đơn tối thiểu ${formatVND(v.minOrderValue)}`}
+                    <div className="ml-3 flex-shrink-0 text-right">
+                      <div
+                        className={cn(
+                          'text-sm font-bold',
+                          isSelected ? 'text-green-700' : 'text-gray-900 group-hover:text-green-700',
+                        )}
+                      >
+                        {v.discountType === 'PERCENT' ? `Giảm ${v.discountValue}%` : formatVND(v.discountValue)}
+                      </div>
+                      <div className="text-[11px] text-gray-500">
+                        {v.eligible
+                          ? '✔ Có thể dùng'
+                          : v.minOrderValue != null && v.minOrderValue > 0
+                            ? `✘ Đơn tối thiểu ${formatVND(v.minOrderValue)}`
+                            : '✘ Chưa đủ điều kiện'}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
