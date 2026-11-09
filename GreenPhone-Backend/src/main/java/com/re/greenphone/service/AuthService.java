@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.Duration;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -51,6 +52,9 @@ public class AuthService {
     private static final String OTP_PREFIX = "otp:";
     private static final String OTP_ATTEMPTS_PREFIX = "otp_attempts:";
     private static final String OTP_LOCK_PREFIX = "otp_lock:";
+    private static final String REFRESH_TOKEN_PREFIX = "refresh_token:";
+    private static final String USER_REFRESH_TOKEN_PREFIX = "user_refresh_token:";
+    public static final String BLACKLIST_TOKEN_PREFIX = "blacklist:";
     private static final Duration OTP_TTL = Duration.ofMinutes(5);
     private static final Duration LOCK_TTL = Duration.ofMinutes(15);
     private static final int MAX_ATTEMPTS = 5;
@@ -85,7 +89,8 @@ public class AuthService {
         emailService.sendOTP(saved.getEmail(), otp);
 
         String token = jwtTokenProvider.generateToken(UserPrincipal.create(saved));
-        return authMapper.toAuthResponse(saved, token, jwtConfig.getExpiration());
+        String refreshToken = createAndStoreRefreshToken(saved.getId());
+        return authMapper.toAuthResponse(saved, token, refreshToken, jwtConfig.getExpiration());
     }
 
     // ===== LOGIN =====
@@ -105,7 +110,77 @@ public class AuthService {
 
         UserPrincipal principal = UserPrincipal.create(user);
         String token = jwtTokenProvider.generateToken(principal);
-        return authMapper.toAuthResponse(user, token, jwtConfig.getExpiration());
+        String refreshToken = createAndStoreRefreshToken(user.getId());
+        return authMapper.toAuthResponse(user, token, refreshToken, jwtConfig.getExpiration());
+    }
+
+    // ===== REFRESH TOKEN =====
+
+    public AuthResponse refreshToken(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new BadRequestException("Refresh token cannot be blank");
+        }
+
+        String userIdStr = redisTemplate.opsForValue().get(REFRESH_TOKEN_PREFIX + refreshToken.trim());
+        if (userIdStr == null) {
+            throw new UnauthorizedException("Invalid or expired refresh token");
+        }
+
+        Long userId;
+        try {
+            userId = Long.parseLong(userIdStr);
+        } catch (NumberFormatException e) {
+            throw new UnauthorizedException("Invalid refresh token");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (!"ACTIVE".equals(user.getStatus())) {
+            throw new BadRequestException("Account is not active");
+        }
+
+        UserPrincipal principal = UserPrincipal.create(user);
+        String newAccessToken = jwtTokenProvider.generateToken(principal);
+        String newRefreshToken = createAndStoreRefreshToken(user.getId());
+
+        return authMapper.toAuthResponse(user, newAccessToken, newRefreshToken, jwtConfig.getExpiration());
+    }
+
+    // ===== LOGOUT =====
+
+    public void logout(String authHeaderOrToken) {
+        if (authHeaderOrToken == null || authHeaderOrToken.isBlank()) {
+            return;
+        }
+
+        String token = authHeaderOrToken;
+        if (token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+        token = token.trim();
+        if (token.isEmpty()) {
+            return;
+        }
+
+        long remainingTtl = jwtTokenProvider.getRemainingExpiration(token);
+        if (remainingTtl > 0) {
+            redisTemplate.opsForValue().set(
+                    BLACKLIST_TOKEN_PREFIX + token,
+                    "revoked",
+                    remainingTtl,
+                    TimeUnit.MILLISECONDS);
+            log.info("Token successfully blacklisted for remaining {} ms", remainingTtl);
+        }
+
+        Long userId = jwtTokenProvider.getUserIdFromToken(token);
+        if (userId != null) {
+            String userRefreshToken = redisTemplate.opsForValue().get(USER_REFRESH_TOKEN_PREFIX + userId);
+            if (userRefreshToken != null) {
+                redisTemplate.delete(REFRESH_TOKEN_PREFIX + userRefreshToken);
+            }
+            redisTemplate.delete(USER_REFRESH_TOKEN_PREFIX + userId);
+        }
     }
 
     // ===== ME =====
@@ -132,7 +207,8 @@ public class AuthService {
         userRepository.save(user);
 
         String token = jwtTokenProvider.generateToken(UserPrincipal.create(user));
-        return authMapper.toAuthResponse(user, token, jwtConfig.getExpiration());
+        String refreshToken = createAndStoreRefreshToken(user.getId());
+        return authMapper.toAuthResponse(user, token, refreshToken, jwtConfig.getExpiration());
     }
 
     // ===== FORGOT / RESET PASSWORD =====
@@ -180,7 +256,10 @@ public class AuthService {
                 long minutes = (ttlSeconds + 59) / 60;
                 waitTime = minutes > 1 ? minutes + " phút" : ttlSeconds + " giây";
             }
-            throw new BadRequestException("Bạn đã nhập sai quá số lần quy định. Tài khoản đang tạm khóa bảo mật, vui lòng yêu cầu mã mới sau " + waitTime + ".", ERROR_CODE_ACCOUNT_LOCKED);
+            throw new BadRequestException(
+                    "Bạn đã nhập sai quá số lần quy định. Tài khoản đang tạm khóa bảo mật, vui lòng yêu cầu mã mới sau "
+                            + waitTime + ".",
+                    ERROR_CODE_ACCOUNT_LOCKED);
         }
     }
 
@@ -207,8 +286,11 @@ public class AuthService {
                 redisTemplate.delete(OTP_PREFIX + email);
                 redisTemplate.delete(OTP_ATTEMPTS_PREFIX + email);
                 redisTemplate.opsForValue().set(OTP_LOCK_PREFIX + email, "LOCKED", LOCK_TTL);
-                log.warn("Tài khoản {} đã nhập sai OTP quá {} lần. Mã OTP đã bị hủy và khóa 15 phút.", email, MAX_ATTEMPTS);
-                throw new BadRequestException("Bạn đã nhập sai quá số lần quy định. Mã xác thực đã bị hủy để bảo vệ tài khoản, vui lòng yêu cầu mã mới sau 15 phút.", ERROR_CODE_ACCOUNT_LOCKED);
+                log.warn("Tài khoản {} đã nhập sai OTP quá {} lần. Mã OTP đã bị hủy và khóa 15 phút.", email,
+                        MAX_ATTEMPTS);
+                throw new BadRequestException(
+                        "Bạn đã nhập sai quá số lần quy định. Mã xác thực đã bị hủy để bảo vệ tài khoản, vui lòng yêu cầu mã mới sau 15 phút.",
+                        ERROR_CODE_ACCOUNT_LOCKED);
             } else {
                 long remaining = MAX_ATTEMPTS - currentAttempts;
                 throw new BadRequestException("Mã OTP không chính xác. Bạn còn " + remaining + " lần thử.");
@@ -223,5 +305,18 @@ public class AuthService {
     private String generateOTP() {
         int otp = 100000 + RANDOM.nextInt(900000);
         return String.valueOf(otp);
+    }
+
+    private String createAndStoreRefreshToken(Long userId) {
+        String refreshToken = UUID.randomUUID().toString();
+        long ttlMs = jwtConfig.getRefreshExpiration() > 0 ? jwtConfig.getRefreshExpiration() : 604800000L;
+        String oldRefreshToken = redisTemplate.opsForValue().get(USER_REFRESH_TOKEN_PREFIX + userId);
+        if (oldRefreshToken != null) {
+            redisTemplate.delete(REFRESH_TOKEN_PREFIX + oldRefreshToken);
+        }
+        redisTemplate.opsForValue().set(REFRESH_TOKEN_PREFIX + refreshToken, String.valueOf(userId), ttlMs,
+                TimeUnit.MILLISECONDS);
+        redisTemplate.opsForValue().set(USER_REFRESH_TOKEN_PREFIX + userId, refreshToken, ttlMs, TimeUnit.MILLISECONDS);
+        return refreshToken;
     }
 }
