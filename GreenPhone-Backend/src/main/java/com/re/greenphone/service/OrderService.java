@@ -249,6 +249,9 @@ public class OrderService {
                 promo.setUsedQuantity(promo.getUsedQuantity() - 1);
                 promotionRepository.save(promo);
             }
+
+            // Gỡ liên kết userPromotion khỏi đơn đã hủy để giải phóng khóa UNIQUE và trả lại voucher
+            order.setUserPromotion(null);
         }
 
         order.setOrderStatus("CANCELLED");

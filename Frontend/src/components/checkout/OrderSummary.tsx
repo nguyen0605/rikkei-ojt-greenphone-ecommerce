@@ -128,7 +128,16 @@ export default function OrderSummary() {
     message.success(`Đã áp dụng mã ${promo.code}`);
   };
 
-  const availableVouchers = myPromos || [];
+  // Lọc bỏ hoàn toàn các voucher đã hết hạn khỏi danh sách thanh toán
+  const availableVouchers = (myPromos || []).filter((v) => {
+    if (v.endDate) {
+      const endTimestamp = new Date(String(v.endDate)).getTime();
+      if (!isNaN(endTimestamp) && endTimestamp < Date.now()) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   if (cartItems.length === 0) {
     return (
@@ -263,7 +272,11 @@ export default function OrderSummary() {
                         {v.discountType === 'PERCENT' ? `Giảm ${v.discountValue}%` : formatVND(v.discountValue)}
                       </div>
                       <div className="text-[11px] text-gray-500">
-                        {v.eligible ? '✔ Có thể dùng' : `✘ Đơn tối thiểu ${formatVND(v.minOrderValue)}`}
+                        {v.eligible
+                          ? '✔ Có thể dùng'
+                          : v.minOrderValue != null && v.minOrderValue > 0
+                            ? `✘ Đơn tối thiểu ${formatVND(v.minOrderValue)}`
+                            : '✘ Chưa đủ điều kiện'}
                       </div>
                     </div>
                   </div>

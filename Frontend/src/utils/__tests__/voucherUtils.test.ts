@@ -103,3 +103,4 @@ describe('calculateBestVoucherForPrice', () => {
     expect(result?.finalPrice).toBe(1900000);
   });
 });
+

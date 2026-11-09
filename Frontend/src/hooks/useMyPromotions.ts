@@ -13,3 +13,4 @@ export function useMyPromotions() {
     staleTime: 60_000,
   });
 }
+
