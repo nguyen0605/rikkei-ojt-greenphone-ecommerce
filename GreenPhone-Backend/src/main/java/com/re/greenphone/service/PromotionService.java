@@ -78,10 +78,17 @@ public class PromotionService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<UserPromotionDTO> getMyPromotions() {
         Long userId = SecurityUtils.getCurrentUserId();
+        LocalDateTime now = LocalDateTime.now();
+        List<UserPromotion> list = userPromotionRepository.findByUserIdAndStatus(userId, "AVAILABLE");
         return userPromotionMapper.toDtoList(
-                userPromotionRepository.findByUserIdOrderByReceivedAtDesc(userId));
+                list.stream()
+                        .filter(up -> up.getPromotion() != null
+                                && (up.getPromotion().getEndDate() == null || up.getPromotion().getEndDate().isAfter(now)))
+                        .sorted(Comparator.comparing(UserPromotion::getReceivedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                        .toList());
     }
 
     @CacheEvict(value = "promotions", allEntries = true)
