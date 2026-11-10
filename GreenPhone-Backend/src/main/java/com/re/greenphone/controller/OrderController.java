@@ -46,16 +46,14 @@ public class OrderController {
     public ResponseEntity<ApiResponse<?>> cancel(
             @PathVariable Long id,
             @RequestBody(required = false) com.re.greenphone.dto.request.CancelOrderRequest request) {
-        String reason = request != null ? request.getReason() : null;
-        return ResponseEntity.ok(ApiResponse.success(orderService.cancelOrder(id, reason)));
+        return ResponseEntity.ok(ApiResponse.success(orderService.cancelOrder(id, request)));
     }
 
     @PutMapping("/{id}/cancel")
     public ResponseEntity<ApiResponse<?>> cancelPut(
             @PathVariable Long id,
             @RequestBody(required = false) com.re.greenphone.dto.request.CancelOrderRequest request) {
-        String reason = request != null ? request.getReason() : null;
-        return ResponseEntity.ok(ApiResponse.success(orderService.cancelOrder(id, reason)));
+        return ResponseEntity.ok(ApiResponse.success(orderService.cancelOrder(id, request)));
     }
 
     @PutMapping("/{id}/promotion")

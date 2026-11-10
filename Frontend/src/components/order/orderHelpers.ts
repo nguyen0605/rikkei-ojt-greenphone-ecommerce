@@ -68,6 +68,20 @@ export function getStatusBadgeConfig(status: string, paymentStatus?: string) {
         dotColor: 'bg-emerald-500',
       };
     case 'CANCELLED':
+      if (paymentStatus === 'REFUND_PENDING') {
+        return {
+          label: 'Đã hủy (Chờ hoàn tiền)',
+          className: 'bg-orange-50 text-orange-700 border-orange-200',
+          dotColor: 'bg-orange-500',
+        };
+      }
+      if (paymentStatus === 'REFUNDED') {
+        return {
+          label: 'Đã hủy (Đã hoàn tiền)',
+          className: 'bg-purple-50 text-purple-700 border-purple-200',
+          dotColor: 'bg-purple-500',
+        };
+      }
       return {
         label: 'Đã hủy',
         className: 'bg-rose-50 text-rose-700 border-rose-200',

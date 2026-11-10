@@ -30,8 +30,8 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onCancelRequest }) 
 
   const statusConfig = getStatusBadgeConfig(order.orderStatus, order.paymentStatus);
 
-  // Điều kiện nút hành động theo nghiệp vụ chặt chẽ
-  const canCancel = order.orderStatus === 'PENDING';
+  // Điều kiện nút hành động theo nghiệp vụ chặt chẽ: PENDING hoặc CONFIRMED đều có thể yêu cầu hủy
+  const canCancel = order.orderStatus === 'PENDING' || order.orderStatus === 'CONFIRMED';
   const canPayNow =
     order.orderStatus === 'PENDING' &&
     order.paymentStatus === 'UNPAID' &&
@@ -45,22 +45,33 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onCancelRequest }) 
     setIsReordering(true);
     try {
       let addedCount = 0;
+      let failedCount = 0;
       for (const item of order.orderDetails) {
         if (item.phoneVariantId) {
-          await dispatch(
-            addCartItem({
-              phoneVariantId: item.phoneVariantId,
-              quantity: item.quantity || 1,
-            })
-          ).unwrap();
-          addedCount += 1;
+          try {
+            await dispatch(
+              addCartItem({
+                phoneVariantId: item.phoneVariantId,
+                quantity: item.quantity || 1,
+              })
+            ).unwrap();
+            addedCount += 1;
+          } catch {
+            failedCount += 1;
+          }
         }
       }
       if (addedCount > 0) {
-        message.success(`Đã thêm ${addedCount} sản phẩm vào giỏ hàng`);
+        if (failedCount > 0) {
+          message.warning(
+            `Đã thêm ${addedCount} sản phẩm vào giỏ. ${failedCount} sản phẩm đã hết hàng hoặc ngừng kinh doanh đã được bỏ qua.`
+          );
+        } else {
+          message.success(`Đã thêm ${addedCount} sản phẩm vào giỏ hàng`);
+        }
         navigate('/gio-hang');
       } else {
-        message.warning('Không tìm thấy thông tin biến thể để thêm vào giỏ');
+        message.error('Các sản phẩm trong đơn hàng này hiện đã hết hàng hoặc không còn khả dụng');
       }
     } catch (err: unknown) {
       const errMsg = (err as { message?: string })?.message || 'Có lỗi khi thêm vào giỏ hàng';
@@ -183,6 +194,14 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onCancelRequest }) 
               {order.paymentStatus === 'PAID' ? (
                 <span className="ml-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
                   Đã thanh toán
+                </span>
+              ) : order.paymentStatus === 'REFUND_PENDING' ? (
+                <span className="ml-1 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-800">
+                  Chờ hoàn tiền
+                </span>
+              ) : order.paymentStatus === 'REFUNDED' ? (
+                <span className="ml-1 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
+                  Đã hoàn tiền
                 </span>
               ) : order.paymentStatus === 'UNPAID' ? (
                 <span className="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">

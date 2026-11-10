@@ -211,11 +211,14 @@ public class OrderService {
         // Shipping fee: free above threshold, else fixed fee (from settings)
         BigDecimal shippingFee = settingsService.getShippingFee();
         BigDecimal freeThreshold = settingsService.getFreeShippingThreshold();
+        BigDecimal actualShippingFee = BigDecimal.ZERO;
         if (shippingFee.signum() > 0
                 && (freeThreshold.signum() <= 0 || finalAmount.compareTo(freeThreshold) < 0)) {
+            actualShippingFee = shippingFee;
             finalAmount = finalAmount.add(shippingFee);
         }
 
+        order.setShippingFee(actualShippingFee);
         order.setFinalAmount(finalAmount);
 
         order = orderRepository.save(order);
@@ -312,10 +315,14 @@ public class OrderService {
     }
 
     public OrderDTO cancelOrder(Long orderId) {
-        return cancelOrder(orderId, null);
+        return cancelOrder(orderId, (com.re.greenphone.dto.request.CancelOrderRequest) null);
     }
 
     public OrderDTO cancelOrder(Long orderId, String reason) {
+        return cancelOrder(orderId, com.re.greenphone.dto.request.CancelOrderRequest.builder().reason(reason).build());
+    }
+
+    public OrderDTO cancelOrder(Long orderId, com.re.greenphone.dto.request.CancelOrderRequest request) {
         Long userId = SecurityUtils.getCurrentUserId();
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
@@ -372,15 +379,36 @@ public class OrderService {
         }
 
         order.setOrderStatus("CANCELLED");
-        if (reason != null && !reason.trim().isEmpty()) {
-            String existingNote = order.getNote();
-            String cancelNote = "[Lý do hủy: " + reason.trim() + "]";
-            if (existingNote != null && !existingNote.trim().isEmpty()) {
-                order.setNote(existingNote + " " + cancelNote);
-            } else {
-                order.setNote(cancelNote);
-            }
+
+        // Nếu đơn hàng đã thanh toán trước (PAID), chuyển paymentStatus sang REFUND_PENDING
+        boolean isPaid = "PAID".equalsIgnoreCase(order.getPaymentStatus());
+        String reason = request != null ? request.getReason() : null;
+
+        if (isPaid && reason != null && (reason.trim().equalsIgnoreCase("Lý do khác") || reason.trim().isEmpty())) {
+            throw new BadRequestException("Đối với đơn hàng đã thanh toán, vui lòng nhập chi tiết lý do hủy đơn");
         }
+
+        if (isPaid) {
+            order.setPaymentStatus("REFUND_PENDING");
+        }
+        StringBuilder noteBuilder = new StringBuilder();
+        if (order.getNote() != null && !order.getNote().trim().isEmpty()) {
+            noteBuilder.append(order.getNote().trim()).append(" ");
+        }
+        if (reason != null && !reason.trim().isEmpty()) {
+            noteBuilder.append("[Lý do hủy: ").append(reason.trim()).append("]");
+        }
+        if (isPaid && request != null && request.getAccountNumber() != null && !request.getAccountNumber().trim().isEmpty()) {
+            noteBuilder.append(String.format(" [YÊU CẦU HOÀN TIỀN: Ngân hàng: %s | STK: %s | Chủ TK: %s]",
+                    request.getBankName() != null ? request.getBankName().trim() : "N/A",
+                    request.getAccountNumber().trim(),
+                    request.getAccountHolder() != null ? request.getAccountHolder().trim() : "N/A"));
+        }
+
+        if (noteBuilder.length() > 0) {
+            order.setNote(noteBuilder.toString().trim());
+        }
+
         order = orderRepository.save(order);
         return orderMapper.toDto(order);
     }
@@ -455,10 +483,13 @@ public class OrderService {
         BigDecimal finalAmount = order.getTotalAmount().subtract(discount);
         BigDecimal shippingFee = settingsService.getShippingFee();
         BigDecimal freeThreshold = settingsService.getFreeShippingThreshold();
+        BigDecimal actualShippingFee = BigDecimal.ZERO;
         if (shippingFee.signum() > 0
                 && (freeThreshold.signum() <= 0 || finalAmount.compareTo(freeThreshold) < 0)) {
+            actualShippingFee = shippingFee;
             finalAmount = finalAmount.add(shippingFee);
         }
+        order.setShippingFee(actualShippingFee);
         order.setFinalAmount(finalAmount);
 
         up.setStatus("USED");

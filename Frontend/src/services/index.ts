@@ -1,6 +1,7 @@
 export { authService } from "./authService";
 export { userService, formatFullAddress } from "./userService";
 export { reviewService } from './reviewService';
+export { shipmentService } from './shipmentService';
 import { get, post, put, del } from './api';
 import type {
   CartDTO, CartItemRequest, CartSyncRequest, OrderDTO,

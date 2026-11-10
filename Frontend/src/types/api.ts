@@ -255,6 +255,7 @@ export interface OrderDTO {
   shippingAddress: string;
   totalAmount: number;
   discountAmount: number;
+  shippingFee?: number;
   finalAmount: number;
   orderStatus: string;
   paymentStatus: string;
@@ -263,6 +264,34 @@ export interface OrderDTO {
   promotionCode: string;
   createdAt: string;
   orderDetails: OrderDetailDTO[];
+}
+
+// Shipment
+export interface ShipmentHistoryDTO {
+  id: number;
+  status: string;
+  hubLocation: string;
+  shipperNote: string;
+  createdAt: string;
+}
+
+export interface ShipmentDTO {
+  id: number;
+  orderId: number;
+  receiverName: string;
+  receiverPhone: string;
+  shippingAddress: string;
+  trackingNumber: string;
+  carrierCode: string;
+  shippingFee: number;
+  codAmount: number;
+  status: string;
+  estimatedDeliveryAt?: string;
+  deliveredAt?: string;
+  note?: string;
+  createdAt: string;
+  updatedAt?: string;
+  histories?: ShipmentHistoryDTO[];
 }
 
 // Payment
