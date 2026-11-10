@@ -1,5 +1,6 @@
 package com.re.greenphone.service.admin;
 
+import com.re.greenphone.common.exception.BadRequestException;
 import com.re.greenphone.common.exception.ResourceNotFoundException;
 import com.re.greenphone.common.pagination.PageResponse;
 import com.re.greenphone.dto.request.PromotionRequest;
@@ -7,6 +8,7 @@ import com.re.greenphone.dto.response.PromotionDTO;
 import com.re.greenphone.entity.Promotion;
 import com.re.greenphone.mapper.PromotionMapper;
 import com.re.greenphone.repository.PromotionRepository;
+import com.re.greenphone.repository.UserPromotionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -16,6 +18,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -25,6 +28,7 @@ import java.util.List;
 public class AdminPromotionService {
 
     private final PromotionRepository promotionRepository;
+    private final UserPromotionRepository userPromotionRepository;
     private final PromotionMapper promotionMapper;
 
     @Transactional(readOnly = true)
@@ -34,17 +38,9 @@ public class AdminPromotionService {
                 pageRequest.getPage(), pageRequest.getSize(),
                 Sort.by(Sort.Direction.fromString(pageRequest.getSortDir()), pageRequest.getSortBy()));
 
-        Page<Promotion> page;
-        if (keyword != null && !keyword.isBlank()) {
-            page = promotionRepository.findByCodeContainingIgnoreCaseOrNameContainingIgnoreCase(keyword, keyword, pageable);
-        } else {
-            page = promotionRepository.findAll(pageable);
-        }
-        // Lọc status sau (ACTIVE/INACTIVE) nếu có — promotion không có status column? dùng status field nếu có
+        Page<Promotion> page = promotionRepository.searchPromotions(keyword, status, pageable);
         List<PromotionDTO> dtos = promotionMapper.toDtoList(page.getContent());
-        if (status != null && !status.isBlank()) {
-            dtos = dtos.stream().filter(d -> status.equals(d.getStatus())).toList();
-        }
+
         return new PageResponse<>(dtos, page.getNumber(), page.getSize(),
                 page.getTotalElements(), page.getTotalPages(), page.isLast());
     }
@@ -58,16 +54,27 @@ public class AdminPromotionService {
 
     @CacheEvict(value = "promotions", allEntries = true)
     public PromotionDTO createPromotion(PromotionRequest request) {
+        validatePromotionRequest(request);
+
+        String code = request.getCode().trim().toUpperCase();
+        if (promotionRepository.findByCode(code).isPresent()) {
+            throw new BadRequestException("Mã khuyến mãi '" + code + "' đã tồn tại trên hệ thống");
+        }
+
         Promotion promo = Promotion.builder()
-                .code(request.getCode())
-                .name(request.getName())
+                .code(code)
+                .name(request.getName().trim())
                 .description(request.getDescription())
                 .discountType(request.getDiscountType())
                 .discountValue(request.getDiscountValue())
                 .minOrderValue(request.getMinOrderValue())
                 .maxDiscountAmount(request.getMaxDiscountAmount())
+                .quantity(request.getQuantity() != null ? request.getQuantity() : 0)
+                .claimedQuantity(0)
+                .usedQuantity(0)
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
+                .status(request.getStatus() != null && !request.getStatus().isBlank() ? request.getStatus() : "ACTIVE")
                 .build();
 
         promo = promotionRepository.save(promo);
@@ -79,13 +86,23 @@ public class AdminPromotionService {
         Promotion promo = promotionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Promotion", "id", id));
 
-        promo.setCode(request.getCode());
-        promo.setName(request.getName());
+        validatePromotionRequest(request);
+
+        String code = request.getCode().trim().toUpperCase();
+        if (!promo.getCode().equalsIgnoreCase(code) && promotionRepository.findByCode(code).isPresent()) {
+            throw new BadRequestException("Mã khuyến mãi '" + code + "' đã tồn tại trên hệ thống");
+        }
+
+        promo.setCode(code);
+        promo.setName(request.getName().trim());
         promo.setDescription(request.getDescription());
         promo.setDiscountType(request.getDiscountType());
         promo.setDiscountValue(request.getDiscountValue());
         promo.setMinOrderValue(request.getMinOrderValue());
         promo.setMaxDiscountAmount(request.getMaxDiscountAmount());
+        if (request.getQuantity() != null) {
+            promo.setQuantity(request.getQuantity());
+        }
         promo.setStartDate(request.getStartDate());
         promo.setEndDate(request.getEndDate());
         if (request.getStatus() != null && !request.getStatus().isBlank()) {
@@ -96,10 +113,38 @@ public class AdminPromotionService {
         return promotionMapper.toDto(promo);
     }
 
+    private void validatePromotionRequest(PromotionRequest request) {
+        if (request.getStartDate() != null && request.getEndDate() != null
+                && !request.getEndDate().isAfter(request.getStartDate())) {
+            throw new BadRequestException("Ngày kết thúc phải sau ngày bắt đầu");
+        }
+
+        if ("PERCENT".equals(request.getDiscountType())) {
+            if (request.getDiscountValue() == null
+                    || request.getDiscountValue().compareTo(BigDecimal.ZERO) <= 0
+                    || request.getDiscountValue().compareTo(BigDecimal.valueOf(100)) > 0) {
+                throw new BadRequestException("Phần trăm giảm giá phải lớn hơn 0 và không vượt quá 100%");
+            }
+        } else if ("FIXED".equals(request.getDiscountType())) {
+            if (request.getDiscountValue() == null || request.getDiscountValue().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BadRequestException("Số tiền giảm giá cố định phải lớn hơn 0");
+            }
+        }
+    }
+
     @CacheEvict(value = "promotions", allEntries = true)
     public void deletePromotion(Long id) {
         Promotion promo = promotionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Promotion", "id", id));
-        promotionRepository.delete(promo);
+
+        boolean isReferenced = userPromotionRepository.existsByPromotionId(id);
+        if (isReferenced) {
+            promo.setStatus("INACTIVE");
+            promotionRepository.save(promo);
+            log.info("Chương trình khuyến mãi ID {} đã có người nhận hoặc sử dụng, thực hiện Soft Delete (chuyển sang INACTIVE)", id);
+        } else {
+            promotionRepository.delete(promo);
+            log.info("Chương trình khuyến mãi ID {} chưa có ai nhận, đã xóa hoàn toàn khỏi hệ thống", id);
+        }
     }
 }

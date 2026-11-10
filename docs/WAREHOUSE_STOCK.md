@@ -24,7 +24,7 @@ Chuyển Hà Nội sang Đà Nẵng 10 → Hà Nội 50, Đà Nẵng 13, tổng 
   không dùng tổng kho để cho phép xuất quá số lượng tại một chi nhánh.
 - Tràn số nguyên bị từ chối; lỗi giữa hai vế chuyển kho rollback toàn bộ.
 - Kho INACTIVE không nhập/xuất/chuyển thủ công. Hoàn đơn cũ vẫn về kho gốc, kể cả kho đã INACTIVE.
-- Lịch sử cũ tổng hợp vẫn được giữ nguyên. V8 ghi OPENING cho phân bổ ban đầu có số lượng >0.
+- Lịch sử cũ tổng hợp vẫn được giữ nguyên. V12 ghi OPENING cho phân bổ ban đầu có số lượng >0.
 
 ## Đặt và hủy đơn
 
@@ -61,18 +61,18 @@ Chuyển:
 Hai POST trả PhoneVariantDTO với tổng mới. Endpoint nhập/xuất cũ `/api/admin/inventory/variants/{id}/movements`
 tiếp tục hoạt động nhưng chỉ thao tác kho mặc định Hà Nội, không bỏ qua phân bổ chi nhánh.
 
-## Migration V8 và vận hành
+## Migration V12 và vận hành
 
-- Chỉ thêm migration `V8__warehouse_variant_stock.sql`; không sửa V1–V7.
+- Chỉ thêm migration `V12__warehouse_variant_stock.sql`; không sửa V1–V11.
 - Dừng toàn bộ writer đơn hàng/kho và scheduler trước khi migrate/backfill; sao lưu database.
 - Migration chép tổng hiện hữu của mỗi biến thể vào đúng một dòng của Hà Nội. Không thay đổi tổng cũ.
 - Gắn dòng đơn cũ với Hà Nội, phù hợp mô hình kho tổng trước đây.
 - Nếu kho WH-HN-MAIN bị đổi mã/mất, khôi phục mã đúng trước migration; không tự gán tồn sang kho khác.
-- Chạy Flyway qua V8, kiểm tra tổng phân bổ bằng tổng biến thể rồi mới khởi động code mới.
+- Chạy Flyway qua V12, kiểm tra tổng phân bổ bằng tổng biến thể rồi mới khởi động code mới.
 - Không chạy đồng thời code cũ còn ghi tổng kho trực tiếp sau khi chuyển sang mô hình này.
 - Không rollback binary về code cũ và tiếp tục bán hàng trên dữ liệu đã tách kho. Cần dừng writer,
   đối soát/phục hồi theo backup; không có down migration tự động xóa bảng/lịch sử.
-- Môi trường local hiện dùng schema demo Hibernate; script SQL V8 phải được áp dụng trước khi khởi động
+- Môi trường local hiện dùng schema demo Hibernate; script SQL V12 phải được áp dụng trước khi khởi động
   JAR mới. Không coi Hibernate update là bằng chứng Flyway/backfill. Test migration dùng Flyway thật
   trên MySQL tách biệt.
 
@@ -81,7 +81,7 @@ tiếp tục hoạt động nhưng chỉ thao tác kho mặc định Hà Nội, 
 Backend: `gradlew test build --max-workers=2` với JDK 17 và Docker Desktop.
 WarehouseInventoryIT kiểm tra nhập/xuất/chuyển, rollback khi thiếu hàng hoặc kho INACTIVE,
 khách hủy đơn hoàn đúng kho gốc và xuất đồng thời chiếc cuối tại chi nhánh.
-WarehouseStockMigrationIT kiểm tra backfill thật từ schema V7 đến V8.
+WarehouseStockMigrationIT kiểm tra backfill thật từ schema V11 đến V12.
 
 Frontend: `npm test -- --run --maxWorkers=2`, `npm run build`;
 Playwright: `npm exec -- playwright test e2e/warehouse-stock.spec.ts e2e/admin-warehouses.spec.ts --project=chromium`.

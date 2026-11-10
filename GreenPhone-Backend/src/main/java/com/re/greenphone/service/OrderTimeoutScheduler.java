@@ -108,6 +108,7 @@ public class OrderTimeoutScheduler {
             up.setStatus("AVAILABLE");
             up.setUsedAt(null);
             userPromotionRepository.save(up);
+            fresh.setUserPromotion(null);
         }
 
         fresh.setOrderStatus("CANCELLED");

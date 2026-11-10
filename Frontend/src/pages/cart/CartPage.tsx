@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, Empty, App, Popconfirm, Checkbox } from 'antd';
 import { DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, ShoppingOutlined, TagOutlined, CloseOutlined, RightOutlined } from '@ant-design/icons';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { removeCartItem, updateCartItem, removeFromCart, updateQuantity, clearCart, moveItem as moveCartItem, clearCartRemote, applyVoucher } from '@/store/slices/cartSlice';
+import { removeCartItem, updateCartItem, removeFromCart, updateQuantity, clearCart, moveItem as moveCartItem, clearCartRemote, applyVoucher, removeVoucher } from '@/store/slices/cartSlice';
 import { selectCartSummary } from '@/store/selectors/cartSelectors';
 import type { CartItem } from '@/types';
+import type { AvailablePromotionDTO } from '@/types/api';
 import { formatVND } from '@/utils';
-import { phoneService, brandService } from '@/services';
+import { phoneService, brandService, promotionService } from '@/services';
 import { useQuery } from '@tanstack/react-query';
 import { ROUTES } from '@/routes/routePaths';
 
@@ -20,6 +21,31 @@ export default function CartPage() {
   const isAuthenticated = useAppSelector((s) => s.auth.isAuthenticated);
   const appliedVoucher = useAppSelector((s) => s.cart.appliedVoucher);
   const summary = useAppSelector(selectCartSummary);
+  const [cartDismissedVoucher, setCartDismissedVoucher] = useState(false);
+
+  const { data: availableVouchers } = useQuery<AvailablePromotionDTO[]>({
+    queryKey: ['promotions', 'available', summary.subtotal],
+    queryFn: () => promotionService.available(summary.subtotal),
+    enabled: isAuthenticated && summary.subtotal > 0,
+  });
+
+  // Tự động áp dụng voucher cao nhất cho giỏ hàng nếu chưa có voucher
+  useEffect(() => {
+    if (cartDismissedVoucher) return;
+    if (!appliedVoucher && availableVouchers && availableVouchers.length > 0) {
+      const eligible = availableVouchers.filter((p) => p.eligible && p.calculatedDiscount > 0);
+      if (eligible.length > 0) {
+        const best = [...eligible].sort((a, b) => b.calculatedDiscount - a.calculatedDiscount)[0];
+        dispatch(
+          applyVoucher({
+            code: best.code,
+            discountAmount: best.calculatedDiscount,
+            title: best.name || best.code,
+          }),
+        );
+      }
+    }
+  }, [appliedVoucher, availableVouchers, cartDismissedVoucher, dispatch]);
 
   // ── Select all ──
   const [selected, setSelected] = useState<Set<string> | null>(null);
@@ -40,20 +66,6 @@ export default function CartPage() {
   const selectedSummary = {
     subtotal: selectedItems.reduce((s, i) => s + i.product.price * i.quantity, 0),
     totalItems: selectedItems.reduce((s, i) => s + i.quantity, 0),
-  };
-
-  // ── Voucher (xuất mã giảm sẵn trong giỏ) ──
-  const DEMO_VOUCHERS = [
-    { code: 'GREEN10', title: 'Giảm 10% tối đa 500k', discount: Math.min(500_000, summary.subtotal * 0.1) },
-    { code: 'FREESHIP', title: 'Miễn phí vận chuyển', discount: summary.shippingFee },
-  ];
-  const [showVouchers, setShowVouchers] = useState(false);
-
-  const applyDemoVoucher = (code: string) => {
-    const v = DEMO_VOUCHERS.find((x) => x.code === code);
-    if (!v) return;
-    dispatch(applyVoucher({ code: v.code, discountAmount: v.discount, title: v.title }));
-    message.success(`Đã áp mã ${code}`);
   };
 
   // ── Free-ship progress ──
@@ -158,27 +170,35 @@ export default function CartPage() {
         {/* ── Summary column ── */}
         <div className="w-full lg:sticky lg:top-6 lg:w-80">
           <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-            {/* Voucher */}
-            <button
-              onClick={() => setShowVouchers(!showVouchers)}
-              className="mb-4 flex w-full items-center justify-between rounded-xl border border-dashed border-green-300 bg-green-50/50 px-3 py-2.5 text-sm text-green-700 hover:bg-green-50"
-            >
-              <span className="flex items-center gap-2"><TagOutlined /> {appliedVoucher ? `Mã ${appliedVoucher.code}` : 'Chọn mã giảm giá'}</span>
-              <span className="text-xs">{showVouchers ? '▲' : '▼'}</span>
-            </button>
-            {showVouchers && (
-              <div className="mb-4 space-y-2">
-                {DEMO_VOUCHERS.map((v) => (
-                  <div key={v.code} className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2">
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-gray-800">{v.code}</div>
-                      <div className="truncate text-xs text-gray-500">{v.title}</div>
-                    </div>
-                    <Button size="small" type="primary" onClick={() => applyDemoVoucher(v.code)} className="!rounded-full !border-green-600 !bg-green-600 !text-white hover:!bg-green-700">Áp dụng</Button>
-                  </div>
-                ))}
+            {/* Voucher hint banner */}
+            <div className="mb-4 rounded-xl border border-dashed border-green-300 bg-green-50/60 p-3 text-xs text-gray-600">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 font-medium text-green-800">
+                  <TagOutlined className="text-green-600" /> Mã giảm giá
+                </span>
+                <Link to={ROUTES.VOUCHERS} className="text-xs font-semibold text-green-700 hover:underline">
+                  Săn voucher →
+                </Link>
               </div>
-            )}
+              <div className="mt-1 flex items-center justify-between">
+                <p className="text-gray-500">
+                  {appliedVoucher
+                    ? `Đã áp dụng mã ${appliedVoucher.code} (-${formatVND(appliedVoucher.discountAmount)})`
+                    : 'Mã giảm giá sẽ được tự động áp dụng tại bước thanh toán'}
+                </p>
+                {appliedVoucher && (
+                  <button
+                    onClick={() => {
+                      setCartDismissedVoucher(true);
+                      dispatch(removeVoucher());
+                    }}
+                    className="ml-2 flex-shrink-0 text-xs text-red-500 hover:underline"
+                  >
+                    Bỏ chọn
+                  </button>
+                )}
+              </div>
+            </div>
 
             {/* Price breakdown */}
             <div className="space-y-2 text-sm">

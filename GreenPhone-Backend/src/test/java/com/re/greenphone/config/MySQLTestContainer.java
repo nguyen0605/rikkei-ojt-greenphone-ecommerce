@@ -28,6 +28,8 @@ public abstract class MySQLTestContainer {
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
         registry.add("spring.jpa.show-sql", () -> "false");
         registry.add("spring.jpa.properties.hibernate.format_sql", () -> "false");
+        // Disable flyway for testcontainers since hibernate create-drop manages test schema
+        registry.add("spring.flyway.enabled", () -> "false");
         // Disable external services for tests
         registry.add("CLOUDINARY_CLOUD_NAME", () -> "test");
         registry.add("CLOUDINARY_API_KEY", () -> "test");

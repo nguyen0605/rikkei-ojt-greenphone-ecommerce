@@ -35,6 +35,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -64,6 +65,17 @@ public class AdminPhoneService {
     public PageResponse<PhoneDTO> getPhones(String keyword, Long brandId, String status,
                                             boolean lowStock,
                                             com.re.greenphone.common.pagination.PageRequest pageRequest) {
+        return getPhonesWithThreshold(keyword, brandId, status, lowStock, LOW_STOCK_THRESHOLD, pageRequest);
+    }
+
+    public PageResponse<PhoneDTO> getLowStockPhones(int threshold,
+                                                    com.re.greenphone.common.pagination.PageRequest pageRequest) {
+        return getPhonesWithThreshold(null, null, null, true, threshold, pageRequest);
+    }
+
+    private PageResponse<PhoneDTO> getPhonesWithThreshold(String keyword, Long brandId, String status,
+                                                          boolean lowStock, int threshold,
+                                                          com.re.greenphone.common.pagination.PageRequest pageRequest) {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(
                 pageRequest.getPage(), pageRequest.getSize(),
                 Sort.by(Sort.Direction.fromString(pageRequest.getSortDir()), pageRequest.getSortBy()));
@@ -82,7 +94,7 @@ public class AdminPhoneService {
             }
             if (lowStock) {
                 var variants = root.join("variants");
-                predicates.add(cb.lessThanOrEqualTo(variants.get("stockQuantity"), LOW_STOCK_THRESHOLD));
+                predicates.add(cb.lessThanOrEqualTo(variants.get("stockQuantity"), threshold));
                 cq.distinct(true);
             }
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
@@ -210,6 +222,8 @@ public class AdminPhoneService {
         Phone phone = phoneRepository.findById(phoneId)
                 .orElseThrow(() -> new ResourceNotFoundException("Phone", "id", phoneId));
 
+        validateVariantPricing(request.getPrice(), request.getDiscountPrice());
+
         PhoneVariant variant = PhoneVariant.builder()
                 .phone(phone)
                 .ramItem(requireItem(request.getRamItemId(), "RAM"))
@@ -230,10 +244,13 @@ public class AdminPhoneService {
         PhoneVariant variant = phoneVariantRepository.findById(variantId)
                 .orElseThrow(() -> new ResourceNotFoundException("PhoneVariant", "id", variantId));
 
+        BigDecimal effectivePrice = request.getPrice() != null ? request.getPrice() : variant.getPrice();
+        validateVariantPricing(effectivePrice, request.getDiscountPrice());
+
         if (request.getRamItemId() != null) variant.setRamItem(requireItem(request.getRamItemId(), "RAM"));
         if (request.getStorageItemId() != null) variant.setStorageItem(requireItem(request.getStorageItemId(), "STORAGE"));
         if (request.getColorItemId() != null) variant.setColorItem(requireItem(request.getColorItemId(), "COLOR"));
-        variant.setPrice(request.getPrice());
+        if (request.getPrice() != null) variant.setPrice(request.getPrice());
         variant.setDiscountPrice(request.getDiscountPrice());
         if (request.getStockQuantity() != null) {
             int quantityBefore = variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
@@ -252,6 +269,20 @@ public class AdminPhoneService {
 
         variant = phoneVariantRepository.save(variant);
         return phoneVariantMapper.toDto(variant);
+    }
+
+    private void validateVariantPricing(BigDecimal price, BigDecimal discountPrice) {
+        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Giá gốc của biến thể phải lớn hơn 0");
+        }
+        if (discountPrice != null) {
+            if (discountPrice.compareTo(BigDecimal.ZERO) < 0) {
+                throw new BadRequestException("Giá khuyến mãi không được âm");
+            }
+            if (discountPrice.compareTo(price) >= 0) {
+                throw new BadRequestException("Giá khuyến mãi phải nhỏ hơn giá gốc của biến thể");
+            }
+        }
     }
 
     private com.re.greenphone.entity.OptionItem requireItem(Long itemId, String expectedType) {

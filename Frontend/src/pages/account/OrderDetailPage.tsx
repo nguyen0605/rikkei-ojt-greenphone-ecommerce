@@ -6,7 +6,6 @@ import {
   MapPin,
   CreditCard,
   ShoppingBag,
-  Smartphone,
   AlertCircle,
   XCircle,
   RotateCcw,
@@ -23,6 +22,8 @@ import OrderTrackingTimeline from '@/components/order/OrderTrackingTimeline';
 import OrderCancelModal from '@/components/order/OrderCancelModal';
 import BankTransferPaymentCard from '@/components/checkout/BankTransferPaymentCard';
 import { usePaymentCountdown } from '@/hooks/usePaymentCountdown';
+import { useOrderProductLookup } from '@/hooks/useOrderProductLookup';
+import OrderItemThumbnail from '@/components/order/OrderItemThumbnail';
 import { useAppDispatch } from '@/store/hooks';
 import { addCartItem } from '@/store/slices/cartSlice';
 
@@ -31,6 +32,7 @@ export const OrderDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useAppDispatch();
+  const { resolveItem } = useOrderProductLookup();
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
 
@@ -327,30 +329,49 @@ export const OrderDetailPage: React.FC = () => {
         <div className="divide-y divide-gray-100 px-5">
           {order.orderDetails?.map((item: OrderDetailDTO) => {
             const variantSpecs = [item.ram, item.storage, item.color].filter(Boolean).join(' • ');
+            const resolved = resolveItem(item);
 
             return (
               <div
                 key={item.id || item.phoneVariantId}
                 className="flex items-center gap-4 py-4"
               >
-                {/* Thumbnail */}
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-gray-100 bg-gray-50 p-1">
-                  {(item as { imageUrl?: string }).imageUrl ? (
-                    <img
-                      src={(item as { imageUrl?: string }).imageUrl}
-                      alt={item.productName}
-                      className="h-full w-full object-contain"
-                    />
-                  ) : (
-                    <Smartphone className="h-8 w-8 text-emerald-600/50" />
-                  )}
-                </div>
+                {/* Thumbnail với ảnh thực tế hoặc fallback */}
+                <OrderItemThumbnail
+                  imageUrl={resolved.imageUrl}
+                  productName={item.productName}
+                  navUrl={resolved.navUrl}
+                  size="md"
+                />
 
                 {/* Info */}
                 <div className="min-w-0 flex-1">
-                  <h4 className="text-sm font-semibold text-gray-900 line-clamp-1">
-                    {item.productName}
-                  </h4>
+                  {resolved.navUrl ? (
+                    <Link
+                      to={resolved.navUrl}
+                      data-testid="order-item-name-link"
+                      className="group inline-block focus:outline-none"
+                    >
+                      <h4 className="text-sm font-semibold text-gray-900 line-clamp-1 group-hover:text-emerald-600 transition-colors">
+                        {item.productName}
+                      </h4>
+                    </Link>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="text-sm font-semibold text-gray-900 line-clamp-1">
+                        {item.productName}
+                      </h4>
+                      {resolved.isInactive && (
+                        <span
+                          data-testid="product-inactive-badge"
+                          className="rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600"
+                        >
+                          Sản phẩm hiện đã ngừng kinh doanh
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {variantSpecs && (
                     <div className="mt-1 text-xs text-gray-500">{variantSpecs}</div>
                   )}

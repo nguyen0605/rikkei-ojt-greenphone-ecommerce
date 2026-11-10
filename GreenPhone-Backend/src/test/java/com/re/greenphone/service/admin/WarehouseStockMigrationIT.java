@@ -17,8 +17,8 @@ class WarehouseStockMigrationIT {
     void backfillAssignsExistingTotalsOnlyToHanoiAndPinsHistoricalOrderWarehouse() throws Exception {
         var configuration = Flyway.configure().dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
                 .locations("classpath:db/migration");
-        configuration.target("7").load().migrate();
-        configuration.target("8").load().migrate();
+        configuration.target("11").load().migrate();
+        configuration.target("12").load().migrate();
         try (var connection = DriverManager.getConnection(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword());
              var statement = connection.createStatement()) {
             try (var result = statement.executeQuery("SELECT COUNT(*) FROM phone_variant v LEFT JOIN warehouse_stock s ON s.phone_variant_id=v.id LEFT JOIN warehouse w ON w.id=s.warehouse_id WHERE s.id IS NULL OR s.quantity<>v.stock_quantity OR w.code<>'WH-HN-MAIN'")) {

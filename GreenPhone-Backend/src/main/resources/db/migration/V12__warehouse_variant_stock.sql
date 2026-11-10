@@ -43,4 +43,4 @@ CREATE TABLE warehouse_stock_history (
 INSERT INTO warehouse_stock_history(warehouse_id, phone_variant_id, change_type,
  quantity_before, quantity_change, quantity_after, reason, changed_by_name)
  SELECT warehouse_id, phone_variant_id, 'OPENING', 0, quantity, quantity,
- 'Opening allocation from aggregate stock (V8)', 'SYSTEM' FROM warehouse_stock WHERE quantity > 0;
+ 'Opening allocation from aggregate stock (V12)', 'SYSTEM' FROM warehouse_stock WHERE quantity > 0;
