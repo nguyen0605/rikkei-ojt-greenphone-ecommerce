@@ -13,6 +13,7 @@ const COLOR: Record<string, string> = {
   // payments
   UNPAID: 'orange',
   PAID: 'green',
+  REFUND_PENDING: 'volcano',
   REFUNDED: 'purple',
   // users / entities
   ACTIVE: 'green',
@@ -32,6 +33,7 @@ const LABEL: Record<string, string> = {
   CANCELLED: 'Đã hủy',
   UNPAID: 'Chưa thanh toán',
   PAID: 'Đã thanh toán',
+  REFUND_PENDING: 'Chờ hoàn tiền',
   REFUNDED: 'Đã hoàn tiền',
   ACTIVE: 'Hoạt động',
   LOCKED: 'Khóa',

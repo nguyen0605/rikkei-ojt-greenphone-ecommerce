@@ -34,6 +34,7 @@ import static org.mockito.Mockito.*;
 class OrderServiceTest {
 
     @Mock private OrderRepository orderRepository;
+    @Mock private com.re.greenphone.repository.OrderHistoryRepository orderHistoryRepository;
     @Mock private UserRepository userRepository;
     @Mock private PhoneVariantRepository phoneVariantRepository;
     @Mock private UserPromotionRepository userPromotionRepository;
@@ -340,6 +341,35 @@ class OrderServiceTest {
         when(orderRepository.findByIdForUpdate(3L)).thenReturn(Optional.of(shippingOrder));
 
         assertThrows(BadRequestException.class, () -> orderService.cancelOrder(3L, "Lý do"));
+    }
+
+    @Test
+    @DisplayName("A1/Phần 1: Khách hủy đơn đã thanh toán online (PAID) thì chuyển sang REFUND_PENDING và lưu thông tin ngân hàng")
+    void cancelOrder_PaidOrder_TransitionsToRefundPendingAndSavesBankDetails() {
+        User u = createUser(); u.setId(USER_ID);
+        securityUtilsMock.when(SecurityUtils::getCurrentUserId).thenReturn(USER_ID);
+
+        com.re.greenphone.entity.Order order = com.re.greenphone.entity.Order.builder()
+                .user(u).orderStatus("CONFIRMED").paymentStatus("PAID")
+                .orderDetails(new java.util.ArrayList<>()).build();
+        order.setId(55L);
+
+        when(orderRepository.findByIdForUpdate(55L)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(orderMapper.toDto(any())).thenReturn(OrderDTO.builder().id(55L).build());
+
+        com.re.greenphone.dto.request.CancelOrderRequest cancelReq = com.re.greenphone.dto.request.CancelOrderRequest.builder()
+                .reason("Đổi ý không mua nữa")
+                .bankName("MB Bank")
+                .accountNumber("0943941773")
+                .accountHolder("NGUYEN VAN A")
+                .build();
+
+        orderService.cancelOrder(55L, cancelReq);
+
+        assertEquals("CANCELLED", order.getOrderStatus());
+        assertEquals("REFUND_PENDING", order.getPaymentStatus());
+        assertTrue(order.getNote().contains("YÊU CẦU HOÀN TIỀN: Ngân hàng: MB Bank | STK: 0943941773 | Chủ TK: NGUYEN VAN A"));
     }
 
     @Test

@@ -1,9 +1,10 @@
 export { authService } from "./authService";
 export { userService, formatFullAddress } from "./userService";
 export { reviewService } from './reviewService';
+export { shipmentService } from './shipmentService';
 import { get, post, put, del } from './api';
 import type {
-  CartDTO, CartItemRequest, CartSyncRequest, OrderDTO,
+  CartDTO, CartItemRequest, CartSyncRequest, OrderDTO, AdminOrderDetailDTO,
   PaymentDTO, PaymentQRInfo, PromotionDTO, UserPromotionDTO, AvailablePromotionDTO, ReviewDTO,
   PageResponse, PhoneDTO, PhoneDetailDTO,
   PhoneVariantDTO, PhoneImageDTO, BrandDTO, BannerDTO,
@@ -114,7 +115,7 @@ export const adminBrandService = {
 
 export const adminOrderService = {
   list: (params?: Record<string, string>) => get<PageResponse<OrderDTO>>('/admin/orders', { params }),
-  detail: (id: number) => get<OrderDTO>('/admin/orders/' + id),
+  detail: (id: number) => get<AdminOrderDetailDTO>('/admin/orders/' + id),
   updateStatus: (id: number, status: string, reason?: string) => put<OrderDTO>('/admin/orders/' + id + '/status', { status, reason }),
   updatePaymentStatus: (id: number, paymentStatus: string) => put<OrderDTO>('/admin/orders/' + id + '/payment-status', { paymentStatus }),
   confirm: (id: number) => put<OrderDTO>('/admin/orders/' + id + '/confirm'),

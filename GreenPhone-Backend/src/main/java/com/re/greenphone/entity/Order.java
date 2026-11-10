@@ -41,6 +41,10 @@ public class Order extends BaseEntity {
     @Builder.Default
     private BigDecimal discountAmount = BigDecimal.ZERO;
 
+    @Column(name = "SHIPPING_FEE", nullable = false, precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal shippingFee = BigDecimal.ZERO;
+
     @Column(name = "FINAL_AMOUNT", nullable = false, precision = 12, scale = 2)
     private BigDecimal finalAmount;
 
@@ -76,4 +80,8 @@ public class Order extends BaseEntity {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Shipment> shipments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<OrderHistory> orderHistories = new ArrayList<>();
 }

@@ -276,6 +276,7 @@ export const OrderHistoryPage: React.FC = () => {
       {/* 4. Modal Hủy đơn hàng */}
       <OrderCancelModal
         orderId={selectedCancelOrderId}
+        paymentStatus={filteredOrders.find((o: OrderDTO) => o.id === selectedCancelOrderId)?.paymentStatus}
         open={selectedCancelOrderId !== null}
         onClose={() => setSelectedCancelOrderId(null)}
       />

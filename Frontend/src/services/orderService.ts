@@ -1,6 +1,13 @@
 import { get, post, put } from './api';
 import type { PageResponse, OrderDTO, OrderRequest } from '@/types/api';
 
+export interface CancelOrderParams {
+  reason?: string;
+  bankName?: string;
+  accountNumber?: string;
+  accountHolder?: string;
+}
+
 /**
  * Service API quản lý đơn hàng phía khách hàng
  */
@@ -22,9 +29,10 @@ export const orderService = {
   /**
    * Khách hàng yêu cầu hủy đơn hàng (áp dụng cho đơn PENDING/CONFIRMED)
    */
-  cancel: (id: number, reason?: string) => {
-    return reason
-      ? put<OrderDTO>(`/orders/${id}/cancel`, { reason })
+  cancel: (id: number, data?: string | CancelOrderParams) => {
+    const payload = typeof data === 'string' ? { reason: data } : data;
+    return payload
+      ? put<OrderDTO>(`/orders/${id}/cancel`, payload)
       : put<OrderDTO>(`/orders/${id}/cancel`);
   },
 
