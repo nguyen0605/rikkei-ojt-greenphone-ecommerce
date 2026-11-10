@@ -216,8 +216,8 @@ public class WarrantyClaimService {
             code = "RMA-" + datePart + "-" + suffix;
             attempt++;
             if (attempt > maxAttempts) {
-                // Thêm timestamp để đảm bảo tuyệt đối không trùng lặp
-                code = "RMA-" + datePart + "-" + System.currentTimeMillis() % 10000;
+                long fallbackNumber = Math.abs(System.currentTimeMillis() % 10000);
+                code = String.format("RMA-%s-%04d", datePart, fallbackNumber);
                 break;
             }
         } while (warrantyClaimRepository.existsByClaimCode(code));

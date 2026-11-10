@@ -1,6 +1,7 @@
 package com.re.greenphone.controller.admin;
 
 import com.re.greenphone.common.dto.ApiResponse;
+import com.re.greenphone.dto.request.UpdateClaimStatusRequest;
 import com.re.greenphone.dto.request.WarrantyClaimCreateRequest;
 import com.re.greenphone.dto.response.WarrantyClaimResponse;
 import com.re.greenphone.enums.ClaimStatus;
@@ -55,5 +56,20 @@ public class AdminWarrantyClaimController {
     @Operation(summary = "Lấy toàn bộ lịch sử tiếp nhận bảo hành của một số IMEI")
     public ResponseEntity<ApiResponse<List<WarrantyClaimResponse>>> getByImei(@PathVariable String imeiNumber) {
         return ResponseEntity.ok(ApiResponse.success(warrantyClaimService.getClaimsByImei(imeiNumber)));
+    }
+
+    @PutMapping("/{id}/status")
+    @Operation(summary = "Cập nhật trạng thái phiếu bảo hành và lưu vết tiến trình")
+    public ResponseEntity<ApiResponse<WarrantyClaimResponse>> updateStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateClaimStatusRequest request) {
+        WarrantyClaimResponse response = warrantyClaimService.updateClaimStatus(
+                id,
+                request.getStatus(),
+                request.getResolution(),
+                request.getNote(),
+                request.getPerformedByName()
+        );
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }
