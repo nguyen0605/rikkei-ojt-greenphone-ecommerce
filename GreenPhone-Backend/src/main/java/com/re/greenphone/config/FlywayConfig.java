@@ -3,6 +3,10 @@ package com.re.greenphone.config;
 import lombok.extern.slf4j.Slf4j;
 import org.flywaydb.core.Flyway;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
+import org.springframework.util.StringUtils;
+import jakarta.persistence.EntityManagerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -67,6 +71,20 @@ public class FlywayConfig {
             log.error("Loi khi tu dong chay Flyway migration: {}", e.getMessage(), e);
             throw e;
         }
+    }
+
+    /**
+     * Dam bao Flyway migration phai chay xong xuoi truoc khi Hibernate khoi tao EntityManagerFactory.
+     * Ngan chan triet de loi schema validation hoac race condition giua Hibernate va Flyway.
+     */
+    @Bean
+    public static BeanFactoryPostProcessor flywayDependsOnPostProcessor() {
+        return beanFactory -> {
+            for (String name : beanFactory.getBeanNamesForType(EntityManagerFactory.class)) {
+                BeanDefinition bd = beanFactory.getBeanDefinition(name);
+                bd.setDependsOn(StringUtils.addStringToArray(bd.getDependsOn(), "flyway"));
+            }
+        };
     }
 
     /**
