@@ -35,8 +35,10 @@ export interface AppliedVoucher {
 
 export interface WishlistItem {
   productId: string;
+  phoneId?: number | string;
   addedAt: string;
   name?: string;
+  thumbnail?: string;
   price?: number;
   originalPrice?: number;
   imageUrl?: string;

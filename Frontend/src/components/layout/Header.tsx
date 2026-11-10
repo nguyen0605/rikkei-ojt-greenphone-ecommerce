@@ -19,6 +19,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { selectCartTotalItems } from '@/store/selectors/cartSelectors';
 import { logout } from '@/store/slices/authSlice';
 import { clearCart } from '@/store/slices/cartSlice';
+import { clearWishlist } from '@/store/slices/wishlistSlice';
 import { resetCheckout } from '@/store/slices/checkoutSlice';
 import { cn } from '@/utils';
 import { ROUTES } from '@/routes/routePaths';
@@ -33,6 +34,7 @@ export default function Header() {
   const handleLogout = () => {
     dispatch(logout());
     dispatch(clearCart());
+    dispatch(clearWishlist());
     dispatch(resetCheckout());
     navigate(ROUTES.HOME);
   };

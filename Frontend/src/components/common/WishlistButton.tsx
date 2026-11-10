@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Heart } from 'lucide-react';
 import { App } from 'antd';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { addToWishlist, removeFromWishlist } from '@/store/slices/wishlistSlice';
+import { toggleWishlistAsync } from '@/store/slices/wishlistSlice';
 import { cn } from '@/utils';
 
 export interface WishlistButtonProps {
@@ -52,25 +52,31 @@ export default function WishlistButton({
     setIsBouncing(true);
     setTimeout(() => setIsBouncing(false), 300);
 
-    if (isLiked) {
-      dispatch(removeFromWishlist(String(productId)));
-      message.info(name ? `Đã xóa ${name} khỏi danh sách yêu thích` : 'Đã xóa khỏi danh sách yêu thích');
-      onToggle?.(false);
-    } else {
-      dispatch(
-        addToWishlist({
-          productId: String(productId),
-          name,
-          price: price ?? undefined,
-          originalPrice: originalPrice ?? undefined,
-          imageUrl,
-          brandName,
-          inStock,
-        })
-      );
-      message.success(name ? `Đã thêm ${name} vào danh sách yêu thích` : 'Đã thêm vào danh sách yêu thích');
-      onToggle?.(true);
-    }
+    // Optimistic UI toggle via toggleWishlistAsync (< 50ms)
+    dispatch(
+      toggleWishlistAsync({
+        productId: String(productId),
+        name,
+        price: price ?? undefined,
+        originalPrice: originalPrice ?? undefined,
+        imageUrl,
+        brandName,
+        inStock,
+      })
+    )
+      .unwrap()
+      .then((res) => {
+        if (res.isLiked) {
+          message.success(name ? `Đã thêm ${name} vào danh sách yêu thích` : 'Đã thêm vào danh sách yêu thích');
+          onToggle?.(true);
+        } else {
+          message.info(name ? `Đã xóa ${name} khỏi danh sách yêu thích` : 'Đã xóa khỏi danh sách yêu thích');
+          onToggle?.(false);
+        }
+      })
+      .catch((err) => {
+        message.error(typeof err === 'string' ? err : 'Không thể cập nhật danh sách yêu thích, vui lòng thử lại.');
+      });
   };
 
   return (
