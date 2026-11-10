@@ -60,16 +60,16 @@ export default function AdminWarehouseDetailPage() {
       <div className="rounded-xl border border-gray-200 bg-white p-4"><div className="text-sm text-gray-500">Biến thể tại chi nhánh</div><div className="mt-1 text-2xl font-semibold">{stock.data?.length ?? 0}</div></div>
       <div className="rounded-xl border border-green-100 bg-green-50 p-4"><div className="text-sm text-green-700">Sản phẩm trong kho</div><div className="mt-1 text-2xl font-semibold text-green-800">{(stock.data ?? []).reduce((sum, row) => sum + row.quantity, 0).toLocaleString('vi-VN')}</div></div>
     </div>
-    <AdminCard><div className="mb-4 flex flex-wrap gap-3">
-      <Input.Search style={{ width: 320, maxWidth: '100%' }} placeholder="Tìm sản phẩm, SKU, màu..." aria-label="Tìm trong chi nhánh"
+    <AdminCard><div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(260px,1.6fr)_repeat(3,minmax(160px,1fr))_auto]">
+      <Input.Search style={{ width: '100%' }} placeholder="Tìm sản phẩm, SKU, màu..." aria-label="Tìm trong chi nhánh"
         allowClear value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
-      <Select aria-label="Lọc tồn kho" value={stockFilter} style={{ width: 190 }} onChange={(value) => { setStockFilter(value); setPage(1); }} options={[
+      <Select aria-label="Lọc tồn kho" value={stockFilter} style={{ width: '100%' }} onChange={(value) => { setStockFilter(value); setPage(1); }} options={[
         { value: 'ALL', label: 'Tất cả tồn kho' }, { value: 'IN_STOCK', label: 'Còn hàng' },
         { value: 'LOW', label: 'Sắp hết (1–5)' }, { value: 'EMPTY', label: 'Hết hàng (0)' },
       ]} />
-      <Select aria-label="Lọc dung lượng" placeholder="Tất cả dung lượng" allowClear value={storageFilter} style={{ width: 180 }}
+      <Select aria-label="Lọc dung lượng" placeholder="Tất cả dung lượng" allowClear value={storageFilter} style={{ width: '100%' }}
         onChange={(value) => { setStorageFilter(value); setPage(1); }} options={[...new Set((stock.data ?? []).map((row) => row.storage))].sort().map((value) => ({ value, label: value }))} />
-      <Select aria-label="Sắp xếp tồn kho" value={sort} style={{ width: 210 }} onChange={(value) => { setSort(value); setPage(1); }} options={[
+      <Select aria-label="Sắp xếp tồn kho" value={sort} style={{ width: '100%' }} onChange={(value) => { setSort(value); setPage(1); }} options={[
         { value: 'NAME_ASC', label: 'Tên sản phẩm: A → Z' }, { value: 'NAME_DESC', label: 'Tên sản phẩm: Z → A' },
         { value: 'QTY_ASC', label: 'Tồn kho: thấp → cao' }, { value: 'QTY_DESC', label: 'Tồn kho: cao → thấp' },
         { value: 'SKU_ASC', label: 'SKU: A → Z' }, { value: 'SKU_DESC', label: 'SKU: Z → A' },
@@ -77,16 +77,16 @@ export default function AdminWarehouseDetailPage() {
       <Button onClick={() => { setSearch(''); setStockFilter('ALL'); setStorageFilter(undefined); setSort('NAME_ASC'); setPage(1); }}>Đặt lại</Button>
     </div>
     <p className="mb-3 text-sm text-gray-500">Hiển thị {rows.length} / {stock.data?.length ?? 0} biến thể</p>
-    <Table<WarehouseStock> rowKey="variantId" size="middle" loading={stock.isPending}
-      dataSource={rows} scroll={{ x: 1000 }} pagination={{ current: page, pageSize: 10, onChange: setPage, hideOnSinglePage: true }}
+    <Table<WarehouseStock> rowKey="variantId" size="middle" tableLayout="fixed" loading={stock.isPending}
+      dataSource={rows} scroll={{ x: 1100 }} pagination={{ current: page, pageSize: 10, onChange: setPage, hideOnSinglePage: true }}
       locale={{ emptyText: stock.data?.length ? 'Không có biến thể phù hợp bộ lọc' : 'Chưa có sản phẩm tại chi nhánh. Bấm Nhập sản phẩm để thêm.' }} columns={[
-        { title: 'Sản phẩm', width: 290, render: (_, row) => <div><div className="font-semibold">{row.productName}</div><div className="mt-1 font-mono text-xs text-gray-500">{row.sku}</div></div> },
-        { title: 'Biến thể', width: 240, render: (_, row) => `${row.ram} / ${row.storage} / ${row.color}` },
-        { title: 'Tồn chi nhánh', width: 130, dataIndex: 'quantity', align: 'right', render: (quantity: number) => <span className="text-lg font-semibold text-green-700">{quantity}</span> },
-        { title: 'Tổng tồn', width: 100, dataIndex: 'aggregateQuantity', align: 'right' },
-        { title: 'Thao tác', render: (_, row) => <Space wrap>
-          {(['IMPORT', 'EXPORT', 'TRANSFER'] as const).map((mode) => <Button key={mode} disabled={!active || mutation.isPending}
-            onClick={() => setAction({ mode, variant: row })}>{({ IMPORT: 'Nhập', EXPORT: 'Xuất', TRANSFER: 'Chuyển kho' })[mode]}</Button>)}
+        { title: 'Sản phẩm', width: '28%', render: (_, row) => <div><div className="font-semibold">{row.productName}</div><div className="mt-1 font-mono text-xs text-gray-500">{row.sku}</div></div> },
+        { title: 'Biến thể', width: '27%', render: (_, row) => `${row.ram} / ${row.storage} / ${row.color}` },
+        { title: 'Tồn chi nhánh', width: '14%', dataIndex: 'quantity', align: 'center', render: (quantity: number) => <span className="text-lg font-semibold text-green-700">{quantity}</span> },
+        { title: 'Tổng tồn', width: '11%', dataIndex: 'aggregateQuantity', align: 'center' },
+        { title: 'Thao tác', width: '20%', align: 'right', render: (_, row) => <Space>
+          {(['IMPORT', 'EXPORT'] as const).map((mode) => <Button key={mode} disabled={!active || mutation.isPending}
+            onClick={() => setAction({ mode, variant: row })}>{({ IMPORT: 'Nhập', EXPORT: 'Xuất' })[mode]}</Button>)}
           <Button onClick={() => setHistoryVariant(row.variantId)}>Lịch sử</Button>
         </Space> },
       ]} /></AdminCard>

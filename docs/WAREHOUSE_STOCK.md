@@ -5,8 +5,8 @@
 1. Admin mở **Kho hàng → Danh mục Chi nhánh → Chi tiết**.
 2. **Nhập sản phẩm**: tìm sản phẩm có sẵn, chọn đúng biến thể RAM/dung lượng/màu,
    nhập số lượng nguyên dương và lý do. Biến thể đã có được cộng số lượng, không tạo dòng trùng.
-3. Mỗi dòng có **Nhập**, **Xuất**, **Chuyển kho**, **Lịch sử**.
-4. Chuyển kho chọn một chi nhánh ACTIVE khác; giảm nguồn và tăng đích trong cùng transaction.
+3. Mỗi dòng có **Nhập**, **Xuất**, **Lịch sử**; không có nút Chuyển kho riêng.
+4. Form Nhập/Xuất giữ bốn trường Kho nhập, Kho xuất, Số lượng, Lý do. Chọn hai chi nhánh ACTIVE khác nhau để điều chuyển; giảm nguồn và tăng đích trong cùng transaction. Chọn Ngoài hệ thống ở một đầu để nhập/xuất bên ngoài.
 5. Tại **Tồn kho**, mở sản phẩm rồi mở mũi tên **Chi nhánh** của biến thể để xem phân bổ.
    Tên chi nhánh liên kết về trang chi tiết tương ứng.
 6. Khi nhập/xuất ngay tại trang Tồn kho, bắt buộc chọn chi nhánh.

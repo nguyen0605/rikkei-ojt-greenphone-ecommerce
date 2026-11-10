@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('branch import, export, transfer and nested variant allocation agree', async ({ page }) => {
+test('branch import, export, transfer and nested variant allocation agree', async ({ page }, testInfo) => {
   await page.addInitScript(() => {
     localStorage.setItem('greenphone.token', `${btoa('{}')}.${btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }))}.mock`);
     localStorage.setItem('greenphone.user', JSON.stringify({ id: 1, fullName: 'Admin', email: 'admin@example.com', role: 'ADMIN' }));
@@ -54,13 +54,17 @@ test('branch import, export, transfer and nested variant allocation agree', asyn
   await page.getByLabel('Lý do').fill('Xuất bán');
   await page.getByRole('button', { name: 'Xác nhận', exact: true }).click();
   await expect(page.getByRole('row').filter({ hasText: 'REDMI-XF' })).toContainText('63');
-  await page.getByRole('button', { name: 'Chuyển kho', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Chuyển kho', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Xuất', exact: true }).click();
   await page.getByRole('combobox', { name: 'Kho nhập' }).click();
   await page.getByText(/WH-HN-MAIN — Kho Hà Nội · Tồn:/).click();
   await page.getByLabel('Lý do').fill('Điều chuyển');
   await page.getByRole('button', { name: 'Xác nhận', exact: true }).click();
   await expect(page.getByRole('dialog')).not.toBeVisible();
   expect(main).toBe(61); expect(branch).toBe(2);
+  await page.setViewportSize({ width: 1680, height: 1000 });
+  await page.locator('.ant-table-content').evaluateAll((elements) => elements.forEach((element) => { element.scrollLeft = 0; }));
+  await page.screenshot({ path: testInfo.outputPath('branch-detail-layout.png'), fullPage: true });
   await page.goto('/admin/ton-kho');
   await page.getByRole('button', { name: 'Mở rộng biến thể Redmi Note 13 Pro' }).click();
   await page.locator('.ant-table-row-expand-icon').click();

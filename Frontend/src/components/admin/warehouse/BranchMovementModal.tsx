@@ -5,7 +5,7 @@ import { adminPhoneService } from '@/services';
 import { warehouseService, warehouseInventoryService, type WarehouseStock } from '@/services/warehouseService';
 
 export interface BranchMovementValues { variantId: number; quantity: number; reason: string; warehouseId: number; targetWarehouseId?: number }
-export interface BranchAction { mode: 'IMPORT' | 'EXPORT' | 'TRANSFER'; variant?: WarehouseStock }
+export interface BranchAction { mode: 'IMPORT' | 'EXPORT'; variant?: WarehouseStock }
 interface Props { warehouseId: number; action: BranchAction; onCancel: () => void; onSubmit: (values: BranchMovementValues) => Promise<unknown> }
 
 export default function BranchMovementModal({ warehouseId, action, onCancel, onSubmit }: Props) {
@@ -32,7 +32,7 @@ export default function BranchMovementModal({ warehouseId, action, onCancel, onS
     catch (failure) { setError(failure instanceof Error ? failure.message : 'Không thể cập nhật kho'); }
     finally { lock.current = false; setPending(false); }
   };
-  const title = { IMPORT: 'Nhập sản phẩm vào chi nhánh', EXPORT: 'Xuất sản phẩm khỏi chi nhánh', TRANSFER: 'Chuyển kho' }[action.mode];
+  const title = { IMPORT: 'Nhập sản phẩm vào chi nhánh', EXPORT: 'Xuất sản phẩm khỏi chi nhánh' }[action.mode];
   return <Modal open title={title} okText="Xác nhận" cancelText="Hủy" confirmLoading={pending}
     onOk={() => form.submit()} onCancel={() => { if (!lock.current) onCancel(); }}
     width={640} okButtonProps={{ disabled: pending }} cancelButtonProps={{ disabled: pending }} closable={!pending} mask={{ closable: false }}>
@@ -40,7 +40,7 @@ export default function BranchMovementModal({ warehouseId, action, onCancel, onS
     {(phones.isError || variants.isError || warehouses.isError) && <Alert type="error" title="Không tải được danh mục. Vui lòng đóng và thử lại." className="mb-4" />}
     <Form form={form} layout="vertical" onFinish={submit} disabled={pending}
       initialValues={{ variantId: action.variant?.variantId, warehouseId: action.mode === 'IMPORT' ? 0 : warehouseId,
-        targetWarehouseId: action.mode === 'IMPORT' ? warehouseId : action.mode === 'EXPORT' ? 0 : undefined, quantity: 1 }}>
+        targetWarehouseId: action.mode === 'IMPORT' ? warehouseId : 0, quantity: 1 }}>
       {action.variant ? <div className="mb-5 rounded-xl bg-green-50 p-4"><div className="font-semibold">{action.variant.productName}</div>
         <div className="mt-1 text-sm text-gray-600">{action.variant.ram} / {action.variant.storage} / {action.variant.color} · {action.variant.sku}</div></div> : <>
         <Form.Item label="Sản phẩm">

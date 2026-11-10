@@ -120,12 +120,11 @@ describe('branch inventory', () => {
       { variantId: 7, quantity: 1, reason: 'Xuất từ Hà Nội', changeType: 'EXPORT' }));
   }, 15000);
 
-  it('requires a destination and transfers to another active branch', async () => {
+  it('uses export to move stock between branches without a separate transfer action', async () => {
     mount(); const user = userEvent.setup({ delay: null });
-    await user.click(await screen.findByRole('button', { name: 'Chuyển kho' }));
+    await user.click(await screen.findByRole('button', { name: /^Xuất$/ }));
+    expect(screen.queryByRole('button', { name: /^Chuyển kho$/ })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Lý do'), { target: { value: 'Điều chuyển' } });
-    await user.click(screen.getByRole('button', { name: 'Xác nhận' }));
-    expect(await screen.findByText('Chọn kho nhập')).toBeInTheDocument();
     await user.click(screen.getByRole('combobox', { name: 'Kho nhập' }));
     await user.click(await screen.findByText(/WH-HN-MAIN — Hà Nội · Tồn:/));
     await user.click(screen.getByRole('button', { name: 'Xác nhận' }));
