@@ -1,5 +1,14 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Maximize2, X, ImageOff } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Maximize2,
+  X,
+  ImageOff,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+} from 'lucide-react';
 import type { PhoneImageDTO } from '@/types/api';
 import { cn } from '@/utils';
 
@@ -17,11 +26,20 @@ interface NormalizedImage {
   url: string;
 }
 
+const MIN_ZOOM = 1.0;
+const MAX_ZOOM = 4.0;
+const ZOOM_STEP = 0.2;
+
 /**
- * Component hiển thị bộ sưu tập ảnh sản phẩm với:
- * 1. Image Zoom on Hover (kính lúp tỉ lệ nội tại mượt mà, giới hạn trong khung hình, vô hiệu trên thiết bị cảm ứng)
- * 2. Lightbox Modal toàn màn hình (Next/Prev, phím mũi tên, phím Escape, vuốt cảm ứng trên di động, khóa cuộn trang, phục hồi focus)
- * 3. Hỗ trợ responsive, đồng bộ hai chiều với Variant Selector qua selectedIndex / onSelectIndex
+ * Component hiển thị bộ sưu tập ảnh sản phẩm:
+ * 1. Ảnh chính trên trang PDP: KHÔNG tự động phóng to khi hover chuột.
+ * 2. Click vào ảnh mở Lightbox modal toàn màn hình.
+ * 3. Trong Lightbox:
+ *    - Sử dụng con lăn chuột (Mouse Wheel) để phóng to/thu nhỏ (100% - 400%, bước 20%).
+ *    - Khi zoom > 100%, cho phép giữ chuột trái kéo ảnh (Pan/Drag) với con trỏ grab/grabbing.
+ *    - Có thanh điều khiển zoom (+, -, reset) cho accessibility & thao tác tiện lợi.
+ *    - Chuyển ảnh hoặc đóng modal tự động reset zoom về 100% và căn giữa ảnh.
+ *    - Hỗ trợ phím mũi tên, Escape, vuốt cảm ứng trên di động và khóa cuộn trang.
  */
 export default function ProductGallery({
   images,
@@ -58,87 +76,83 @@ export default function ProductGallery({
     ? selectedIndex
     : Math.min(internalActive, Math.max(0, normalizedImages.length - 1));
 
+  // ── Lightbox Zoom & Pan State ──
+  const [zoomScale, setZoomScale] = useState(1.0);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [imageErrorMap, setImageErrorMap] = useState<Record<string | number, boolean>>({});
+
+  const resetZoom = useCallback(() => {
+    setZoomScale(1.0);
+    setPanOffset({ x: 0, y: 0 });
+    setIsDragging(false);
+  }, []);
+
   const setActiveImage = useCallback(
     (index: number) => {
       const clamped = Math.max(0, Math.min(index, normalizedImages.length - 1));
       setInternalActive(clamped);
+      resetZoom();
       onSelectIndex?.(clamped);
     },
-    [normalizedImages.length, onSelectIndex]
+    [normalizedImages.length, onSelectIndex, resetZoom]
   );
-
-  // ── Zoom on Hover State ──
-  const [isHovered, setIsHovered] = useState(false);
-  const [zoomPos, setZoomPos] = useState({ x: 50, y: 50 });
-  const [supportsHover, setSupportsHover] = useState(() => {
-    if (typeof window !== 'undefined' && window.matchMedia) {
-      return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-    }
-    return false;
-  });
-  const [imageErrorMap, setImageErrorMap] = useState<Record<string | number, boolean>>({});
-
-  useEffect(() => {
-    // Lắng nghe thay đổi thiết bị / media query
-    if (typeof window !== 'undefined' && window.matchMedia) {
-      const mediaQuery = window.matchMedia('(hover: hover) and (pointer: fine)');
-      const listener = (e: MediaQueryListEvent) => setSupportsHover(e.matches);
-      mediaQuery.addEventListener('change', listener);
-      return () => mediaQuery.removeEventListener('change', listener);
-    }
-  }, []);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!supportsHover) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-
-    // Tính phần trăm vị trí chuột trong khung ảnh (0 - 100%)
-    const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
-    const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
-    setZoomPos({ x, y });
-  };
-
-  const handleMouseEnter = () => {
-    if (supportsHover) {
-      setIsHovered(true);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    setIsHovered(false);
-    setZoomPos({ x: 50, y: 50 });
-  };
 
   // ── Lightbox Modal State ──
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const triggerRef = useRef<HTMLElement | null>(null);
+  const imageContainerRef = useRef<HTMLDivElement | null>(null);
+  const dragStartRef = useRef({ x: 0, y: 0 });
   const touchStartXRef = useRef<number | null>(null);
   const touchEndXRef = useRef<number | null>(null);
+  const touchStartDistanceRef = useRef<number | null>(null);
+  const touchStartScaleRef = useRef(1.0);
 
   const openLightbox = useCallback((e?: React.SyntheticEvent<HTMLElement>) => {
     if (e) {
       e.stopPropagation();
       triggerRef.current = e.currentTarget;
     }
+    resetZoom();
     setIsLightboxOpen(true);
-  }, []);
+  }, [resetZoom]);
 
   const closeLightbox = useCallback(() => {
     setIsLightboxOpen(false);
+    resetZoom();
     // Khôi phục focus cho trigger element
     if (triggerRef.current && typeof triggerRef.current.focus === 'function') {
       triggerRef.current.focus();
     }
-  }, []);
+  }, [resetZoom]);
 
   const goToPrev = useCallback(() => {
+    resetZoom();
     setActiveImage(active === 0 ? normalizedImages.length - 1 : active - 1);
-  }, [active, normalizedImages.length, setActiveImage]);
+  }, [active, normalizedImages.length, resetZoom, setActiveImage]);
 
   const goToNext = useCallback(() => {
+    resetZoom();
     setActiveImage(active === normalizedImages.length - 1 ? 0 : active + 1);
-  }, [active, normalizedImages.length, setActiveImage]);
+  }, [active, normalizedImages.length, resetZoom, setActiveImage]);
+
+  // Điều chỉnh mức zoom qua nút bấm
+  const handleZoomIn = useCallback(() => {
+    setZoomScale((prev) => {
+      const next = Math.min(MAX_ZOOM, Number((prev + ZOOM_STEP).toFixed(2)));
+      return next;
+    });
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoomScale((prev) => {
+      const next = Math.max(MIN_ZOOM, Number((prev - ZOOM_STEP).toFixed(2)));
+      if (next === MIN_ZOOM) {
+        setPanOffset({ x: 0, y: 0 });
+      }
+      return next;
+    });
+  }, []);
 
   // Khóa cuộn trang khi Lightbox mở và hỗ trợ phím điều hướng
   useEffect(() => {
@@ -154,6 +168,12 @@ export default function ProductGallery({
         goToPrev();
       } else if (e.key === 'ArrowRight') {
         goToNext();
+      } else if (e.key === '+' || e.key === '=') {
+        handleZoomIn();
+      } else if (e.key === '-' || e.key === '_') {
+        handleZoomOut();
+      } else if (e.key === '0') {
+        resetZoom();
       }
     };
 
@@ -163,26 +183,158 @@ export default function ProductGallery({
       document.body.style.overflow = originalOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isLightboxOpen, closeLightbox, goToPrev, goToNext]);
+  }, [isLightboxOpen, closeLightbox, goToPrev, goToNext, handleZoomIn, handleZoomOut, resetZoom]);
 
-  // Xử lý vuốt màn hình cảm ứng trong Lightbox
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartXRef.current = e.touches[0].clientX;
-    touchEndXRef.current = null;
+  // ── Xử lý con lăn chuột (Mouse Wheel Zoom) chống cuộn trang nền ──
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement> | WheelEvent) => {
+    if (typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
+    if (typeof e.stopPropagation === 'function') {
+      e.stopPropagation();
+    }
+
+    const delta = e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
+    setZoomScale((prevScale) => {
+      const nextScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Number((prevScale + delta).toFixed(2))));
+      if (nextScale === MIN_ZOOM) {
+        setPanOffset({ x: 0, y: 0 });
+        return MIN_ZOOM;
+      }
+
+      // Căn chỉnh vị trí pan tương ứng với chuột
+      const container = imageContainerRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        const maxPanX = (rect.width * (nextScale - 1)) / 2;
+        const maxPanY = (rect.height * (nextScale - 1)) / 2;
+
+        setPanOffset((prevPan) => ({
+          x: Math.max(-maxPanX, Math.min(maxPanX, prevPan.x)),
+          y: Math.max(-maxPanY, Math.min(maxPanY, prevPan.y)),
+        }));
+      }
+
+      return nextScale;
+    });
+  }, []);
+
+  useEffect(() => {
+    const container = imageContainerRef.current;
+    if (!isLightboxOpen || !container) return;
+
+    const onWheelHandler = (e: WheelEvent) => {
+      handleWheel(e);
+    };
+
+    container.addEventListener('wheel', onWheelHandler, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', onWheelHandler);
+    };
+  }, [isLightboxOpen, handleWheel]);
+
+  // ── Xử lý kéo ảnh khi zoom > 100% (Pan / Drag) ──
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (zoomScale <= MIN_ZOOM) return;
+    e.preventDefault();
+    setIsDragging(true);
+    dragStartRef.current = {
+      x: e.clientX - panOffset.x,
+      y: e.clientY - panOffset.y,
+    };
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    touchEndXRef.current = e.touches[0].clientX;
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDragging || zoomScale <= MIN_ZOOM) return;
+    e.preventDefault();
+
+    const container = imageContainerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const maxPanX = (rect.width * (zoomScale - 1)) / 2;
+    const maxPanY = (rect.height * (zoomScale - 1)) / 2;
+
+    const rawX = e.clientX - dragStartRef.current.x;
+    const rawY = e.clientY - dragStartRef.current.y;
+
+    setPanOffset({
+      x: Math.max(-maxPanX, Math.min(maxPanX, rawX)),
+      y: Math.max(-maxPanY, Math.min(maxPanY, rawY)),
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // ── Xử lý cảm ứng trên thiết bị di động (Pinch Zoom & Drag / Swipe) ──
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 2) {
+      // 2 ngón tay -> Pinch zoom
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const dist = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+      touchStartDistanceRef.current = dist;
+      touchStartScaleRef.current = zoomScale;
+    } else if (e.touches.length === 1) {
+      if (zoomScale > MIN_ZOOM) {
+        // 1 ngón tay khi đã zoom -> Kéo ảnh (Pan)
+        dragStartRef.current = {
+          x: e.touches[0].clientX - panOffset.x,
+          y: e.touches[0].clientY - panOffset.y,
+        };
+        setIsDragging(true);
+      } else {
+        // 1 ngón tay khi zoom 100% -> Chuẩn bị vuốt chuyển ảnh (Swipe)
+        touchStartXRef.current = e.touches[0].clientX;
+        touchEndXRef.current = null;
+      }
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 2 && touchStartDistanceRef.current !== null) {
+      // Pinch to zoom
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const dist = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+      const factor = dist / touchStartDistanceRef.current;
+      const nextScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Number((touchStartScaleRef.current * factor).toFixed(2))));
+      setZoomScale(nextScale);
+      if (nextScale === MIN_ZOOM) {
+        setPanOffset({ x: 0, y: 0 });
+      }
+    } else if (e.touches.length === 1) {
+      if (zoomScale > MIN_ZOOM && isDragging) {
+        const container = imageContainerRef.current;
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
+        const maxPanX = (rect.width * (zoomScale - 1)) / 2;
+        const maxPanY = (rect.height * (zoomScale - 1)) / 2;
+        const rawX = e.touches[0].clientX - dragStartRef.current.x;
+        const rawY = e.touches[0].clientY - dragStartRef.current.y;
+        setPanOffset({
+          x: Math.max(-maxPanX, Math.min(maxPanX, rawX)),
+          y: Math.max(-maxPanY, Math.min(maxPanY, rawY)),
+        });
+      } else if (zoomScale <= MIN_ZOOM) {
+        touchEndXRef.current = e.touches[0].clientX;
+      }
+    }
   };
 
   const handleTouchEnd = () => {
-    if (touchStartXRef.current !== null && touchEndXRef.current !== null) {
+    touchStartDistanceRef.current = null;
+    setIsDragging(false);
+
+    if (zoomScale <= MIN_ZOOM && touchStartXRef.current !== null && touchEndXRef.current !== null) {
       const distance = touchStartXRef.current - touchEndXRef.current;
       const minSwipeDistance = 50;
       if (distance > minSwipeDistance) {
-        goToNext(); // Vuốt sang trái -> chuyển ảnh tiếp
+        goToNext();
       } else if (distance < -minSwipeDistance) {
-        goToPrev(); // Vuốt sang phải -> quay lại ảnh trước
+        goToPrev();
       }
     }
     touchStartXRef.current = null;
@@ -195,13 +347,10 @@ export default function ProductGallery({
 
   return (
     <div className={cn('flex flex-col gap-3', className)}>
-      {/* Khung ảnh chính với Zoom Hover & Nút mở Lightbox */}
+      {/* Khung ảnh chính trên PDP: Không zoom tự động khi rê chuột */}
       <div
         data-testid="main-image-container"
-        className="group relative aspect-square w-full overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 cursor-zoom-in"
-        onMouseEnter={handleMouseEnter}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
+        className="group relative aspect-square w-full overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 cursor-pointer"
         onClick={openLightbox}
         role="button"
         tabIndex={0}
@@ -227,17 +376,11 @@ export default function ProductGallery({
             height={600}
             loading="eager"
             onError={() => setImageErrorMap((prev) => ({ ...prev, [currentImage.id]: true }))}
-            className={cn(
-              'h-full w-full object-contain select-none transition-transform duration-200 ease-out will-change-transform',
-              isHovered && supportsHover ? 'scale-[2.2]' : 'scale-100'
-            )}
-            style={{
-              transformOrigin: isHovered && supportsHover ? `${zoomPos.x}% ${zoomPos.y}%` : 'center center',
-            }}
+            className="h-full w-full object-contain select-none transition-transform duration-200"
           />
         )}
 
-        {/* Nút phóng to Lightbox ở góc trên bên phải */}
+        {/* Nút phóng to mở Lightbox ở góc trên bên phải */}
         <button
           type="button"
           onClick={openLightbox}
@@ -247,12 +390,10 @@ export default function ProductGallery({
           <Maximize2 className="h-4 w-4" />
         </button>
 
-        {/* Gợi ý phóng to ở chân ảnh trên desktop */}
-        {supportsHover && (
-          <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-            Rê chuột để soi chi tiết • Nhấp để phóng to
-          </div>
-        )}
+        {/* Gợi ý click mở Lightbox */}
+        <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+          Nhấp để mở toàn màn hình & cuộn chuột để zoom
+        </div>
       </div>
 
       {/* Dải ảnh nhỏ thu nhỏ (Thumbnails) */}
@@ -300,7 +441,7 @@ export default function ProductGallery({
         </div>
       )}
 
-      {/* ── LIGHTBOX MODAL ── */}
+      {/* ── LIGHTBOX MODAL TOÀN MÀN HÌNH VỚI MOUSE WHEEL ZOOM & PAN ── */}
       {isLightboxOpen && (
         <div
           data-testid="lightbox-modal"
@@ -309,9 +450,6 @@ export default function ProductGallery({
           aria-label={`Xem ảnh lớn: ${productName}`}
           className="fixed inset-0 z-50 flex flex-col items-center justify-between bg-black/95 p-4 sm:p-6 backdrop-blur-md"
           onClick={closeLightbox}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
         >
           {/* Header Lightbox */}
           <div
@@ -328,21 +466,80 @@ export default function ProductGallery({
               </span>
             </div>
 
-            <button
-              data-testid="lightbox-close-button"
-              type="button"
-              onClick={closeLightbox}
-              aria-label="Đóng xem ảnh"
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-green-400"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            {/* Thanh công cụ Zoom trong Lightbox */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 rounded-full bg-white/10 px-2 py-1 backdrop-blur-sm">
+                <button
+                  data-testid="zoom-out-button"
+                  type="button"
+                  onClick={handleZoomOut}
+                  disabled={zoomScale <= MIN_ZOOM}
+                  aria-label="Thu nhỏ ảnh"
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-white transition hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-transparent"
+                >
+                  <ZoomOut className="h-4 w-4" />
+                </button>
+                <span data-testid="zoom-level-indicator" className="min-w-[3rem] text-center text-xs font-medium text-gray-200">
+                  {Math.round(zoomScale * 100)}%
+                </span>
+                <button
+                  data-testid="zoom-in-button"
+                  type="button"
+                  onClick={handleZoomIn}
+                  disabled={zoomScale >= MAX_ZOOM}
+                  aria-label="Phóng to ảnh"
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-white transition hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-transparent"
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </button>
+                {zoomScale > MIN_ZOOM && (
+                  <button
+                    data-testid="reset-zoom-button"
+                    type="button"
+                    onClick={resetZoom}
+                    aria-label="Đặt lại mức zoom 100%"
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-white transition hover:bg-white/20 ml-1"
+                    title="Đặt lại mức zoom (100%)"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Nút đóng modal */}
+              <button
+                data-testid="lightbox-close-button"
+                type="button"
+                onClick={closeLightbox}
+                aria-label="Đóng xem ảnh"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-green-400"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
 
-          {/* Vùng hiển thị ảnh chính lớn */}
+          {/* Vùng hiển thị ảnh chính lớn với Mouse Wheel Zoom & Drag/Pan */}
           <div
-            className="relative flex flex-1 w-full max-w-5xl items-center justify-center overflow-hidden my-4"
+            ref={imageContainerRef}
+            data-testid="lightbox-viewport"
+            className={cn(
+              'relative flex flex-1 w-full max-w-5xl items-center justify-center overflow-hidden my-2 select-none touch-none',
+              zoomScale > MIN_ZOOM
+                ? isDragging
+                  ? 'cursor-grabbing'
+                  : 'cursor-grab'
+                : 'cursor-default'
+            )}
             onClick={(e) => e.stopPropagation()}
+            onWheel={handleWheel}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
           >
             {/* Nút Prev */}
             {hasMultipleImages && (
@@ -368,7 +565,11 @@ export default function ProductGallery({
                 data-testid="lightbox-current-image"
                 src={currentImage.url}
                 alt={`${productName} - Ảnh phóng to ${active + 1}`}
-                className="max-h-[75vh] max-w-[90vw] object-contain transition-all duration-200 select-none"
+                draggable={false}
+                className="max-h-[72vh] max-w-[90vw] object-contain transition-transform duration-100 select-none will-change-transform"
+                style={{
+                  transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomScale})`,
+                }}
               />
             )}
 
@@ -384,6 +585,13 @@ export default function ProductGallery({
                 <ChevronRight className="h-6 w-6" />
               </button>
             )}
+
+            {/* Gợi ý điều khiển zoom ở góc dưới ảnh */}
+            <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-xs text-gray-300 backdrop-blur-sm">
+              {zoomScale > MIN_ZOOM
+                ? 'Giữ chuột trái để kéo ảnh • Cuộn chuột để chỉnh mức zoom'
+                : 'Cuộn chuột hoặc dùng +/- để phóng to (100% – 400%)'}
+            </div>
           </div>
 
           {/* Dải thumbnail thu nhỏ trong Lightbox */}
