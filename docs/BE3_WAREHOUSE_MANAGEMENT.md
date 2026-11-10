@@ -1,4 +1,4 @@
-﻿# BE3 — Warehouse management
+# BE3 — Warehouse management
 
 Admin-only warehouse directory API at `/api/v1/admin/warehouses`.
 This manages branches, not stock quantities per warehouse or shipping allocation.
@@ -81,4 +81,3 @@ the database unique constraint. It does not reset the developer database.
 
 Measure HTTP response times separately on the running application after warm-up.
 Unit tests are not evidence of the <500 ms HTTP acceptance criterion.
-
