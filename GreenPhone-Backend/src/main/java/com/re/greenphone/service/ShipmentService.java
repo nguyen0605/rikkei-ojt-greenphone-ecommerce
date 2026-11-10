@@ -54,18 +54,21 @@ public class ShipmentService {
             throw new BadRequestException("Order must be in PROCESSING status to create shipment. Current status: " + order.getOrderStatus());
         }
 
+        String carrierCode = request.getCarrierCode().trim().toUpperCase();
+        if (!VALID_CARRIER_CODES.contains(carrierCode)) {
+            throw new BadRequestException("Invalid carrier code: " + carrierCode + ". Valid carriers: " + VALID_CARRIER_CODES);
+        }
+
         // Tạo hoặc kiểm tra tính duy nhất của mã vận đơn
         String trackingNumber = request.getTrackingNumber();
         if (trackingNumber == null || trackingNumber.trim().isEmpty()) {
-            trackingNumber = generateTrackingNumber(request.getCarrierCode());
+            trackingNumber = generateTrackingNumber();
         } else {
             trackingNumber = trackingNumber.trim().toUpperCase();
             if (shipmentRepository.existsByTrackingNumber(trackingNumber)) {
                 throw new BadRequestException("Tracking number already exists: " + trackingNumber);
             }
         }
-
-        String carrierCode = request.getCarrierCode().trim().toUpperCase();
 
         Shipment shipment = Shipment.builder()
                 .order(order)
@@ -230,20 +233,26 @@ public class ShipmentService {
     }
 
     /**
-     * Sinh mã vận đơn tự động duy nhất (UNIQUE) dựa trên nhà mạng vận chuyển.
-     * Cú pháp: [CARRIER]-[TIMESTAMP]-[RANDOM]
+     * Sinh mã vận đơn tự động duy nhất (UNIQUE) theo định dạng chuẩn: GP-YYYYMMDD-XXXXX.
+     * Trong đó:
+     * - GP: Tiền tố cố định của GreenPhone
+     * - YYYYMMDD: Năm tháng ngày hiện tại
+     * - XXXXX: 5 ký tự ngẫu nhiên bao gồm chữ số và chữ in hoa
      */
-    private String generateTrackingNumber(String carrierCode) {
-        String prefix = (carrierCode != null && !carrierCode.isBlank()) ? carrierCode.trim().toUpperCase() : "GP";
-        for (int i = 0; i < 10; i++) {
-            long ts = System.currentTimeMillis() % 100000000;
-            int rand = 1000 + random.nextInt(9000);
-            String candidate = prefix + "-" + ts + "-" + rand;
+    public String generateTrackingNumber() {
+        String datePart = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String characters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        for (int attempt = 0; attempt < 20; attempt++) {
+            StringBuilder suffix = new StringBuilder(5);
+            for (int i = 0; i < 5; i++) {
+                suffix.append(characters.charAt(random.nextInt(characters.length())));
+            }
+            String candidate = "GP-" + datePart + "-" + suffix;
             if (!shipmentRepository.existsByTrackingNumber(candidate)) {
                 return candidate;
             }
         }
-        return prefix + "-" + System.nanoTime();
+        return "GP-" + datePart + "-" + String.format("%05d", random.nextInt(100000));
     }
 
     /**

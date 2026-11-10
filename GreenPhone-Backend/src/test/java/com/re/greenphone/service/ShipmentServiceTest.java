@@ -127,6 +127,7 @@ class ShipmentServiceTest {
         assertThat(result.getId()).isEqualTo(10L);
         assertThat(result.getStatus()).isEqualTo("READY_TO_SHIP");
         assertThat(result.getCarrierCode()).isEqualTo("GHN");
+        assertThat(result.getTrackingNumber()).matches("^GP-\\d{8}-[A-Z0-9]{5}$");
 
         // Kiểm tra Order đã tự động đổi trạng thái sang SHIPPING
         assertThat(sampleOrder.getOrderStatus()).isEqualTo("SHIPPING");
@@ -177,6 +178,29 @@ class ShipmentServiceTest {
         assertThat(createdWarranty.getImeiNumber()).hasSize(15); // Đúng chuẩn 15 chữ số IMEI
         assertThat(createdWarranty.getStatus()).isEqualTo("ACTIVE");
         assertThat(createdWarranty.getEndDate()).isAfterOrEqualTo(createdWarranty.getStartDate().plusMonths(12).minusDays(1));
+    }
+
+    @Test
+    @DisplayName("Quy tắc bắt buộc: Từ chối tạo Shipment nếu CarrierCode không hợp lệ")
+    void testCreateShipment_WithInvalidCarrierCode_ThrowsException() {
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+
+        CreateShipmentRequest req = CreateShipmentRequest.builder()
+                .orderId(1L)
+                .carrierCode("UNKNOWN_CARRIER")
+                .build();
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> shipmentService.createShipment(req));
+        assertThat(ex.getMessage()).contains("Invalid carrier code");
+        verify(shipmentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Kiểm tra sinh mã vận đơn tự động theo định dạng GP-YYYYMMDD-XXXXX")
+    void testGenerateTrackingNumber_MatchesPattern() {
+        when(shipmentRepository.existsByTrackingNumber(anyString())).thenReturn(false);
+        String trackingNumber = shipmentService.generateTrackingNumber();
+        assertThat(trackingNumber).matches("^GP-\\d{8}-[A-Z0-9]{5}$");
     }
 
     @Test
