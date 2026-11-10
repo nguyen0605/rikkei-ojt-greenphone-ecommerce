@@ -21,7 +21,7 @@ public class CreateShipmentRequest {
     private String carrierCode;
 
     /**
-     * Mã vận đơn. Nếu để trống, hệ thống sẽ tự sinh mã duy nhất theo cú pháp GP-SHP-<timestamp>-<random>.
+     * Mã vận đơn. Nếu để trống, hệ thống sẽ tự sinh mã duy nhất theo cú pháp GP-YYYYMMDD-XXXXX.
      */
     private String trackingNumber;
 

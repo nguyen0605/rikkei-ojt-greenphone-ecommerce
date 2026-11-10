@@ -6,6 +6,8 @@ CLAUDE.md
 .claude
 .hallmark
 design.md
+AI_PROMPTS.md
+prompts.md
 
 # ============================
 # Environment / secrets
