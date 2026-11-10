@@ -4,13 +4,17 @@ import com.re.greenphone.common.exception.BadRequestException;
 import com.re.greenphone.common.exception.ResourceNotFoundException;
 import com.re.greenphone.common.pagination.PageRequest;
 import com.re.greenphone.common.pagination.PageResponse;
+import com.re.greenphone.dto.response.AdminOrderDetailDTO;
 import com.re.greenphone.dto.response.OrderDTO;
+import com.re.greenphone.dto.response.OrderHistoryDTO;
 import com.re.greenphone.entity.Order;
+import com.re.greenphone.entity.OrderHistory;
 import com.re.greenphone.entity.Payment;
 import com.re.greenphone.entity.PhoneVariant;
 import com.re.greenphone.entity.Promotion;
 import com.re.greenphone.entity.UserPromotion;
 import com.re.greenphone.mapper.OrderMapper;
+import com.re.greenphone.repository.OrderHistoryRepository;
 import com.re.greenphone.repository.OrderRepository;
 import com.re.greenphone.repository.PaymentRepository;
 import com.re.greenphone.repository.PhoneVariantRepository;
@@ -40,6 +44,7 @@ public class AdminOrderService {
     );
 
     private final OrderRepository orderRepository;
+    private final OrderHistoryRepository orderHistoryRepository;
     private final PhoneVariantRepository phoneVariantRepository;
     private final PaymentRepository paymentRepository;
     private final UserPromotionRepository userPromotionRepository;
@@ -82,10 +87,26 @@ public class AdminOrderService {
                 page.getTotalElements(), page.getTotalPages(), page.isLast());
     }
 
-    public OrderDTO getOrderDetail(Long id) {
-        Order order = orderRepository.findById(id)
+    public AdminOrderDetailDTO getOrderDetail(Long id) {
+        Order order = orderRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
-        return orderMapper.toDto(order);
+        AdminOrderDetailDTO dto = orderMapper.toAdminDetailDto(order);
+
+        List<OrderHistoryDTO> histories = orderHistoryRepository.findByOrderIdOrderByCreatedAtDesc(id)
+                .stream()
+                .map(h -> OrderHistoryDTO.builder()
+                        .id(h.getId())
+                        .orderId(id)
+                        .fromStatus(h.getFromStatus())
+                        .toStatus(h.getToStatus())
+                        .note(h.getNote())
+                        .changedBy(h.getChangedBy())
+                        .createdAt(h.getCreatedAt())
+                        .build())
+                .toList();
+
+        dto.setHistories(histories);
+        return dto;
     }
 
     public OrderDTO updateStatus(Long id, String status) {
@@ -177,6 +198,14 @@ public class AdminOrderService {
         order.setOrderStatus(status);
         order = orderRepository.save(order);
 
+        orderHistoryRepository.save(com.re.greenphone.entity.OrderHistory.builder()
+                .order(order)
+                .fromStatus(currentStatus)
+                .toStatus(status)
+                .note(reason != null && !reason.isBlank() ? reason.trim() : "Quản trị viên chuyển trạng thái sang " + status)
+                .changedBy("ADMIN")
+                .build());
+
         if ("DELIVERED".equals(status)) {
             sendDeliveredEmail(order);
         }
@@ -192,6 +221,7 @@ public class AdminOrderService {
             throw new BadRequestException("Invalid payment status: " + paymentStatus);
         }
 
+        String previousPaymentStatus = order.getPaymentStatus();
         if ("REFUNDED".equalsIgnoreCase(paymentStatus)) {
             String existingNote = order.getNote() != null ? order.getNote().trim() : "";
             String refundTag = "[Kế toán đã hoàn tiền thành công lúc " + java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").format(LocalDateTime.now()) + "]";
@@ -202,6 +232,15 @@ public class AdminOrderService {
 
         order.setPaymentStatus(paymentStatus);
         order = orderRepository.save(order);
+
+        orderHistoryRepository.save(com.re.greenphone.entity.OrderHistory.builder()
+                .order(order)
+                .fromStatus(previousPaymentStatus)
+                .toStatus(paymentStatus)
+                .note("REFUNDED".equalsIgnoreCase(paymentStatus) ? "Kế toán đã hoàn tiền thành công" : "Cập nhật trạng thái thanh toán sang " + paymentStatus)
+                .changedBy("ADMIN")
+                .build());
+
         return orderMapper.toDto(order);
     }
 
@@ -217,8 +256,17 @@ public class AdminOrderService {
             throw new BadRequestException("Cannot update delivery at status: " + order.getOrderStatus());
         }
 
+        String currentStatus = order.getOrderStatus();
         order.setOrderStatus(status);
         order = orderRepository.save(order);
+
+        orderHistoryRepository.save(com.re.greenphone.entity.OrderHistory.builder()
+                .order(order)
+                .fromStatus(currentStatus)
+                .toStatus(status)
+                .note("Cập nhật trạng thái giao hàng sang " + status)
+                .changedBy("ADMIN")
+                .build());
 
         if ("DELIVERED".equals(status)) {
             sendDeliveredEmail(order);

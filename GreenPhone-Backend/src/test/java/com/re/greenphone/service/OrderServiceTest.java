@@ -34,6 +34,7 @@ import static org.mockito.Mockito.*;
 class OrderServiceTest {
 
     @Mock private OrderRepository orderRepository;
+    @Mock private com.re.greenphone.repository.OrderHistoryRepository orderHistoryRepository;
     @Mock private UserRepository userRepository;
     @Mock private PhoneVariantRepository phoneVariantRepository;
     @Mock private UserPromotionRepository userPromotionRepository;

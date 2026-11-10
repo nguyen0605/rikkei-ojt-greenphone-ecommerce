@@ -38,6 +38,9 @@ class AdminOrderServiceTest {
     private OrderRepository orderRepository;
 
     @Mock
+    private com.re.greenphone.repository.OrderHistoryRepository orderHistoryRepository;
+
+    @Mock
     private PhoneVariantRepository phoneVariantRepository;
 
     @Mock

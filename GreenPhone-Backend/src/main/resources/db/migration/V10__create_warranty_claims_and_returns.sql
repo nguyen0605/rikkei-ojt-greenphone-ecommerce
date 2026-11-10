@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS refund (
     refunded_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at DATETIME(6) NULL ON UPDATE CURRENT_TIMESTAMP(6),
-    CONSTRAINT fk_refund_order FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_refund_tbl_order FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE RESTRICT,
     CONSTRAINT fk_refund_return FOREIGN KEY (return_request_id) REFERENCES return_request (id) ON DELETE SET NULL
 );
 

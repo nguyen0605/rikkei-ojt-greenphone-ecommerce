@@ -266,6 +266,22 @@ export interface OrderDTO {
   orderDetails: OrderDetailDTO[];
 }
 
+export interface OrderHistoryDTO {
+  id: number;
+  orderId: number;
+  fromStatus: string | null;
+  toStatus: string;
+  note: string | null;
+  changedBy: string | null;
+  createdAt: string;
+}
+
+export interface AdminOrderDetailDTO extends OrderDTO {
+  histories?: OrderHistoryDTO[];
+  shipments?: ShipmentDTO[];
+  payments?: PaymentDTO[];
+}
+
 // Shipment
 export interface ShipmentHistoryDTO {
   id: number;

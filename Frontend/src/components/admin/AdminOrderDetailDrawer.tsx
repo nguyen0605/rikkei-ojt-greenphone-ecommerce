@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   CloseCircleOutlined,
   CheckCircleOutlined,
+  HistoryOutlined,
   UserOutlined,
   PhoneOutlined,
   EnvironmentOutlined,
@@ -11,7 +12,7 @@ import {
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminOrderService } from '@/services';
-import type { OrderDTO, OrderDetailDTO } from '@/types/api';
+import type { OrderDTO, OrderDetailDTO, AdminOrderDetailDTO } from '@/types/api';
 import { formatVND, formatDate } from '@/utils';
 import StatusTag from '@/components/admin/StatusTag';
 import { extractCancelReason, extractCustomerNote, isTerminalOrderStatus } from '@/utils/orderStateMachine';
@@ -402,6 +403,37 @@ export default function AdminOrderDetailDrawer({
               </div>
             </div>
           </div>
+
+          {/* 6. Lịch sử trạng thái đơn hàng (Audit History) */}
+          {order.histories && order.histories.length > 0 && (
+            <div className="rounded-xl border border-line bg-bg-soft/40 p-4">
+              <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-ink-2 flex items-center gap-2">
+                <HistoryOutlined className="text-primary-600" />
+                Lịch sử xử lý đơn hàng
+              </h4>
+              <div className="space-y-3">
+                {order.histories.map((h) => (
+                  <div key={h.id} className="flex items-start justify-between text-xs border-b border-line/60 pb-2.5 last:border-0 last:pb-0">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Tag color="blue" className="!m-0 text-[11px] font-medium">
+                          {h.toStatus}
+                        </Tag>
+                        {h.fromStatus && (
+                          <span className="text-ink-3">từ <span className="font-medium text-ink-2">{h.fromStatus}</span></span>
+                        )}
+                        <span className="text-ink-3">• bởi <span className="font-semibold text-ink">{h.changedBy || 'Hệ thống'}</span></span>
+                      </div>
+                      {h.note && <div className="text-ink-2 italic font-sans">{h.note}</div>}
+                    </div>
+                    <span className="text-ink-3 shrink-0 whitespace-nowrap pl-2">
+                      {formatDate(h.createdAt)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Drawer>

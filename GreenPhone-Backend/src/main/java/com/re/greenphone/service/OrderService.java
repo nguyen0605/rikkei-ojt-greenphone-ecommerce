@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final com.re.greenphone.repository.OrderHistoryRepository orderHistoryRepository;
     private final UserRepository userRepository;
     private final PhoneVariantRepository phoneVariantRepository;
     private final UserPromotionRepository userPromotionRepository;
@@ -224,6 +225,14 @@ public class OrderService {
         order.setFinalAmount(finalAmount);
 
         order = orderRepository.save(order);
+
+        orderHistoryRepository.save(com.re.greenphone.entity.OrderHistory.builder()
+                .order(order)
+                .fromStatus(null)
+                .toStatus(order.getOrderStatus())
+                .note("Đơn hàng được khởi tạo thành công (" + order.getPaymentMethod() + ")")
+                .changedBy(user.getFullName() != null ? user.getFullName() : "CUSTOMER")
+                .build());
 
         // Clear cart
         cartRepository.findByUserId(userId).ifPresent(cart -> {
@@ -416,7 +425,18 @@ public class OrderService {
             order.setNote(noteBuilder.toString().trim());
         }
 
+        String previousStatus = order.getOrderStatus();
+        order.setOrderStatus("CANCELLED");
         order = orderRepository.save(order);
+
+        orderHistoryRepository.save(com.re.greenphone.entity.OrderHistory.builder()
+                .order(order)
+                .fromStatus(previousStatus)
+                .toStatus("CANCELLED")
+                .note(reason != null && !reason.isBlank() ? reason.trim() : "Khách hàng hủy đơn")
+                .changedBy(order.getUser() != null ? order.getUser().getFullName() : "CUSTOMER")
+                .build());
+
         return orderMapper.toDto(order);
     }
 
