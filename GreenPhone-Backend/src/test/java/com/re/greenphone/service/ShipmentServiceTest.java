@@ -2,11 +2,13 @@ package com.re.greenphone.service;
 
 import com.re.greenphone.common.exception.BadRequestException;
 import com.re.greenphone.common.exception.ResourceNotFoundException;
+import com.re.greenphone.common.exception.UnauthorizedException;
 import com.re.greenphone.dto.request.CreateShipmentRequest;
 import com.re.greenphone.dto.request.UpdateShipmentStatusRequest;
 import com.re.greenphone.dto.response.ShipmentDTO;
 import com.re.greenphone.entity.*;
 import com.re.greenphone.repository.*;
+import com.re.greenphone.security.SecurityUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
@@ -223,5 +226,60 @@ class ShipmentServiceTest {
             sum += digit;
         }
         assertThat(sum % 10).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("Chống IDOR: Khách hàng là chủ sở hữu đơn hàng xem danh sách kiện hàng thành công")
+    void testGetShipmentsByOrderId_WhenOwner_Success() {
+        User owner = new User();
+        owner.setId(10L);
+        sampleOrder.setUser(owner);
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+        when(shipmentRepository.findByOrderId(1L)).thenReturn(List.of());
+
+        try (MockedStatic<SecurityUtils> secMock = mockStatic(SecurityUtils.class)) {
+            secMock.when(SecurityUtils::getCurrentUserId).thenReturn(10L);
+            secMock.when(() -> SecurityUtils.hasRole("ROLE_ADMIN")).thenReturn(false);
+
+            List<ShipmentDTO> list = shipmentService.getShipmentsByOrderId(1L);
+            assertThat(list).isNotNull();
+        }
+    }
+
+    @Test
+    @DisplayName("Chống IDOR: Người dùng lạ không phải chủ đơn hàng và không phải Admin bị từ chối với UnauthorizedException")
+    void testGetShipmentsByOrderId_WhenNotOwnerAndNotAdmin_ThrowsUnauthorizedException() {
+        User owner = new User();
+        owner.setId(10L);
+        sampleOrder.setUser(owner);
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+
+        try (MockedStatic<SecurityUtils> secMock = mockStatic(SecurityUtils.class)) {
+            secMock.when(SecurityUtils::getCurrentUserId).thenReturn(999L);
+            secMock.when(() -> SecurityUtils.hasRole("ROLE_ADMIN")).thenReturn(false);
+
+            assertThrows(UnauthorizedException.class, () -> shipmentService.getShipmentsByOrderId(1L));
+        }
+    }
+
+    @Test
+    @DisplayName("Chống IDOR: Quản trị viên (ROLE_ADMIN) có quyền xem kiện hàng của bất kỳ đơn nào")
+    void testGetShipmentsByOrderId_WhenAdmin_Success() {
+        User owner = new User();
+        owner.setId(10L);
+        sampleOrder.setUser(owner);
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+        when(shipmentRepository.findByOrderId(1L)).thenReturn(List.of());
+
+        try (MockedStatic<SecurityUtils> secMock = mockStatic(SecurityUtils.class)) {
+            secMock.when(SecurityUtils::getCurrentUserId).thenReturn(999L);
+            secMock.when(() -> SecurityUtils.hasRole("ROLE_ADMIN")).thenReturn(true);
+
+            List<ShipmentDTO> list = shipmentService.getShipmentsByOrderId(1L);
+            assertThat(list).isNotNull();
+        }
     }
 }

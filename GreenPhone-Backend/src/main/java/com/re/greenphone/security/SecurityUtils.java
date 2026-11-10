@@ -27,4 +27,13 @@ public final class SecurityUtils {
                 .map(Object::toString)
                 .orElse("ROLE_CUSTOMER");
     }
+
+    public static boolean hasRole(String role) {
+        try {
+            return getCurrentUser().getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equalsIgnoreCase(role));
+        } catch (Exception e) {
+            return false;
+        }
+    }
 }

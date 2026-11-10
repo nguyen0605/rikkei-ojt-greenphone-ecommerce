@@ -2,12 +2,14 @@ package com.re.greenphone.service;
 
 import com.re.greenphone.common.exception.BadRequestException;
 import com.re.greenphone.common.exception.ResourceNotFoundException;
+import com.re.greenphone.common.exception.UnauthorizedException;
 import com.re.greenphone.dto.request.CreateShipmentRequest;
 import com.re.greenphone.dto.request.UpdateShipmentStatusRequest;
 import com.re.greenphone.dto.response.ShipmentDTO;
 import com.re.greenphone.dto.response.ShipmentHistoryDTO;
 import com.re.greenphone.entity.*;
 import com.re.greenphone.repository.*;
+import com.re.greenphone.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -222,6 +224,15 @@ public class ShipmentService {
 
     @Transactional(readOnly = true)
     public List<ShipmentDTO> getShipmentsByOrderId(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+
+        Long currentUserId = SecurityUtils.getCurrentUserId();
+        boolean isAdmin = SecurityUtils.hasRole("ROLE_ADMIN");
+        if (!isAdmin && (order.getUser() == null || !order.getUser().getId().equals(currentUserId))) {
+            throw new UnauthorizedException("You do not have permission to view shipments for this order");
+        }
+
         return shipmentRepository.findByOrderId(orderId).stream()
                 .map(this::mapToDTO)
                 .toList();
@@ -252,7 +263,11 @@ public class ShipmentService {
                 return candidate;
             }
         }
-        return "GP-" + datePart + "-" + String.format("%05d", random.nextInt(100000));
+        StringBuilder fallbackSuffix = new StringBuilder(5);
+        for (int i = 0; i < 5; i++) {
+            fallbackSuffix.append(characters.charAt(random.nextInt(characters.length())));
+        }
+        return "GP-" + datePart + "-" + fallbackSuffix;
     }
 
     /**
