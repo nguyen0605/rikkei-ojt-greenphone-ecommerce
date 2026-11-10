@@ -100,9 +100,10 @@ export function useOrderProductLookup() {
         : undefined;
 
     // Valid navigation URL requires a valid phoneId and an active product
+    // Uses canonical query parameter `variantId` (avoiding redundant `variant` parameter in modern URLs)
     const navUrl =
       phoneId && !isInactive
-        ? `/san-pham/${phoneId}?variantId=${item.phoneVariantId}&variant=${item.phoneVariantId}${
+        ? `/san-pham/${phoneId}?variantId=${item.phoneVariantId}${
             slug ? `&slug=${slug}` : ''
           }`
         : undefined;

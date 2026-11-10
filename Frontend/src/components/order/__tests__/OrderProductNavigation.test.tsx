@@ -328,8 +328,10 @@ describe('ORD-20: Order Product Quick Navigation to PDP', () => {
     const imageLink = screen.getByTestId('order-item-image-link');
 
     expect(nameLink.getAttribute('href')).toContain('/san-pham/1?variantId=10');
+    expect(nameLink.getAttribute('href')).not.toContain('&variant=');
     expect(nameLink.getAttribute('href')).toContain('slug=iphone-15-pro-max');
     expect(imageLink.getAttribute('href')).toContain('/san-pham/1?variantId=10');
+    expect(imageLink.getAttribute('href')).not.toContain('&variant=');
 
     // Click name link
     await user.click(nameLink);
@@ -342,6 +344,24 @@ describe('ORD-20: Order Product Quick Navigation to PDP', () => {
         <Route path="/san-pham/:id" element={<ProductDetailPage />} />
       </Routes>,
       { initialEntries: ['/san-pham/1?variantId=10'] }
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: 'iPhone 15 Pro Max' })).toBeInTheDocument();
+    });
+
+    // Variant 10: 8GB/256GB - Titan Tự Nhiên
+    const radioVariant10 = screen.getByTestId('variant-radio-10');
+    expect(radioVariant10.parentElement).toHaveClass('ant-radio-button-checked');
+    expect(screen.getByText(/256GB — Titan Tự Nhiên/)).toBeInTheDocument();
+  });
+
+  it('8b: PDP tự động chọn đúng dung lượng và màu sắc từ query param cũ variant (tương thích ngược)', async () => {
+    renderComponent(
+      <Routes>
+        <Route path="/san-pham/:id" element={<ProductDetailPage />} />
+      </Routes>,
+      { initialEntries: ['/san-pham/1?variant=10'] }
     );
 
     await waitFor(() => {
@@ -423,6 +443,7 @@ describe('ORD-20: Order Product Quick Navigation to PDP', () => {
 
     const link = screen.getByTestId('admin-order-item-name-link');
     expect(link.getAttribute('href')).toContain('/san-pham/1?variantId=10');
+    expect(link.getAttribute('href')).not.toContain('&variant=');
   });
 
   it('15: OrderDetailPage cũng hiển thị thumbnail và cho phép điều hướng đến PDP', async () => {
@@ -446,6 +467,7 @@ describe('ORD-20: Order Product Quick Navigation to PDP', () => {
 
     const link = screen.getByTestId('order-item-name-link');
     expect(link.getAttribute('href')).toContain('/san-pham/1?variantId=10');
+    expect(link.getAttribute('href')).not.toContain('&variant=');
   });
 
   it('13 & 14: Điều hướng không reload toàn bộ trang (sử dụng React Router)', async () => {

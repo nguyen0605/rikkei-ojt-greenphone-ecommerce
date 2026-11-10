@@ -128,6 +128,7 @@ describe('useOrderProductLookup', () => {
     expect(resolved.imageUrl).toBe('https://img.example.com/15promax.png');
     expect(resolved.isInactive).toBe(false);
     expect(resolved.navUrl).toContain('/san-pham/1?variantId=101');
+    expect(resolved.navUrl).not.toContain('variant=');
   });
 
   it('resolves product info by productName prefix matching longer names first', async () => {
@@ -156,6 +157,7 @@ describe('useOrderProductLookup', () => {
     expect(resolved.imageUrl).toBe('https://img.example.com/15promax.png');
     expect(resolved.isInactive).toBe(false);
     expect(resolved.navUrl).toContain('/san-pham/1?variantId=102');
+    expect(resolved.navUrl).not.toContain('variant=');
   });
 
   it('marks product as inactive and suppresses navUrl when status is INACTIVE', async () => {
