@@ -39,7 +39,7 @@ export default function AccountLayout() {
               <ArrowLeftOutlined /> Trang chủ
             </NavLink>
             <h1 className="text-2xl font-bold text-gray-900">Tài khoản của tôi</h1>
-            <p className="mt-1 text-sm text-gray-500">Quản lý hồ sơ cá nhân, sổ địa chỉ và đơn hàng</p>
+            <p className="mt-1 text-sm text-gray-500">Quản lý hồ sơ cá nhân, sổ địa chỉ, đơn hàng và sản phẩm yêu thích</p>
           </div>
 
           <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">

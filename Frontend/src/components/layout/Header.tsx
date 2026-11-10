@@ -74,7 +74,7 @@ export default function Header() {
         {
           key: 'wishlist',
           icon: <Heart className="h-4 w-4" />,
-          label: <Link to={ROUTES.WISHLIST}>Sản phẩm yêu thích</Link>,
+          label: <Link to={ROUTES.ACCOUNT_WISHLIST}>Sản phẩm yêu thích</Link>,
         },
         {
           key: 'reviews',
@@ -110,7 +110,7 @@ export default function Header() {
         <div className="flex items-center gap-1.5 sm:gap-2">
           {/* Wishlist */}
           <Link
-            to={ROUTES.WISHLIST}
+            to={ROUTES.ACCOUNT_WISHLIST}
             className="relative rounded-full p-2 text-gray-700 transition-colors hover:bg-red-50 hover:text-red-500"
             aria-label="Sản phẩm yêu thích"
             title="Sản phẩm yêu thích"

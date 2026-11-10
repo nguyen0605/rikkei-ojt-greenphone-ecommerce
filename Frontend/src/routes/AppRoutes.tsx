@@ -64,8 +64,8 @@ export default function AppRoutes() {
         <Route path={ROUTES.PRODUCT_DETAIL()} element={withSuspense(ProductDetailPage)} />
         <Route path={ROUTES.VOUCHERS} element={withSuspense(VouchersPage)} />
         <Route path={ROUTES.CART} element={withSuspense(CartPage)} />
-        <Route path={ROUTES.WISHLIST} element={withSuspense(WishlistPage)} />
-        <Route path="/wishlist" element={<Navigate to={ROUTES.WISHLIST} replace />} />
+        <Route path={ROUTES.WISHLIST} element={<Navigate to={ROUTES.ACCOUNT_WISHLIST} replace />} />
+        <Route path="/wishlist" element={<Navigate to={ROUTES.ACCOUNT_WISHLIST} replace />} />
         <Route path={ROUTES.DIEU_KHOAN} element={withSuspense(TermsPage)} />
         <Route path={ROUTES.CHINH_SACH_BAO_MAT} element={withSuspense(PrivacyPage)} />
         <Route path="*" element={withSuspense(NotFoundPage)} />
