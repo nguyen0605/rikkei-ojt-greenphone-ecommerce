@@ -359,6 +359,8 @@ export interface ChangePasswordRequest {
   newPassword: string;
 }
 
+export type AddressLabel = 'HOME' | 'OFFICE' | 'FAMILY' | 'OTHER';
+
 export interface AddressItem {
   id: string | number;
   receiverName: string;
@@ -367,6 +369,9 @@ export interface AddressItem {
   district?: string;
   ward?: string;
   streetAddress: string;
+  label?: AddressLabel | string;
+  latitude?: number;
+  longitude?: number;
   note?: string;
   isDefault: boolean;
   createdAt?: string;
@@ -379,6 +384,9 @@ export interface AddressRequest {
   district?: string;
   ward?: string;
   streetAddress: string;
+  label?: AddressLabel | string;
+  latitude?: number;
+  longitude?: number;
   note?: string;
   isDefault?: boolean;
 }

@@ -227,5 +227,85 @@ describe('userService', () => {
       expect(list.find((a) => a.id === addr1.id)?.isDefault).toBe(false);
       expect(list.find((a) => a.id === addr2.id)?.isDefault).toBe(true);
     });
+
+    it('createAddress rejects duplicate address for the same recipient', async () => {
+      localStorage.setItem('greenphone.user', JSON.stringify({ id: 10 }));
+
+      await userService.createAddress({
+        receiverName: 'Dương Phúc Thịnh',
+        receiverPhone: '0827242427',
+        province: 'TP. Hồ Chí Minh',
+        streetAddress: 'Vinhomes Grand Park, Thủ Đức',
+      });
+
+      await expect(
+        userService.createAddress({
+          receiverName: 'Dương Phúc Thịnh',
+          receiverPhone: '0827242427',
+          province: 'TP. Hồ Chí Minh',
+          streetAddress: 'Vinhomes Grand Park, Thủ Đức',
+        })
+      ).rejects.toThrow('Địa chỉ này đã tồn tại trong sổ địa chỉ của bạn.');
+    });
+
+    it('updateAddress rejects updating to an existing duplicate address', async () => {
+      localStorage.setItem('greenphone.user', JSON.stringify({ id: 10 }));
+
+      await userService.createAddress({
+        receiverName: 'Dương Phúc Thịnh',
+        receiverPhone: '0827242427',
+        province: 'TP. Hồ Chí Minh',
+        streetAddress: 'Số 10 Lê Duẩn',
+      });
+
+      const addr2 = await userService.createAddress({
+        receiverName: 'Dương Phúc Thịnh',
+        receiverPhone: '0827242427',
+        province: 'TP. Hồ Chí Minh',
+        streetAddress: 'Số 99 Nguyễn Xiển',
+      });
+
+      await expect(
+        userService.updateAddress(addr2.id, {
+          receiverName: 'Dương Phúc Thịnh',
+          receiverPhone: '0827242427',
+          province: 'TP. Hồ Chí Minh',
+          streetAddress: 'Số 10 Lê Duẩn',
+        })
+      ).rejects.toThrow('Địa chỉ này đã trùng với một địa chỉ khác trong sổ địa chỉ của bạn.');
+    });
+
+    it('getAddresses automatically deduplicates existing records and preserves pinned coordinates', async () => {
+      localStorage.setItem('greenphone.user', JSON.stringify({ id: 10 }));
+
+      // Giả lập dữ liệu cũ bị trùng lặp trong localStorage
+      const corrupted = [
+        {
+          id: 'addr_1',
+          receiverName: 'Dương Phúc Thịnh',
+          receiverPhone: '0827242427',
+          province: 'TP. Hồ Chí Minh',
+          streetAddress: 'Vinhomes Grand Park, Thủ Đức',
+          isDefault: true,
+        },
+        {
+          id: 'addr_2',
+          receiverName: 'Dương Phúc Thịnh',
+          receiverPhone: '0827242427',
+          province: 'TP. Hồ Chí Minh',
+          streetAddress: 'Vinhomes Grand Park, Thủ Đức',
+          latitude: 10.84,
+          longitude: 106.83,
+          isDefault: false,
+        },
+      ];
+      localStorage.setItem('greenphone.addresses.10', JSON.stringify(corrupted));
+
+      const cleaned = await userService.getAddresses();
+      expect(cleaned.length).toBe(1);
+      expect(cleaned[0].latitude).toBe(10.84);
+      expect(cleaned[0].longitude).toBe(106.83);
+      expect(cleaned[0].isDefault).toBe(true);
+    });
   });
 });
