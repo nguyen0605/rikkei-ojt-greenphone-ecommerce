@@ -1,4 +1,5 @@
 import { Drawer, Space, Button, Descriptions, Tag, Table, Divider, Popconfirm, message, type TableColumnsType } from 'antd';
+import { Link } from 'react-router-dom';
 import {
   CloseCircleOutlined,
   CheckCircleOutlined,
@@ -14,6 +15,8 @@ import type { OrderDTO, OrderDetailDTO } from '@/types/api';
 import { formatVND, formatDate } from '@/utils';
 import StatusTag from '@/components/admin/StatusTag';
 import { extractCancelReason, extractCustomerNote, isTerminalOrderStatus } from '@/utils/orderStateMachine';
+import { useOrderProductLookup } from '@/hooks/useOrderProductLookup';
+import OrderItemThumbnail from '@/components/order/OrderItemThumbnail';
 import ShipmentTrackingCard from '@/components/order/ShipmentTrackingCard';
 
 interface AdminOrderDetailDrawerProps {
@@ -34,6 +37,7 @@ export default function AdminOrderDetailDrawer({
   isConfirming = false,
 }: AdminOrderDetailDrawerProps) {
   const qc = useQueryClient();
+  const { resolveItem } = useOrderProductLookup();
 
   // Query chi tiết đơn hàng
   const { data: order, isLoading } = useQuery({
@@ -61,14 +65,42 @@ export default function AdminOrderDetailDrawer({
     {
       title: 'Sản phẩm',
       dataIndex: 'productName',
-      render: (name: string, r) => (
-        <div>
-          <div className="font-semibold text-ink">{name}</div>
-          <div className="text-xs text-ink-3">
-            {[r.ram, r.storage, r.color].filter(Boolean).join(' • ')}
+      render: (name: string, r) => {
+        const resolved = resolveItem(r);
+        return (
+          <div className="flex items-center gap-3 py-1">
+            <OrderItemThumbnail
+              imageUrl={resolved.imageUrl}
+              productName={name}
+              navUrl={resolved.navUrl}
+              size="sm"
+            />
+            <div className="min-w-0 flex-1">
+              {resolved.navUrl ? (
+                <Link
+                  to={resolved.navUrl}
+                  data-testid="admin-order-item-name-link"
+                  className="font-semibold text-ink hover:text-primary-600 transition-colors line-clamp-1 block focus:outline-none"
+                >
+                  {name}
+                </Link>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-ink line-clamp-1">{name}</span>
+                  {resolved.isInactive && (
+                    <Tag color="error" className="!m-0 text-[10px]">
+                      Ngừng kinh doanh
+                    </Tag>
+                  )}
+                </div>
+              )}
+              <div className="text-xs text-ink-3">
+                {[r.ram, r.storage, r.color].filter(Boolean).join(' • ')}
+              </div>
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: 'Đơn giá',

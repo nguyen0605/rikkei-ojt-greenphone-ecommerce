@@ -17,6 +17,21 @@ import java.util.Map;
 public class AdminOrderController {
 
     private final AdminOrderService adminOrderService;
+    private final com.re.greenphone.service.RefundService refundService;
+
+    @PostMapping("/{id}/refund/claim")
+    public ResponseEntity<ApiResponse<com.re.greenphone.dto.response.RefundDTO>> claimRefund(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(refundService.claimRefund(id),
+                "Đã tiếp nhận xử lý yêu cầu hoàn tiền thành công"));
+    }
+
+    @PostMapping("/{id}/refund/confirm")
+    public ResponseEntity<ApiResponse<com.re.greenphone.dto.response.RefundDTO>> confirmRefund(
+            @PathVariable Long id,
+            @jakarta.validation.Valid @RequestBody com.re.greenphone.dto.request.ConfirmRefundRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(refundService.confirmRefund(id, request),
+                "Xác nhận hoàn tiền thành công"));
+    }
 
     @GetMapping
     public ResponseEntity<ApiResponse<?>> getOrders(

@@ -52,6 +52,19 @@ class OrderTimeoutSchedulerTest {
     private OrderTimeoutScheduler scheduler;
 
     @Test
+    void expiryUsesTheWarehouseStoredOnTheOrderDetail() {
+        PhoneVariant variant = PhoneVariant.builder().stockQuantity(8).build(); variant.setId(100L);
+        Order order = Order.builder().orderStatus("PENDING").paymentStatus("UNPAID").paymentMethod("VIETQR").build(); order.setId(99L);
+        order.getOrderDetails().add(OrderDetail.builder().order(order).phoneVariant(variant).quantity(2).warehouseId(42L).build());
+        when(orderRepository.findByOrderStatusAndPaymentStatusAndPaymentMethodInAndCreatedAtBefore(anyString(), anyString(), anyList(), any())).thenReturn(List.of(order));
+        when(orderRepository.findByIdForUpdate(99L)).thenReturn(Optional.of(order));
+        when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(variant));
+        scheduler.cancelExpiredPendingOrders();
+        verify(historyService).recordAtWarehouse(eq(variant), eq(8), eq(2), eq("IMPORT"), anyString(), eq(42L));
+        assertEquals(10, variant.getStockQuantity());
+    }
+
+    @Test
     @DisplayName("Case 1: Quá hạn 15 phút - Hủy đơn VietQR/Sepay, hoàn trả tồn kho, hoàn voucher và ghi log lịch sử kho")
     void cancelExpiredPendingOrders_ShouldCancelAndRestoreStockAndVoucher() {
         ReflectionTestUtils.setField(scheduler, "timeoutMinutes", 15);
@@ -88,7 +101,7 @@ class OrderTimeoutSchedulerTest {
                 eq("PENDING"), eq("UNPAID"), eq(List.of("VIETQR", "SEPAY")), any(LocalDateTime.class)))
                 .thenReturn(List.of(order));
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
         when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(variant));
         when(phoneVariantRepository.save(any(PhoneVariant.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -137,7 +150,7 @@ class OrderTimeoutSchedulerTest {
                 eq("PENDING"), eq("UNPAID"), eq(List.of("VIETQR", "SEPAY")), any(LocalDateTime.class)))
                 .thenReturn(List.of(staleOrder));
 
-        when(orderRepository.findById(10L)).thenReturn(Optional.of(paidOrder));
+        when(orderRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(paidOrder));
 
         scheduler.cancelExpiredPendingOrders();
 
@@ -161,7 +174,7 @@ class OrderTimeoutSchedulerTest {
                 eq("PENDING"), eq("UNPAID"), eq(List.of("VIETQR", "SEPAY")), any(LocalDateTime.class)))
                 .thenReturn(List.of(codOrder));
 
-        when(orderRepository.findById(20L)).thenReturn(Optional.of(codOrder));
+        when(orderRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(codOrder));
 
         scheduler.cancelExpiredPendingOrders();
 
@@ -186,10 +199,10 @@ class OrderTimeoutSchedulerTest {
                 eq("PENDING"), eq("UNPAID"), eq(List.of("VIETQR", "SEPAY")), any(LocalDateTime.class)))
                 .thenReturn(List.of(order));
 
-        when(orderRepository.findById(30L)).thenThrow(new OptimisticLockException("Row modified concurrently"));
+        when(orderRepository.findByIdForUpdate(30L)).thenThrow(new OptimisticLockException("Row modified concurrently"));
 
         scheduler.cancelExpiredPendingOrders();
 
-        verify(orderRepository).findById(30L);
+        verify(orderRepository).findByIdForUpdate(30L);
     }
 }

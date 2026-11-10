@@ -43,6 +43,7 @@ public class SecurityConfig {
                         "/api/settings/**",
                         "/api/options/**",
                         "/api/shipments/track/**",
+                        "/api/v1/shipments/track/**",
                         "/swagger-ui/**",
                         "/v3/api-docs/**",
                         "/actuator/health/**"
@@ -55,6 +56,9 @@ public class SecurityConfig {
 
         @Bean
         public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+                var warehouseMatcher = org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher
+                                .withDefaults().matcher("/api/v1/admin/**");
+                var errorMapper = new com.fasterxml.jackson.databind.ObjectMapper();
                 http
                                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                                 .csrf(AbstractHttpConfigurer::disable)
@@ -68,10 +72,23 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.GET, "/api/banners/**").permitAll()
                                                 .requestMatchers(HttpMethod.GET, "/api/reviews/phone/**").permitAll()
                                                 // Admin endpoints
-                                                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                                                .requestMatchers("/api/admin/**", "/api/v1/admin/**").hasRole("ADMIN")
                                                 // All other API endpoints require authentication
-                                                .requestMatchers("/api/**").authenticated()
+                                                .requestMatchers("/api/**", "/api/v1/**").authenticated()
                                                 .anyRequest().permitAll())
+                                .exceptionHandling(errors -> errors
+                                                .defaultAuthenticationEntryPointFor((request, response, exception) -> {
+                                                        response.setStatus(401);
+                                                        response.setContentType("application/json");
+                                                        errorMapper.writeValue(response.getOutputStream(),
+                                                                com.re.greenphone.common.dto.ApiResponse.error(401, "Authentication required"));
+                                                }, warehouseMatcher)
+                                                .defaultAccessDeniedHandlerFor((request, response, exception) -> {
+                                                        response.setStatus(403);
+                                                        response.setContentType("application/json");
+                                                        errorMapper.writeValue(response.getOutputStream(),
+                                                                com.re.greenphone.common.dto.ApiResponse.error(403, "Access denied"));
+                                                }, warehouseMatcher))
                                 .addFilterBefore(jwtAuthenticationFilter,
                                                 UsernamePasswordAuthenticationFilter.class);
 

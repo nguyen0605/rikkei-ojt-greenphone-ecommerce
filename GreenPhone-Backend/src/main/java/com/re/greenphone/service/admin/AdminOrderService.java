@@ -47,6 +47,7 @@ public class AdminOrderService {
     private final OrderMapper orderMapper;
     private final EmailService emailService;
     private final InventoryStockHistoryService inventoryStockHistoryService;
+    private final jakarta.persistence.EntityManager entityManager;
 
     private boolean isValidTransition(String current, String next) {
         if (current == null || next == null) return false;
@@ -92,7 +93,7 @@ public class AdminOrderService {
     }
 
     public OrderDTO updateStatus(Long id, String status, String reason) {
-        Order order = orderRepository.findById(id)
+        Order order = ("CANCELLED".equals(status) ? orderRepository.findByIdForUpdate(id) : orderRepository.findById(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
 
         if (status == null || !VALID_ORDER_STATUSES.contains(status)) {
@@ -116,9 +117,14 @@ public class AdminOrderService {
                 if (variant != null && variant.getStockQuantity() != null) {
                     PhoneVariant locked = phoneVariantRepository.findByIdWithLock(variant.getId())
                             .orElse(variant);
+                    entityManager.refresh(locked, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
                     int quantityBefore = locked.getStockQuantity();
                     locked.setStockQuantity(quantityBefore + detail.getQuantity());
-                    inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Admin hủy đơn hàng");
+                    if (detail.getWarehouseId() == null) {
+                        inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Admin hủy đơn hàng");
+                    } else {
+                        inventoryStockHistoryService.recordAtWarehouse(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Admin hủy đơn hàng", detail.getWarehouseId());
+                    }
                     phoneVariantRepository.save(locked);
                 }
             }

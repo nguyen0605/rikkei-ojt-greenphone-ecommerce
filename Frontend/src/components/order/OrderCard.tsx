@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
-  Smartphone,
   ChevronRight,
   Clock,
   CreditCard,
@@ -15,6 +14,8 @@ import type { OrderDTO, OrderDetailDTO } from '@/types/api';
 import { formatVND, formatDate } from '@/utils';
 import { useAppDispatch } from '@/store/hooks';
 import { addCartItem } from '@/store/slices/cartSlice';
+import { useOrderProductLookup } from '@/hooks/useOrderProductLookup';
+import OrderItemThumbnail from './OrderItemThumbnail';
 import { getStatusBadgeConfig, formatPaymentMethod } from './orderHelpers';
 
 export interface OrderCardProps {
@@ -26,6 +27,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onCancelRequest }) 
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useAppDispatch();
+  const { resolveItem } = useOrderProductLookup();
   const [isReordering, setIsReordering] = useState(false);
 
   const statusConfig = getStatusBadgeConfig(order.orderStatus, order.paymentStatus);
@@ -123,40 +125,49 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onCancelRequest }) 
       <div className="divide-y divide-gray-100 px-5 sm:px-6">
         {order.orderDetails?.map((item: OrderDetailDTO) => {
           const variantSpecs = [item.ram, item.storage, item.color].filter(Boolean).join(' • ');
+          const resolved = resolveItem(item);
 
           return (
             <div
               key={item.id || item.phoneVariantId}
               className="flex items-start gap-4 py-4"
             >
-              {/* Ảnh điện thoại thumbnail có fallback */}
-              <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-100 bg-gray-50 p-1">
-                {(item as { imageUrl?: string }).imageUrl ? (
-                  <img
-                    src={(item as { imageUrl?: string }).imageUrl}
-                    alt={item.productName}
-                    className="h-full w-full object-contain"
-                    loading="lazy"
-                    onError={(e) => {
-                      // Fallback khi ảnh lỗi
-                      e.currentTarget.style.display = 'none';
-                      const parent = e.currentTarget.parentElement;
-                      if (parent) {
-                        parent.classList.add('flex', 'items-center', 'justify-center');
-                        parent.innerHTML = '<svg class="w-8 h-8 text-emerald-600/50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><line x1="12" x2="12.01" y1="18" y2="18"/></svg>';
-                      }
-                    }}
-                  />
-                ) : (
-                  <Smartphone className="h-8 w-8 text-emerald-600/50" />
-                )}
-              </div>
+              {/* Ảnh điện thoại thumbnail với ảnh thực tế hoặc fallback */}
+              <OrderItemThumbnail
+                imageUrl={resolved.imageUrl}
+                productName={item.productName}
+                navUrl={resolved.navUrl}
+                size="md"
+              />
 
               {/* Tên & biến thể */}
               <div className="min-w-0 flex-1">
-                <h4 className="line-clamp-2 text-sm font-semibold text-gray-900 leading-snug">
-                  {item.productName}
-                </h4>
+                {resolved.navUrl ? (
+                  <Link
+                    to={resolved.navUrl}
+                    data-testid="order-item-name-link"
+                    className="group inline-block focus:outline-none"
+                  >
+                    <h4 className="line-clamp-2 text-sm font-semibold text-gray-900 leading-snug group-hover:text-emerald-600 transition-colors">
+                      {item.productName}
+                    </h4>
+                  </Link>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h4 className="line-clamp-2 text-sm font-semibold text-gray-900 leading-snug">
+                      {item.productName}
+                    </h4>
+                    {resolved.isInactive && (
+                      <span
+                        data-testid="product-inactive-badge"
+                        className="rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600"
+                      >
+                        Sản phẩm hiện đã ngừng kinh doanh
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 {variantSpecs && (
                   <div className="mt-1 inline-flex items-center rounded-md bg-gray-100/80 px-2 py-0.5 text-xs text-gray-600 font-medium">
                     {variantSpecs}

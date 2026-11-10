@@ -46,6 +46,7 @@ public class OrderService {
     private final EmailService emailService;
     private final SettingsService settingsService;
     private final InventoryStockHistoryService inventoryStockHistoryService;
+    private final jakarta.persistence.EntityManager entityManager;
     private final RedisTemplate<String, Object> redisTemplate;
 
     public OrderCreationResult createOrderWithIdempotency(OrderRequest request, String idempotencyKey) {
@@ -152,6 +153,7 @@ public class OrderService {
             String colorVal = variant.getColorItem() != null ? variant.getColorItem().getValue() : "";
 
             OrderDetail detail = OrderDetail.builder()
+                    .warehouseId(inventoryStockHistoryService.defaultWarehouseId())
                     .order(order)
                     .phoneVariant(variant)
                     .productName(productName)
@@ -324,7 +326,7 @@ public class OrderService {
 
     public OrderDTO cancelOrder(Long orderId, com.re.greenphone.dto.request.CancelOrderRequest request) {
         Long userId = SecurityUtils.getCurrentUserId();
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
         if (!order.getUser().getId().equals(userId)) {
@@ -347,9 +349,14 @@ public class OrderService {
             if (variant.getStockQuantity() != null) {
                 PhoneVariant locked = phoneVariantRepository.findByIdWithLock(variant.getId())
                         .orElse(variant);
+                entityManager.refresh(locked, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
                 int quantityBefore = locked.getStockQuantity();
                 locked.setStockQuantity(quantityBefore + detail.getQuantity());
-                inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Hủy đơn hàng");
+                if (detail.getWarehouseId() == null) {
+                    inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Hủy đơn hàng");
+                } else {
+                    inventoryStockHistoryService.recordAtWarehouse(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Hủy đơn hàng", detail.getWarehouseId());
+                }
                 phoneVariantRepository.save(locked);
             }
         }

@@ -168,8 +168,10 @@ public class SepayService {
         }
 
         // === Guard: Don't modify orders in terminal states ===
-        if (List.of("DELIVERED", "CANCELLED").contains(order.getOrderStatus())) {
-            log.warn("Order {} is in terminal state {}, ignoring webhook", orderId, order.getOrderStatus());
+        if (List.of("DELIVERED", "CANCELLED", "REFUNDED").contains(order.getOrderStatus())
+                || "REFUNDED".equalsIgnoreCase(order.getPaymentStatus())) {
+            log.warn("Order {} is in terminal state {} or paymentStatus {}, ignoring webhook",
+                    orderId, order.getOrderStatus(), order.getPaymentStatus());
             return Map.of("success", false, "message",
                     "Order is in terminal state: " + order.getOrderStatus());
         }
