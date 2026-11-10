@@ -26,16 +26,31 @@ public class InventoryStockHistoryService {
     private final InventoryStockHistoryRepository historyRepository;
     private final PhoneVariantRepository phoneVariantRepository;
     private final UserRepository userRepository;
+    private final WarehouseStockLedgerService warehouseLedger;
+
+    public Long defaultWarehouseId() { return warehouseLedger.mainWarehouse().getId(); }
+
+    public void recordAtWarehouse(PhoneVariant variant, int before, int delta, String type, String reason, Long warehouseId) {
+        warehouseLedger.apply(variant, warehouseLedger.warehouse(warehouseId), before, delta, type, reason, null);
+        saveCurrentUserRecord(variant, before, delta, type, reason);
+    }
 
     public PhoneVariant applyMovement(Long variantId, InventoryStockMovementRequest request) {
+        if (request.getQuantity() == null || request.getQuantity() <= 0
+                || !("IMPORT".equals(request.getChangeType()) || "EXPORT".equals(request.getChangeType()))) {
+            throw new BadRequestException("Invalid stock movement");
+        }
         PhoneVariant variant = phoneVariantRepository.findByIdWithLock(variantId)
                 .orElseThrow(() -> new ResourceNotFoundException("PhoneVariant", "id", variantId));
+        warehouseLedger.requireActiveMain();
 
         int quantityBefore = variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
         int quantityChange = "IMPORT".equals(request.getChangeType())
                 ? request.getQuantity()
                 : -request.getQuantity();
-        int quantityAfter = quantityBefore + quantityChange;
+        final int quantityAfter;
+        try { quantityAfter = Math.addExact(quantityBefore, quantityChange); }
+        catch (ArithmeticException ex) { throw new BadRequestException("Stock quantity overflow"); }
         if (quantityAfter < 0) {
             throw new BadRequestException("Export quantity cannot exceed current stock");
         }
@@ -48,6 +63,12 @@ public class InventoryStockHistoryService {
 
     public void record(PhoneVariant variant, int quantityBefore, int quantityChange,
                        String changeType, String reason) {
+        if (quantityChange != 0) warehouseLedger.applyDefault(variant, quantityBefore, quantityChange, changeType, reason);
+        saveCurrentUserRecord(variant, quantityBefore, quantityChange, changeType, reason);
+    }
+
+    private void saveCurrentUserRecord(PhoneVariant variant, int quantityBefore, int quantityChange,
+                                      String changeType, String reason) {
         Long userId = null;
         String userName = "SYSTEM";
         try {
@@ -57,10 +78,16 @@ public class InventoryStockHistoryService {
         } catch (RuntimeException ignored) {
             // Scheduled jobs do not have an authenticated principal.
         }
-        record(variant, quantityBefore, quantityChange, changeType, reason, userId, userName);
+        saveRecord(variant, quantityBefore, quantityChange, changeType, reason, userId, userName);
     }
 
     public void record(PhoneVariant variant, int quantityBefore, int quantityChange,
+                       String changeType, String reason, Long userId, String userName) {
+        if (quantityChange != 0) warehouseLedger.applyDefault(variant, quantityBefore, quantityChange, changeType, reason);
+        saveRecord(variant, quantityBefore, quantityChange, changeType, reason, userId, userName);
+    }
+
+    private void saveRecord(PhoneVariant variant, int quantityBefore, int quantityChange,
                        String changeType, String reason, Long userId, String userName) {
         int quantityAfter = quantityBefore + quantityChange;
         if (quantityAfter < 0) {

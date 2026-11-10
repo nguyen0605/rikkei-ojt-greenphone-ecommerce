@@ -40,7 +40,8 @@ public class PaymentService {
         }
 
         // Reject terminal orders
-        if (List.of("DELIVERED", "CANCELLED").contains(order.getOrderStatus())) {
+        if (List.of("DELIVERED", "CANCELLED", "REFUNDED").contains(order.getOrderStatus())
+                || "REFUNDED".equalsIgnoreCase(order.getPaymentStatus())) {
             throw new BadRequestException("Order is in terminal state: " + order.getOrderStatus());
         }
 

@@ -2,12 +2,31 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import OrderCard from '../OrderCard';
 import { getStatusBadgeConfig, formatPaymentMethod } from '../orderHelpers';
 import type { OrderDTO } from '@/types/api';
 import cartReducer from '@/store/slices/cartSlice';
+
+vi.mock('@/services', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services')>();
+  return {
+    ...actual,
+    phoneService: {
+      ...actual.phoneService,
+      list: vi.fn().mockResolvedValue({
+        content: [],
+        page: 0,
+        size: 50,
+        totalElements: 0,
+        totalPages: 0,
+        last: true,
+      }),
+    },
+  };
+});
 
 const createMockStore = () =>
   configureStore({
@@ -50,9 +69,14 @@ const mockOrder: OrderDTO = {
 
 function renderWithProviders(ui: React.ReactElement) {
   const store = createMockStore();
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
   return render(
     <Provider store={store}>
-      <MemoryRouter>{ui}</MemoryRouter>
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>{ui}</MemoryRouter>
+      </QueryClientProvider>
     </Provider>
   );
 }
@@ -119,14 +143,17 @@ describe('OrderCard', () => {
       expect(screen.queryByRole('button', { name: /hủy đơn/i })).not.toBeInTheDocument();
 
       // Test DELIVERED
+      const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
       rerender(
         <Provider store={createMockStore()}>
-          <MemoryRouter>
-            <OrderCard
-              order={{ ...mockOrder, orderStatus: 'DELIVERED' }}
-              onCancelRequest={onCancelRequest}
-            />
-          </MemoryRouter>
+          <QueryClientProvider client={qc}>
+            <MemoryRouter>
+              <OrderCard
+                order={{ ...mockOrder, orderStatus: 'DELIVERED' }}
+                onCancelRequest={onCancelRequest}
+              />
+            </MemoryRouter>
+          </QueryClientProvider>
         </Provider>
       );
       expect(screen.queryByRole('button', { name: /hủy đơn/i })).not.toBeInTheDocument();
@@ -134,12 +161,14 @@ describe('OrderCard', () => {
       // Test CANCELLED
       rerender(
         <Provider store={createMockStore()}>
-          <MemoryRouter>
-            <OrderCard
-              order={{ ...mockOrder, orderStatus: 'CANCELLED' }}
-              onCancelRequest={onCancelRequest}
-            />
-          </MemoryRouter>
+          <QueryClientProvider client={qc}>
+            <MemoryRouter>
+              <OrderCard
+                order={{ ...mockOrder, orderStatus: 'CANCELLED' }}
+                onCancelRequest={onCancelRequest}
+              />
+            </MemoryRouter>
+          </QueryClientProvider>
         </Provider>
       );
       expect(screen.queryByRole('button', { name: /hủy đơn/i })).not.toBeInTheDocument();

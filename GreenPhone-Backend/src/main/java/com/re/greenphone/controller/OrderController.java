@@ -19,6 +19,20 @@ import org.springframework.web.bind.annotation.*;
 public class OrderController {
 
     private final OrderService orderService;
+    private final com.re.greenphone.service.RefundService refundService;
+
+    @PostMapping("/{id}/refund")
+    public ResponseEntity<ApiResponse<com.re.greenphone.dto.response.RefundDTO>> requestRefund(
+            @PathVariable Long id,
+            @jakarta.validation.Valid @RequestBody com.re.greenphone.dto.request.CreateRefundRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(refundService.requestRefund(id, request),
+                "Yêu cầu hoàn tiền đã được tiếp nhận và chuyển vào hàng đợi xử lý"));
+    }
+
+    @GetMapping("/{id}/refund")
+    public ResponseEntity<ApiResponse<com.re.greenphone.dto.response.RefundDTO>> getRefund(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(refundService.getRefundByOrderId(id)));
+    }
 
     @GetMapping
     public ResponseEntity<ApiResponse<?>> getOrders(PageRequest pageRequest) {

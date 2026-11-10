@@ -2,11 +2,13 @@ package com.re.greenphone.service;
 
 import com.re.greenphone.common.exception.BadRequestException;
 import com.re.greenphone.common.exception.ResourceNotFoundException;
+import com.re.greenphone.common.exception.UnauthorizedException;
 import com.re.greenphone.dto.request.CreateShipmentRequest;
 import com.re.greenphone.dto.request.UpdateShipmentStatusRequest;
 import com.re.greenphone.dto.response.ShipmentDTO;
 import com.re.greenphone.entity.*;
 import com.re.greenphone.repository.*;
+import com.re.greenphone.security.SecurityUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
@@ -127,6 +130,7 @@ class ShipmentServiceTest {
         assertThat(result.getId()).isEqualTo(10L);
         assertThat(result.getStatus()).isEqualTo("READY_TO_SHIP");
         assertThat(result.getCarrierCode()).isEqualTo("GHN");
+        assertThat(result.getTrackingNumber()).matches("^GP-\\d{8}-[A-Z0-9]{5}$");
 
         // Kiểm tra Order đã tự động đổi trạng thái sang SHIPPING
         assertThat(sampleOrder.getOrderStatus()).isEqualTo("SHIPPING");
@@ -180,6 +184,29 @@ class ShipmentServiceTest {
     }
 
     @Test
+    @DisplayName("Quy tắc bắt buộc: Từ chối tạo Shipment nếu CarrierCode không hợp lệ")
+    void testCreateShipment_WithInvalidCarrierCode_ThrowsException() {
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+
+        CreateShipmentRequest req = CreateShipmentRequest.builder()
+                .orderId(1L)
+                .carrierCode("UNKNOWN_CARRIER")
+                .build();
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> shipmentService.createShipment(req));
+        assertThat(ex.getMessage()).contains("Invalid carrier code");
+        verify(shipmentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Kiểm tra sinh mã vận đơn tự động theo định dạng GP-YYYYMMDD-XXXXX")
+    void testGenerateTrackingNumber_MatchesPattern() {
+        when(shipmentRepository.existsByTrackingNumber(anyString())).thenReturn(false);
+        String trackingNumber = shipmentService.generateTrackingNumber();
+        assertThat(trackingNumber).matches("^GP-\\d{8}-[A-Z0-9]{5}$");
+    }
+
+    @Test
     @DisplayName("Kiểm tra thuật toán sinh IMEI tuân thủ chuẩn Luhn checksum")
     void testGenerateUniqueImei_ValidLuhn() {
         String imei = shipmentService.generateUniqueImei();
@@ -199,5 +226,60 @@ class ShipmentServiceTest {
             sum += digit;
         }
         assertThat(sum % 10).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("Chống IDOR: Khách hàng là chủ sở hữu đơn hàng xem danh sách kiện hàng thành công")
+    void testGetShipmentsByOrderId_WhenOwner_Success() {
+        User owner = new User();
+        owner.setId(10L);
+        sampleOrder.setUser(owner);
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+        when(shipmentRepository.findByOrderId(1L)).thenReturn(List.of());
+
+        try (MockedStatic<SecurityUtils> secMock = mockStatic(SecurityUtils.class)) {
+            secMock.when(SecurityUtils::getCurrentUserId).thenReturn(10L);
+            secMock.when(() -> SecurityUtils.hasRole("ROLE_ADMIN")).thenReturn(false);
+
+            List<ShipmentDTO> list = shipmentService.getShipmentsByOrderId(1L);
+            assertThat(list).isNotNull();
+        }
+    }
+
+    @Test
+    @DisplayName("Chống IDOR: Người dùng lạ không phải chủ đơn hàng và không phải Admin bị từ chối với UnauthorizedException")
+    void testGetShipmentsByOrderId_WhenNotOwnerAndNotAdmin_ThrowsUnauthorizedException() {
+        User owner = new User();
+        owner.setId(10L);
+        sampleOrder.setUser(owner);
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+
+        try (MockedStatic<SecurityUtils> secMock = mockStatic(SecurityUtils.class)) {
+            secMock.when(SecurityUtils::getCurrentUserId).thenReturn(999L);
+            secMock.when(() -> SecurityUtils.hasRole("ROLE_ADMIN")).thenReturn(false);
+
+            assertThrows(UnauthorizedException.class, () -> shipmentService.getShipmentsByOrderId(1L));
+        }
+    }
+
+    @Test
+    @DisplayName("Chống IDOR: Quản trị viên (ROLE_ADMIN) có quyền xem kiện hàng của bất kỳ đơn nào")
+    void testGetShipmentsByOrderId_WhenAdmin_Success() {
+        User owner = new User();
+        owner.setId(10L);
+        sampleOrder.setUser(owner);
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+        when(shipmentRepository.findByOrderId(1L)).thenReturn(List.of());
+
+        try (MockedStatic<SecurityUtils> secMock = mockStatic(SecurityUtils.class)) {
+            secMock.when(SecurityUtils::getCurrentUserId).thenReturn(999L);
+            secMock.when(() -> SecurityUtils.hasRole("ROLE_ADMIN")).thenReturn(true);
+
+            List<ShipmentDTO> list = shipmentService.getShipmentsByOrderId(1L);
+            assertThat(list).isNotNull();
+        }
     }
 }
