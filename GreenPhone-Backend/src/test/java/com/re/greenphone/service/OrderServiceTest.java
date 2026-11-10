@@ -37,6 +37,7 @@ class OrderServiceTest {
     @Mock private EmailService emailService;
     @Mock private SettingsService settingsService;
     @Mock private InventoryStockHistoryService inventoryStockHistoryService;
+    @Mock private jakarta.persistence.EntityManager entityManager;
 
     @InjectMocks
     private OrderService orderService;
@@ -179,7 +180,7 @@ class OrderServiceTest {
                 .quantity(2).unitPrice(new BigDecimal("15000000")).build();
         order.setOrderDetails(List.of(detail));
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
         when(orderRepository.save(any())).thenReturn(order);
         when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(v));
         when(phoneVariantRepository.save(any())).thenReturn(v);
@@ -204,7 +205,7 @@ class OrderServiceTest {
                 .user(owner).orderStatus("PENDING").build();
         order.setId(2L);
 
-        when(orderRepository.findById(2L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(order));
 
         assertThrows(BadRequestException.class, () -> orderService.cancelOrder(2L, "Lý do"));
     }
@@ -217,7 +218,7 @@ class OrderServiceTest {
                 .user(u).orderStatus("SHIPPING").build();
         shippingOrder.setId(3L);
 
-        when(orderRepository.findById(3L)).thenReturn(Optional.of(shippingOrder));
+        when(orderRepository.findByIdForUpdate(3L)).thenReturn(Optional.of(shippingOrder));
 
         assertThrows(BadRequestException.class, () -> orderService.cancelOrder(3L, "Lý do"));
     }

@@ -27,6 +27,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class InventoryStockHistoryServiceTest {
+    @Mock private WarehouseStockLedgerService warehouseLedger;
     @Mock private InventoryStockHistoryRepository historyRepository;
     @Mock private PhoneVariantRepository phoneVariantRepository;
     @Mock private UserRepository userRepository;

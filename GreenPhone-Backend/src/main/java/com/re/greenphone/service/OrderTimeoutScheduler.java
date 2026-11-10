@@ -70,8 +70,9 @@ public class OrderTimeoutScheduler {
     private void cancelOne(Order order) {
         // Re-check freshness + terminal state inside the same transaction to
         // avoid acting on an order that was paid since the query.
-        Order fresh = orderRepository.findById(order.getId()).orElse(null);
+        Order fresh = orderRepository.findByIdForUpdate(order.getId()).orElse(null);
         if (fresh == null) return;
+        entityManager.refresh(fresh, LockModeType.PESSIMISTIC_WRITE);
         if (!"PENDING".equals(fresh.getOrderStatus()) || !"UNPAID".equals(fresh.getPaymentStatus())) {
             return; // paid or otherwise changed — leave it alone
         }
@@ -92,7 +93,11 @@ public class OrderTimeoutScheduler {
                 entityManager.refresh(locked, LockModeType.PESSIMISTIC_WRITE);
                 int quantityBefore = locked.getStockQuantity();
                 locked.setStockQuantity(quantityBefore + detail.getQuantity());
-                inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Hoàn kho do đơn hết hạn");
+                if (detail.getWarehouseId() == null) {
+                    inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Hoàn kho do đơn hết hạn");
+                } else {
+                    inventoryStockHistoryService.recordAtWarehouse(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Hoàn kho do đơn hết hạn", detail.getWarehouseId());
+                }
                 phoneVariantRepository.save(locked);
             }
         }
