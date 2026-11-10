@@ -36,6 +36,7 @@ public class RefundService {
     private final RefundTransactionRepository refundTransactionRepository;
     private final RefundMapper refundMapper;
     private final EmailService emailService;
+    private final jakarta.persistence.EntityManager entityManager;
 
     /**
      * Khách hàng (hoặc Admin) tạo yêu cầu hoàn tiền cho đơn hàng.
@@ -216,9 +217,14 @@ public class RefundService {
             if (variant.getStockQuantity() != null) {
                 PhoneVariant locked = phoneVariantRepository.findByIdWithLock(variant.getId())
                         .orElse(variant);
+                entityManager.refresh(locked, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
                 int quantityBefore = locked.getStockQuantity();
                 locked.setStockQuantity(quantityBefore + detail.getQuantity());
-                inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Hoàn tiền đơn hàng #" + order.getId());
+                if (detail.getWarehouseId() == null) {
+                    inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Hoàn tiền đơn hàng #" + order.getId());
+                } else {
+                    inventoryStockHistoryService.recordAtWarehouse(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Hoàn tiền đơn hàng #" + order.getId(), detail.getWarehouseId());
+                }
                 phoneVariantRepository.save(locked);
             }
         }

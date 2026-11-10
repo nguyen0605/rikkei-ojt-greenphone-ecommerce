@@ -5,8 +5,11 @@ import {
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, PictureOutlined, AppstoreOutlined, ArrowUpOutlined, ArrowDownOutlined, HistoryOutlined, RightOutlined } from '@ant-design/icons';
 import { useState, type Key } from 'react';
-import { adminPhoneService, adminInventoryService, brandService, adminOptionService, optionService } from '@/services';
-import type { PhoneDTO, PhoneRequest, PhoneVariantDTO, PhoneVariantRequest, InventoryStockMovementRequest, PhoneImageDTO, OptionTreeDTO, OptionItemDTO } from '@/types/api';
+import { adminPhoneService, brandService, adminOptionService, optionService } from '@/services';
+import { warehouseService, warehouseInventoryService } from '@/services/warehouseService';
+import VariantWarehouseStock from '@/components/admin/warehouse/VariantWarehouseStock';
+import BranchMovementModal, { type BranchMovementValues } from '@/components/admin/warehouse/BranchMovementModal';
+import type { PhoneDTO, PhoneRequest, PhoneVariantDTO, PhoneVariantRequest, PhoneImageDTO, OptionTreeDTO, OptionItemDTO } from '@/types/api';
 import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import AdminCard from '@/components/admin/AdminCard';
 import LowStockAlertBadge from '@/components/admin/LowStockAlertBadge';
@@ -84,6 +87,7 @@ function QuickAddSelect({
 
 export default function AdminProductsPage({ inventoryMode = false }: { inventoryMode?: boolean }) {
   const qc = useQueryClient();
+  const warehouseQuery = useQuery({ queryKey: ['admin', 'warehouses'], queryFn: ({ signal }) => warehouseService.list(signal), enabled: inventoryMode });
   // ── Search + filter + server paging ──
   const [page, setPage] = useState(1);
   const [keyword, setKeyword] = useState('');
@@ -126,7 +130,6 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
   const [historyVariant, setHistoryVariant] = useState<PhoneVariantDTO | null>(null);
   const [movementVariant, setMovementVariant] = useState<PhoneVariantDTO | null>(null);
   const [movementType, setMovementType] = useState<'IMPORT' | 'EXPORT'>('IMPORT');
-  const [movementForm] = Form.useForm<InventoryStockMovementRequest>();
   const [expandedInventoryRows, setExpandedInventoryRows] = useState<Key[]>([]);
   const [inventoryVariants, setInventoryVariants] = useState<Record<number, PhoneVariantDTO[]>>({});
   const [inventoryVariantLoading, setInventoryVariantLoading] = useState<Record<number, boolean>>({});
@@ -200,8 +203,16 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
   });
 
   const movementMut = useMutation({
-    mutationFn: ({ variantId, data }: { variantId: number; data: InventoryStockMovementRequest }) =>
-      adminInventoryService.movement(variantId, data),
+    mutationFn: (values: BranchMovementValues) => {
+      if (values.targetWarehouseId === undefined || values.warehouseId === values.targetWarehouseId) throw new Error('Chọn hai đầu nhập/xuất khác nhau');
+      const { variantId, quantity, reason } = values;
+      if (values.warehouseId > 0 && values.targetWarehouseId > 0) {
+        return warehouseInventoryService.transfer(values.warehouseId, { variantId, quantity, reason, targetWarehouseId: values.targetWarehouseId });
+      }
+      const importing = values.warehouseId === 0;
+      return warehouseInventoryService.movement(importing ? values.targetWarehouseId : values.warehouseId,
+        { variantId, quantity, reason, changeType: importing ? 'IMPORT' : 'EXPORT' });
+    },
     onSuccess: (updated) => {
       setVariants((current) => current.map((variant) => variant.id === updated.id ? updated : variant));
       setInventoryVariants((current) => Object.fromEntries(
@@ -212,8 +223,11 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
       ));
       qc.invalidateQueries({ queryKey: ['admin-phones'] });
       qc.invalidateQueries({ queryKey: ['admin-inventory-history', updated.id] });
+      qc.invalidateQueries({ queryKey: ['warehouse-distribution', updated.id] });
+      qc.invalidateQueries({ queryKey: ['warehouse-stock'] });
+      qc.invalidateQueries({ queryKey: ['warehouse-history'] });
       setMovementVariant(null);
-      movementForm.resetFields();
+
       message.success(movementType === 'IMPORT' ? 'Đã nhập kho thành công' : 'Đã xuất kho thành công');
     },
     onError: (error) => message.error(error instanceof Error ? error.message : 'Cập nhật biến động kho thất bại'),
@@ -345,8 +359,8 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
         <Space>
           {inventoryMode && <>
             <Button size="small" icon={<HistoryOutlined />} onClick={() => setHistoryVariant(r)} className="!rounded-full">Lịch sử kho</Button>
-            <Button size="small" type="primary" onClick={() => { setMovementVariant(r); setMovementType('IMPORT'); movementForm.resetFields(); movementForm.setFieldsValue({ changeType: 'IMPORT' }); }} className="!rounded-full">Nhập</Button>
-            <Button size="small" danger onClick={() => { setMovementVariant(r); setMovementType('EXPORT'); movementForm.resetFields(); movementForm.setFieldsValue({ changeType: 'EXPORT' }); }} className="!rounded-full">Xuất</Button>
+            <Button size="small" type="primary" onClick={() => { setMovementVariant(r); setMovementType('IMPORT'); }} className="!rounded-full">Nhập</Button>
+            <Button size="small" danger onClick={() => { setMovementVariant(r); setMovementType('EXPORT'); }} className="!rounded-full">Xuất</Button>
           </>}
           {!inventoryMode && <>
             <Button size="small" icon={<EditOutlined />} onClick={() => { setVarEdit(r); varForm.setFieldsValue({ ramItemId: r.ramItemId, storageItemId: r.storageItemId, colorItemId: r.colorItemId, price: r.price, discountPrice: r.discountPrice }); }} className="!rounded-full" />
@@ -371,8 +385,8 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
       title: 'Thao tác', width: 250,
       render: (_, variant) => (
         <Space>
-          <Button size="small" type="primary" onClick={() => { setMovementVariant(variant); setMovementType('IMPORT'); movementForm.resetFields(); }} className="!rounded-full">Nhập</Button>
-          <Button size="small" danger onClick={() => { setMovementVariant(variant); setMovementType('EXPORT'); movementForm.resetFields(); }} className="!rounded-full">Xuất</Button>
+          <Button size="small" type="primary" onClick={() => { setMovementVariant(variant); setMovementType('IMPORT'); }} className="!rounded-full">Nhập</Button>
+          <Button size="small" danger onClick={() => { setMovementVariant(variant); setMovementType('EXPORT'); }} className="!rounded-full">Xuất</Button>
           <Button size="small" icon={<HistoryOutlined />} onClick={() => setHistoryVariant(variant)} className="!rounded-full">Lịch sử</Button>
         </Space>
       ),
@@ -391,6 +405,7 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
         size="small"
         scroll={{ x: 1050 }}
         locale={{ emptyText: 'Sản phẩm chưa có biến thể' }}
+        expandable={{ expandedRowRender: (variant) => <VariantWarehouseStock variantId={variant.id} />, columnTitle: 'Chi nhánh', columnWidth: 85 }}
       />
     </div>
   );
@@ -554,35 +569,16 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
         </div>}
       </Modal>
 
-      <Modal
-        title={`${movementType === 'IMPORT' ? 'Nhập kho' : 'Xuất kho'} — ${movementVariant?.sku || ''}`}
-        open={movementVariant !== null}
-        onCancel={() => { setMovementVariant(null); movementForm.resetFields(); }}
-        onOk={() => movementForm.submit()}
-        confirmLoading={movementMut.isPending}
-        okButtonProps={{ danger: movementType === 'EXPORT', className: movementType === 'IMPORT' ? '!rounded-full !bg-primary-600' : '!rounded-full' }}
-        cancelButtonProps={{ className: '!rounded-full' }}
-      >
-        <div className="mb-4 rounded-xl bg-bg-soft p-3 text-sm text-ink-2">
-          {movementVariant?.ram} · {movementVariant?.storage} · {movementVariant?.color}
-          <span className="ml-3 font-semibold text-ink">Tồn hiện tại: {movementVariant?.stockQuantity}</span>
-        </div>
-        <Form
-          form={movementForm}
-          layout="vertical"
-          onFinish={(values) => movementVariant && movementMut.mutate({
-            variantId: movementVariant.id,
-            data: { changeType: movementType, quantity: values.quantity, reason: values.reason },
-          })}
-        >
-          <Form.Item name="quantity" label="Số lượng" rules={[{ required: true, message: 'Nhập số lượng' }, { type: 'number', min: 1, message: 'Số lượng phải lớn hơn 0' }]}>
-            <InputNumber min={1} max={100000} className="!w-full" placeholder="Nhập số lượng" />
-          </Form.Item>
-          <Form.Item name="reason" label="Lý do" rules={[{ required: true, message: 'Nhập lý do' }, { max: 255, message: 'Lý do tối đa 255 ký tự' }]}>
-            <Input.TextArea rows={3} placeholder={movementType === 'IMPORT' ? 'Ví dụ: Nhập hàng từ nhà cung cấp' : 'Ví dụ: Xuất kho điều chuyển'} />
-          </Form.Item>
-        </Form>
-      </Modal>
+      {movementVariant && <BranchMovementModal
+        warehouseId={warehouseQuery.data?.find((warehouse) => warehouse.code === 'WH-HN-MAIN' && warehouse.status === 'ACTIVE')?.id
+          ?? warehouseQuery.data?.find((warehouse) => warehouse.status === 'ACTIVE')?.id ?? 0}
+        action={{ mode: movementType, variant: {
+          warehouseId: 0, warehouseCode: '', warehouseName: '', warehouseStatus: 'ACTIVE',
+          variantId: movementVariant.id, phoneId: movementVariant.phoneId,
+          productName: variantPhone?.name ?? 'Biến thể sản phẩm', sku: movementVariant.sku ?? '',
+          ram: movementVariant.ram, storage: movementVariant.storage, color: movementVariant.color,
+          quantity: movementVariant.stockQuantity, aggregateQuantity: movementVariant.stockQuantity,
+        } }} onCancel={() => setMovementVariant(null)} onSubmit={(values) => movementMut.mutateAsync(values)} />}
 
       <InventoryHistoryModal
         variant={historyVariant}

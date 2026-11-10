@@ -10,6 +10,7 @@ import { Button } from 'antd';
 import RequireAuth from '@/components/auth/RequireAuth';
 import { useAppDispatch } from '@/store/hooks';
 import { logout } from '@/store/slices/authSlice';
+import { ROUTES } from '@/routes/routePaths';
 
 /* Hallmark · macrostructure: Workbench · tone: modern-minimal · anchor hue: green (#16a34a)
  * nav: N3 side-rail · genre: modern-minimal
@@ -32,6 +33,9 @@ const menu = [
 
 const MAIN_GROUP = menu.slice(0, 1);
 const CATALOG_GROUP = menu.slice(1, 7);
+const WAREHOUSE_GROUP = [
+  { to: ROUTES.ADMIN_WAREHOUSES, label: 'Chi nhánh', icon: <DatabaseOutlined /> },
+];
 const PROMO_GROUP = menu.slice(7, 10);
 const SYSTEM_GROUP = menu.slice(10);
 
@@ -153,6 +157,7 @@ export default function AdminLayout() {
           <nav className="flex-1 overflow-y-auto px-3 pb-4">
             <NavGroup title="Chung" items={MAIN_GROUP} collapsed={collapsed} onNavigate={go} />
             <NavGroup title="Danh mục" items={CATALOG_GROUP} collapsed={collapsed} onNavigate={go} />
+            <NavGroup title="Kho hàng" items={WAREHOUSE_GROUP} collapsed={collapsed} onNavigate={go} />
             <NavGroup title="Khuyến mãi" items={PROMO_GROUP} collapsed={collapsed} onNavigate={go} />
             <NavGroup title="Hệ thống" items={SYSTEM_GROUP} collapsed={collapsed} onNavigate={go} />
           </nav>
