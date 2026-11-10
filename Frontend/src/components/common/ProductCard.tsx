@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingCart, Loader2 } from 'lucide-react';
+import { ShoppingCart, Loader2, Heart } from 'lucide-react';
 import { App } from 'antd';
 import type { PhoneDTO, PhoneDetailDTO, PhoneVariantDTO } from '@/types/api';
 import type { Product } from '@/types';
 import { cn, getOptimizedImageUrl, formatVND, calculateBestVoucherForPrice } from '@/utils';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { addCartItem, addToCart } from '@/store/slices/cartSlice';
+import { toggleWishlistAsync, selectIsInWishlist } from '@/store/slices/wishlistSlice';
 import { phoneService } from '@/services';
 import { useMyPromotions } from '@/hooks/useMyPromotions';
 
@@ -38,6 +39,7 @@ function toProduct(phone: PhoneDetailDTO, variant: PhoneVariantDTO): Product {
 export default function ProductCard({ product, className }: Props) {
   const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
+  const inWishlist = useAppSelector(selectIsInWishlist(product.id));
   const { data: myPromotions } = useMyPromotions();
   const { message } = App.useApp();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -92,6 +94,30 @@ export default function ProductCard({ product, className }: Props) {
               Giảm {discountPercent}%
             </div>
           )}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              void dispatch(
+                toggleWishlistAsync({
+                  phoneId: product.id,
+                  name: product.name,
+                  thumbnail: product.mainImageUrl || '',
+                  price: product.lowestPrice || 0,
+                })
+              );
+            }}
+            aria-label={inWishlist ? 'Bỏ yêu thích' : 'Thêm vào yêu thích'}
+            className="absolute right-2 top-2 z-10 rounded-full bg-white/80 p-1.5 shadow-sm backdrop-blur-sm transition-all hover:scale-110 hover:bg-white"
+          >
+            <Heart
+              className={cn(
+                'h-4 w-4 transition-colors',
+                inWishlist ? 'fill-red-500 text-red-500' : 'text-gray-400 hover:text-red-500'
+              )}
+            />
+          </button>
           <img
             src={imgUrl}
             alt={product.name}

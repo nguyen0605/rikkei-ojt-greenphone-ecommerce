@@ -47,9 +47,19 @@ const initialState: AuthState = {
   rememberedEmail,
 };
 
-export const loginThunk = createAsyncThunk('auth/login', async (data: LoginRequest & { remember?: boolean }) => {
-  const res = await authService.login(data);
-  return { ...res, remember: data.remember };
+export const loginThunk = createAsyncThunk<
+  any,
+  LoginRequest & { remember?: boolean },
+  { rejectValue: string }
+>('auth/login', async (data, { rejectWithValue }) => {
+  try {
+    const res = await authService.login(data);
+    return { ...res, remember: data.remember };
+  } catch (err: any) {
+    const message =
+      err.response?.data?.message || err.message || 'Login failed';
+    return rejectWithValue(message);
+  }
 });
 
 export const registerThunk = createAsyncThunk('auth/register', async (data: RegisterRequest) => {
@@ -113,7 +123,13 @@ const authSlice = createSlice({
           localStorage.setItem('greenphone.rememberedEmail', state.rememberedEmail || '');
         }
       })
-      .addCase(loginThunk.rejected, (state, action) => { state.loading = false; state.error = action.error.message || 'Login failed'; })
+      .addCase(loginThunk.rejected, (state, action) => {
+        state.loading = false;
+        state.error =
+          (action.payload as string) ||
+          action.error.message ||
+          'Login failed';
+      })
       .addCase(registerThunk.pending, (state) => { state.loading = true; state.error = null; })
       .addCase(registerThunk.fulfilled, (state) => { state.loading = false; })
       .addCase(registerThunk.rejected, (state, action) => { state.loading = false; state.error = action.error.message || 'Register failed'; })

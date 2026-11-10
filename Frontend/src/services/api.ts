@@ -12,8 +12,12 @@ const api: AxiosInstance = axios.create({
 
 // Request interceptor: attach token
 api.interceptors.request.use((config) => {
+  const isAuthEndpoint =
+    config.url?.includes('/auth/login') ||
+    config.url?.includes('/auth/register');
+
   const token = localStorage.getItem('greenphone.token');
-  if (token) {
+  if (token && !isAuthEndpoint) {
     config.headers.Authorization = 'Bearer ' + token;
   }
   return config;

@@ -1,7 +1,9 @@
+import { useEffect, useRef } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { Badge, Dropdown, type MenuProps } from 'antd';
 import {
   ShoppingCart,
+  Heart,
   LogOut,
   Package,
   UserCircle,
@@ -16,6 +18,7 @@ import BrandDropdown from '@/components/layout/BrandDropdown';
 const navItems = [{ key: 'home', label: 'Trang chủ', href: '/' }, { key: 'products', label: 'Sản phẩm', href: '/san-pham' }, { key: 'vouchers', label: 'Khuyến mãi', href: '/khuyen-mai' }];
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { selectCartTotalItems } from '@/store/selectors/cartSelectors';
+import { selectWishlistCount, syncWishlistWithServer, clearWishlist } from '@/store/slices/wishlistSlice';
 import { logout } from '@/store/slices/authSlice';
 import { clearCart } from '@/store/slices/cartSlice';
 import { resetCheckout } from '@/store/slices/checkoutSlice';
@@ -24,14 +27,25 @@ import { ROUTES } from '@/routes/routePaths';
 
 export default function Header() {
   const cartCount = useAppSelector(selectCartTotalItems);
+  const wishlistCount = useAppSelector(selectWishlistCount);
   const { user, isAuthenticated } = useAppSelector((s) => s.auth);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+
+  // Đồng bộ danh sách yêu thích từ local lên server khi đăng nhập thành công
+  const prevAuthRef = useRef(isAuthenticated);
+  useEffect(() => {
+    if (isAuthenticated && !prevAuthRef.current) {
+      void dispatch(syncWishlistWithServer());
+    }
+    prevAuthRef.current = isAuthenticated;
+  }, [isAuthenticated, dispatch]);
 
   const handleLogout = () => {
     dispatch(logout());
     dispatch(clearCart());
     dispatch(resetCheckout());
+    dispatch(clearWishlist());
     navigate(ROUTES.HOME);
   };
 
@@ -70,6 +84,11 @@ export default function Header() {
           label: <Link to={ROUTES.ACCOUNT_ORDERS}>Đơn hàng của tôi</Link>,
         },
         {
+          key: 'wishlist',
+          icon: <Heart className="h-4 w-4" />,
+          label: <Link to={ROUTES.ACCOUNT_WISHLIST}>Danh sách yêu thích</Link>,
+        },
+        {
           key: 'reviews',
           icon: <Star className="h-4 w-4" />,
           label: <Link to={ROUTES.ACCOUNT_REVIEWS}>Đánh giá sản phẩm</Link>,
@@ -99,8 +118,19 @@ export default function Header() {
           <HeaderSearch className="mx-auto block w-full max-w-xl" />
         </div>
 
-        {/* Actions — order: Cart → Login/User */}
+        {/* Actions — order: Wishlist → Cart → Login/User */}
         <div className="flex items-center gap-2">
+          {/* Wishlist */}
+          <Link
+            to={ROUTES.ACCOUNT_WISHLIST}
+            className="relative rounded-full p-2 text-gray-700 transition-colors hover:bg-green-50 hover:text-green-600"
+            aria-label="Yêu thích"
+          >
+            <Badge count={wishlistCount} size="small" offset={[-2, 2]}>
+              <Heart className="h-5 w-5" />
+            </Badge>
+          </Link>
+
           {/* Cart */}
           <Link
             to="/gio-hang"
