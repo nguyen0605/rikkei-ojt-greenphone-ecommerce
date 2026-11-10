@@ -83,7 +83,7 @@ class AdminOrderServiceTest {
                 .build();
         order.setId(1L);
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
         when(orderMapper.toDto(any(Order.class))).thenReturn(OrderDTO.builder().id(1L).build());
 
@@ -119,7 +119,7 @@ class AdminOrderServiceTest {
         Order order = Order.builder().orderStatus("DELIVERED").build();
         order.setId(3L);
 
-        when(orderRepository.findById(3L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(3L)).thenReturn(Optional.of(order));
 
         assertThrows(BadRequestException.class, () -> adminOrderService.updateStatus(3L, "CANCELLED"));
     }

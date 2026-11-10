@@ -353,7 +353,7 @@ class OrderServiceTest {
                 .orderDetails(new java.util.ArrayList<>()).build();
         order.setId(55L);
 
-        when(orderRepository.findById(55L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(55L)).thenReturn(Optional.of(order));
         when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(orderMapper.toDto(any())).thenReturn(OrderDTO.builder().id(55L).build());
 
