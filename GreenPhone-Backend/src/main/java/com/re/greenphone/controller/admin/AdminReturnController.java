@@ -1,6 +1,7 @@
 package com.re.greenphone.controller.admin;
 
 import com.re.greenphone.common.dto.ApiResponse;
+import com.re.greenphone.common.pagination.PageResponse;
 import com.re.greenphone.dto.request.ReturnReviewRequest;
 import com.re.greenphone.dto.response.ReturnResponse;
 import com.re.greenphone.enums.ReturnStatus;
@@ -26,11 +27,19 @@ public class AdminReturnController {
 
     @GetMapping
     @Operation(summary = "Lấy danh sách yêu cầu đổi trả (phân trang & lọc theo trạng thái)")
-    public ResponseEntity<ApiResponse<Page<ReturnResponse>>> getAdminReturnRequests(
+    public ResponseEntity<ApiResponse<PageResponse<ReturnResponse>>> getAdminReturnRequests(
             @RequestParam(required = false) ReturnStatus status,
             @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<ReturnResponse> page = returnRequestService.getAdminReturnRequests(status, pageable);
-        return ResponseEntity.ok(ApiResponse.success(page));
+        PageResponse<ReturnResponse> response = new PageResponse<>(
+                page.getContent(),
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isLast()
+        );
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @GetMapping("/{id}")
@@ -58,4 +67,3 @@ public class AdminReturnController {
         return ResponseEntity.ok(ApiResponse.success(response, "Đã từ chối yêu cầu đổi trả"));
     }
 }
-

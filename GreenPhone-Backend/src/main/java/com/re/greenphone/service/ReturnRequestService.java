@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.re.greenphone.common.exception.BadRequestException;
+import com.re.greenphone.common.exception.ForbiddenException;
 import com.re.greenphone.common.exception.ResourceNotFoundException;
 import com.re.greenphone.dto.request.ReturnCreateRequest;
 import com.re.greenphone.dto.request.ReturnReviewRequest;
@@ -68,9 +69,9 @@ public class ReturnRequestService {
             throw new BadRequestException("Chỉ đơn hàng đã giao thành công (COMPLETED) mới đủ điều kiện đổi trả");
         }
 
-        // 3. Kiểm tra biến thể điện thoại có trong chi tiết đơn hàng không
+        // 3. Kiểm tra biến thể điện thoại có trong chi tiết đơn hàng không (Null-safe check)
         OrderDetail orderDetail = orderDetailRepository.findByOrderId(order.getId()).stream()
-                .filter(od -> od.getPhoneVariant().getId().equals(request.getPhoneVariantId()))
+                .filter(od -> od.getPhoneVariant() != null && od.getPhoneVariant().getId().equals(request.getPhoneVariantId()))
                 .findFirst()
                 .orElseThrow(() -> new BadRequestException("Sản phẩm không thuộc đơn hàng được chỉ định"));
 
@@ -91,7 +92,6 @@ public class ReturnRequestService {
         ReturnType returnType = request.getType() != null ? request.getType() : ReturnType.EXCHANGE;
         BigDecimal refundAmount = BigDecimal.ZERO;
         if (returnType == ReturnType.REFUND) {
-            // Giá trị hoàn trả = đơn giá hoặc tổng tiền dòng sản phẩm
             refundAmount = orderDetail.getUnitPrice() != null ? orderDetail.getUnitPrice() : BigDecimal.ZERO;
         }
 
@@ -262,12 +262,21 @@ public class ReturnRequestService {
     }
 
     /**
-     * Lấy chi tiết yêu cầu đổi trả
+     * Lấy chi tiết yêu cầu đổi trả (Bảo mật chống IDOR / BOLA)
      */
     @Transactional(readOnly = true)
     public ReturnResponse getReturnDetail(Long returnId) {
         ReturnRequest returnRequest = returnRequestRepository.findById(returnId)
                 .orElseThrow(() -> new ResourceNotFoundException("ReturnRequest", "id", returnId));
+
+        Long currentUserId = SecurityUtils.getCurrentUser().getId();
+        String currentRole = SecurityUtils.getCurrentUserRole();
+        boolean isAdmin = "ROLE_ADMIN".equalsIgnoreCase(currentRole);
+
+        if (!isAdmin && (returnRequest.getUser() == null || !returnRequest.getUser().getId().equals(currentUserId))) {
+            throw new ForbiddenException("Bạn không có quyền xem chi tiết yêu cầu đổi trả này");
+        }
+
         return mapToResponse(returnRequest);
     }
 

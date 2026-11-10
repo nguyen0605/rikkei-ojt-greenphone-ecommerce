@@ -2,6 +2,7 @@ package com.re.greenphone.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.re.greenphone.common.exception.BadRequestException;
+import com.re.greenphone.common.exception.ForbiddenException;
 import com.re.greenphone.dto.request.ReturnCreateRequest;
 import com.re.greenphone.dto.request.ReturnReviewRequest;
 import com.re.greenphone.dto.response.ReturnResponse;
@@ -96,6 +97,7 @@ class ReturnRequestServiceTest {
 
         mockedSecurityUtils = Mockito.mockStatic(SecurityUtils.class);
         mockedSecurityUtils.when(SecurityUtils::getCurrentUser).thenReturn(principal);
+        mockedSecurityUtils.when(SecurityUtils::getCurrentUserRole).thenReturn("ROLE_CUSTOMER");
 
         phoneVariant = PhoneVariant.builder()
                 .sku("IPHONE15-128-BLK")
@@ -250,10 +252,10 @@ class ReturnRequestServiceTest {
 
         assertNotNull(response);
         assertEquals(ReturnStatus.APPROVED, response.getStatus());
-        assertEquals(9, phoneVariant.getStockQuantity()); // Tồn kho giảm từ 10 xuống 9
-        verify(phoneVariantRepository).findByIdWithLock(100L); // BẮT BUỘC có khóa bi quan
+        assertEquals(9, phoneVariant.getStockQuantity());
+        verify(phoneVariantRepository).findByIdWithLock(100L);
         verify(inventoryStockHistoryService).record(eq(phoneVariant), eq(10), eq(-1), eq("EXPORT"), anyString(), anyLong(), anyString());
-        verify(warrantyRepository).save(any(Warranty.class)); // Cấp bảo hành mới
+        verify(warrantyRepository).save(any(Warranty.class));
     }
 
     @Test
@@ -290,5 +292,28 @@ class ReturnRequestServiceTest {
         assertEquals(PaymentStatus.REFUNDED.name(), completedOrder.getPaymentStatus());
         verify(refundRepository).save(any(Refund.class));
         verify(orderRepository).save(completedOrder);
+    }
+
+    @Test
+    @DisplayName("Chống IDOR: Người dùng khác không được xem chi tiết yêu cầu đổi trả")
+    void testGetReturnDetail_Forbidden_WhenNotOwnerAndNotAdmin() {
+        User otherUser = new User();
+        otherUser.setId(999L);
+        otherUser.setFullName("Other User");
+
+        ReturnRequest returnReq = ReturnRequest.builder()
+                .returnCode("RET-OTHER")
+                .order(completedOrder)
+                .phoneVariant(phoneVariant)
+                .user(otherUser) // Chủ sở hữu là user khác (ID 999)
+                .reason("Hỏng mic")
+                .errorDescription("Mic không thu tiếng")
+                .build();
+        returnReq.setId(123L);
+
+        when(returnRequestRepository.findById(123L)).thenReturn(Optional.of(returnReq));
+
+        assertThrows(ForbiddenException.class, () ->
+                returnRequestService.getReturnDetail(123L));
     }
 }
