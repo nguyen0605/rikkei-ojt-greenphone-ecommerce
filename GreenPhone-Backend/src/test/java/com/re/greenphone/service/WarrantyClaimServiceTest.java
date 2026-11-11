@@ -42,6 +42,9 @@ class WarrantyClaimServiceTest {
     @Mock
     private WarrantyClaimHistoryRepository warrantyClaimHistoryRepository;
 
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private WarrantyClaimService warrantyClaimService;
 
