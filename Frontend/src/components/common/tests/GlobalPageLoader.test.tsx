@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act, fireEvent } from '@testing-library/react';
+import { render, screen, act, fireEvent, cleanup } from '@testing-library/react';
 import React, { Suspense, lazy } from 'react';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import GlobalPageLoader from '../GlobalPageLoader';
@@ -115,7 +115,8 @@ describe('TopProgressBar', () => {
   });
 
   afterEach(() => {
-    vi.runOnlyPendingTimers();
+    cleanup();
+    vi.clearAllTimers();
     vi.useRealTimers();
   });
 
@@ -243,19 +244,22 @@ describe('TopProgressBar', () => {
     const progressBar = screen.getByTestId('top-progress-bar');
 
     // Clicking external link does not trigger bar
-    act(() => {
+    await act(async () => {
       fireEvent.click(screen.getByTestId('external-link'));
     });
     expect(progressBar.getAttribute('aria-valuenow')).toBe('0');
 
     // Clicking internal link triggers bar immediately
-    act(() => {
+    await act(async () => {
       fireEvent.click(screen.getByTestId('internal-link'));
     });
     expect(Number(progressBar.getAttribute('aria-valuenow'))).toBeGreaterThanOrEqual(25);
 
+    // Complete progress and advance past fade-out
     await act(async () => {
+      completeTopProgressBar();
       await vi.advanceTimersByTimeAsync(500);
     });
+    expect(progressBar.getAttribute('aria-valuenow')).toBe('0');
   });
 });
