@@ -73,3 +73,4 @@ describe('ReturnRequestPage (WAR-05)', () => {
     expect(returnService.createRequest).not.toHaveBeenCalled();
   });
 });
+

@@ -19,17 +19,31 @@ import { returnService, type ReturnResponse, type ReturnType } from '@/services/
 import { formatVND } from '@/utils';
 
 // Zod schema validation bắt buộc
-const returnSchema = z.object({
-  reason: z.string().min(1, 'Vui lòng chọn lý do đổi trả sản phẩm'),
-  type: z.enum(['EXCHANGE', 'REFUND']),
-  errorDescription: z
-    .string()
-    .min(10, 'Mô tả chi tiết lỗi phải có ít nhất 10 ký tự')
-    .max(500, 'Mô tả không được vượt quá 500 ký tự'),
-  proofImages: z
-    .array(z.string().url('Đường dẫn ảnh không hợp lệ'))
-    .min(1, 'Bắt buộc tải lên tối thiểu 1 hình ảnh minh chứng lỗi phần cứng'),
-});
+const returnSchema = z
+  .object({
+    reason: z.string().min(1, 'Vui lòng chọn lý do đổi trả sản phẩm'),
+    customReason: z.string().optional(),
+    type: z.enum(['EXCHANGE', 'REFUND']),
+    errorDescription: z
+      .string()
+      .min(10, 'Mô tả chi tiết lỗi phải có ít nhất 10 ký tự')
+      .max(500, 'Mô tả không được vượt quá 500 ký tự'),
+    proofImages: z
+      .array(z.string().url('Đường dẫn ảnh không hợp lệ'))
+      .min(1, 'Bắt buộc tải lên tối thiểu 1 hình ảnh minh chứng lỗi phần cứng'),
+  })
+  .refine(
+    (data) => {
+      if (data.reason === 'Lý do khác') {
+        return !!data.customReason && data.customReason.trim().length >= 3;
+      }
+      return true;
+    },
+    {
+      message: 'Vui lòng nhập cụ thể lý do khác (tối thiểu 3 ký tự)',
+      path: ['customReason'],
+    }
+  );
 
 type ReturnFormValues = z.infer<typeof returnSchema>;
 
@@ -40,6 +54,7 @@ const REASONS = [
   'Loa rè, mic không thu tiếng',
   'Hàng không đúng mô tả so với đơn đặt',
   'Lỗi kết nối (Wi-Fi, Bluetooth, Sóng di động)',
+  'Lý do khác',
 ];
 
 export const ReturnRequestPage: React.FC = () => {
@@ -76,6 +91,7 @@ export const ReturnRequestPage: React.FC = () => {
   });
 
   const selectedType = watch('type');
+  const selectedReason = watch('reason');
   const proofImages = watch('proofImages');
 
   if (!stateData?.orderId || !stateData?.phoneVariantId) {
@@ -99,10 +115,15 @@ export const ReturnRequestPage: React.FC = () => {
   const onSubmit = async (values: ReturnFormValues) => {
     setIsSubmitting(true);
     try {
+      const finalReason =
+        values.reason === 'Lý do khác' && values.customReason?.trim()
+          ? `Khác: ${values.customReason.trim()}`
+          : values.reason;
+
       const response = await returnService.createRequest({
         orderId: stateData.orderId!,
         phoneVariantId: stateData.phoneVariantId!,
-        reason: values.reason,
+        reason: finalReason,
         errorDescription: values.errorDescription,
         type: values.type as ReturnType,
         proofImages: values.proofImages,
@@ -249,6 +270,27 @@ export const ReturnRequestPage: React.FC = () => {
               )}
             />
             {errors.reason && <p className="mt-1.5 text-xs text-red-500">{errors.reason.message}</p>}
+
+            {/* Ô nhập lý do khác nếu chọn "Lý do khác" */}
+            {selectedReason === 'Lý do khác' && (
+              <div className="mt-3">
+                <Controller
+                  name="customReason"
+                  control={control}
+                  render={({ field }) => (
+                    <input
+                      {...field}
+                      type="text"
+                      placeholder="Nhập cụ thể lý do sự cố bạn gặp phải..."
+                      className="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  )}
+                />
+                {errors.customReason && (
+                  <p className="mt-1.5 text-xs text-red-500">{errors.customReason.message}</p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* 3. Chi tiết mô tả lỗi */}
