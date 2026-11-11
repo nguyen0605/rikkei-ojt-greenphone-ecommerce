@@ -4,6 +4,31 @@ import userEvent from '@testing-library/user-event';
 import AddressModal from '@/components/account/AddressModal';
 import type { AddressItem } from '@/types/api';
 
+vi.mock('@/components/checkout/CheckoutDeliveryMap', () => ({
+  default: () => <div data-testid="mock-checkout-delivery-map" />,
+}));
+
+vi.mock('@/components/checkout/checkoutGeocodingService', () => ({
+  geocodeInitialAddress: vi.fn().mockResolvedValue({
+    lat: 21.0362,
+    lng: 105.7906,
+    displayName: 'Cầu Giấy, Hà Nội',
+  }),
+  searchAddressSuggestions: vi.fn().mockResolvedValue([]),
+  reverseGeocode: vi.fn().mockResolvedValue('Cầu Giấy, Hà Nội'),
+  searchLocalDictionary: vi.fn().mockReturnValue([
+    {
+      id: 'dict-1',
+      place_name: 'Hà Nội',
+      title: 'Hà Nội',
+      subtitle: 'Việt Nam',
+      lat: 21.03,
+      lng: 105.79,
+      source: 'dictionary',
+    },
+  ]),
+}));
+
 describe('AddressModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -28,7 +53,7 @@ describe('AddressModal', () => {
     expect(screen.getByText('Thêm địa chỉ nhận hàng mới')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Nguyễn Văn A')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('0912345678')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Số 123 Đường Cầu Giấy, Tòa nhà Green')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Số 123 Đường Cầu Giấy/i)).toBeInTheDocument();
     expect(screen.getByText('Đặt làm địa chỉ nhận hàng mặc định')).toBeInTheDocument();
   });
 
@@ -90,7 +115,7 @@ describe('AddressModal', () => {
     await user.type(screen.getAllByPlaceholderText('Quận / Huyện')[0], 'Cầu Giấy');
     await user.type(screen.getAllByPlaceholderText('Phường / Xã')[0], 'Dịch Vọng');
     await user.type(
-      screen.getByPlaceholderText('Số 123 Đường Cầu Giấy, Tòa nhà Green'),
+      screen.getByPlaceholderText(/Số 123 Đường Cầu Giấy/i),
       'Số 50 Đường Cầu Giấy'
     );
 
@@ -105,6 +130,42 @@ describe('AddressModal', () => {
           district: 'Cầu Giấy',
           ward: 'Dịch Vọng',
           streetAddress: 'Số 50 Đường Cầu Giấy',
+        })
+      );
+    });
+  });
+
+  it('renders address label radio options and allows selecting label', async () => {
+    const user = userEvent.setup();
+    const handleSubmit = vi.fn().mockResolvedValue(undefined);
+
+    render(<AddressModal open={true} onCancel={vi.fn()} onSubmit={handleSubmit} />);
+
+    expect(screen.getByText(/Nhà riêng/)).toBeInTheDocument();
+    expect(screen.getByText(/Văn phòng/)).toBeInTheDocument();
+    expect(screen.getByText(/Người thân/)).toBeInTheDocument();
+    expect(screen.getByText(/Khác/)).toBeInTheDocument();
+
+    const officeRadio = screen.getByText(/Văn phòng/).closest('label')!;
+    await user.click(officeRadio);
+
+    await user.type(screen.getByPlaceholderText('Nguyễn Văn A'), 'Trần Văn C');
+    await user.type(screen.getByPlaceholderText('0912345678'), '0988776655');
+    await user.type(screen.getAllByPlaceholderText('Quận / Huyện')[0], 'Ba Đình');
+    await user.type(screen.getAllByPlaceholderText('Phường / Xã')[0], 'Kim Mã');
+    await user.type(
+      screen.getByPlaceholderText(/Số 123 Đường Cầu Giấy/i),
+      'Tòa nhà Capital Tower, 109 Trần Hưng Đạo'
+    );
+
+    const submitBtn = screen.getByRole('button', { name: 'Thêm địa chỉ' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(handleSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          label: 'OFFICE',
+          receiverName: 'Trần Văn C',
         })
       );
     });
