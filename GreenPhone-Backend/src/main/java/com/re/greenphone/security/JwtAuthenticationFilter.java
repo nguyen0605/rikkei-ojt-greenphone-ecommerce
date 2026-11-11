@@ -89,7 +89,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             response.setContentType("application/json");
                             response.setCharacterEncoding("UTF-8");
                             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                            response.getWriter().write("{\"code\":403,\"message\":\"User account is not active\",\"data\":null}");
+                            response.getWriter().write("{\"code\":403,\"message\":\"Tài khoản đã bị khóa hoặc không hoạt động. Vui lòng liên hệ với quản trị viên để được hỗ trợ.\",\"data\":null}");
                             return;
                         }
 

@@ -104,8 +104,14 @@ public class AuthService {
             throw new BadRequestException("Invalid email or password");
         }
 
-        if (!"ACTIVE".equals(user.getStatus())) {
-            throw new BadRequestException("Account is not active. Please verify your email.");
+        if ("BLOCKED".equalsIgnoreCase(user.getStatus())) {
+            throw new BadRequestException("Tài khoản đã bị khóa. Vui lòng liên hệ với quản trị viên để được hỗ trợ.");
+        }
+        if ("UNVERIFIED".equalsIgnoreCase(user.getStatus())) {
+            throw new BadRequestException("Tài khoản chưa được kích hoạt. Vui lòng xác thực email của bạn.");
+        }
+        if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
+            throw new BadRequestException("Tài khoản không hoạt động. Vui lòng liên hệ với quản trị viên để được hỗ trợ.");
         }
 
         UserPrincipal principal = UserPrincipal.create(user);
@@ -136,8 +142,11 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        if (!"ACTIVE".equals(user.getStatus())) {
-            throw new BadRequestException("Account is not active");
+        if ("BLOCKED".equalsIgnoreCase(user.getStatus())) {
+            throw new BadRequestException("Tài khoản đã bị khóa. Vui lòng liên hệ với quản trị viên để được hỗ trợ.");
+        }
+        if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
+            throw new BadRequestException("Tài khoản không hoạt động. Vui lòng liên hệ với quản trị viên để được hỗ trợ.");
         }
 
         UserPrincipal principal = UserPrincipal.create(user);
