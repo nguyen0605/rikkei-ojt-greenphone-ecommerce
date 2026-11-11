@@ -60,7 +60,7 @@ export default function StaffCreateModal({ open, onClose }: StaffCreateModalProp
           Tạo tài khoản
         </Button>,
       ]}
-      destroyOnClose
+      destroyOnHidden
     >
       <Form form={form} layout="vertical" className="pt-2">
         <Form.Item

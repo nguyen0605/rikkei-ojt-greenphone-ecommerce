@@ -69,7 +69,7 @@ export default function StaffRoleModal({ staff, open, onClose }: StaffRoleModalP
           Lưu thay đổi
         </Button>,
       ]}
-      destroyOnClose
+      destroyOnHidden
     >
       <div className="pt-2">
         <Alert
