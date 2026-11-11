@@ -17,8 +17,13 @@ export default function RequireRole({ children, allowedRoles }: RequireRoleProps
     return <Navigate to={ROUTES.LOGIN} state={{ from: location }} replace />;
   }
 
-  const userRole = user?.role || 'ROLE_CUSTOMER';
-  const hasPermission = allowedRoles.includes(userRole);
+  const rawRole = user?.role || 'ROLE_CUSTOMER';
+  const normalizedUserRole = rawRole.startsWith('ROLE_') ? rawRole : `ROLE_${rawRole}`;
+
+  const hasPermission = allowedRoles.some((allowed) => {
+    const normalizedAllowed = allowed.startsWith('ROLE_') ? allowed : `ROLE_${allowed}`;
+    return normalizedAllowed === normalizedUserRole;
+  });
 
   if (!hasPermission) {
     return (

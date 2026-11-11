@@ -53,6 +53,12 @@ describe('RequireRole Component', () => {
     expect(screen.getByText('Nội dung bảo mật')).toBeInTheDocument();
   });
 
+  it('Cho phép truy cập ngay cả khi vai trò trong Redux không có tiền tố ROLE_ (ví dụ ADMIN khớp ROLE_ADMIN)', () => {
+    renderWithRole('ADMIN', ['ROLE_ADMIN']);
+    expect(screen.getByTestId('protected-content')).toBeInTheDocument();
+    expect(screen.getByText('Nội dung bảo mật')).toBeInTheDocument();
+  });
+
   it('Hiển thị thông báo 403 khi vai trò người dùng không có quyền truy cập', () => {
     renderWithRole('ROLE_SALES', ['ROLE_ADMIN']);
     expect(screen.queryByTestId('protected-content')).not.toBeInTheDocument();
