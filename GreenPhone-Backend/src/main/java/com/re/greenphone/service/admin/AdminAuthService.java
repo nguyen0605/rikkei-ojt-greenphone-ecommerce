@@ -38,8 +38,9 @@ public class AdminAuthService {
         User user = userRepository.findByEmail(principal.getEmail())
                 .orElseThrow(() -> new BadRequestException("Admin not found"));
 
-        if (!"ADMIN".equals(user.getRole().getName())) {
-            throw new BadRequestException("Access denied: admin only");
+        String roleName = user.getRole() != null ? user.getRole().getName() : "";
+        if (!java.util.List.of("ADMIN", "SALES", "WAREHOUSE", "MARKETING").contains(roleName)) {
+            throw new BadRequestException("Access denied: staff only");
         }
 
         String token = jwtTokenProvider.generateToken(principal);

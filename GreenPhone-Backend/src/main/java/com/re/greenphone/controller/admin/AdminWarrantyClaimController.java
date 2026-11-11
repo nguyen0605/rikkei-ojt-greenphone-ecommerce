@@ -18,7 +18,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping({"/api/v1/admin/warranty-claims", "/api/admin/warranty-claims"})
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE')")
 @RequiredArgsConstructor
 @Tag(name = "Admin - Warranty Claims", description = "Quản lý tiếp nhận sửa chữa và bảo hành thiết bị theo IMEI")
 public class AdminWarrantyClaimController {

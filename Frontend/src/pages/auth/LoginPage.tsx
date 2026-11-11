@@ -21,7 +21,13 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);  
   const [form] = Form.useForm<LoginFormValues>(); 
   useEffect(() => { if (rememberedEmail) form.setFieldsValue({ email: rememberedEmail, remember: true }); }, [rememberedEmail, form]);  
-  useEffect(() => { if (isAuthenticated && user) { const from = (location.state as any)?.from; navigate(user.role === 'ADMIN' ? '/admin' : from || ROUTES.HOME, { replace: true }); } }, [isAuthenticated, user]);
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const from = (location.state as any)?.from;
+      const isStaffOrAdmin = ['ADMIN', 'ROLE_ADMIN', 'SALES', 'ROLE_SALES', 'WAREHOUSE', 'ROLE_WAREHOUSE', 'MARKETING', 'ROLE_MARKETING'].includes(user.role);
+      navigate(isStaffOrAdmin ? '/admin' : from || ROUTES.HOME, { replace: true });
+    }
+  }, [isAuthenticated, user]);
   useEffect(() => { return () => { dispatch(clearError()); }; }, [dispatch]);  
   const handleSubmit = (values: LoginFormValues) => { dispatch(loginThunk({ email: values.email, password: values.password, remember: values.remember })); }; 
   return (  

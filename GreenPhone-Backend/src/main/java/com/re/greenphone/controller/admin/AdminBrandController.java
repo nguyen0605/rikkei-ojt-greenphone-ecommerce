@@ -8,12 +8,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/brands")
+@PreAuthorize("hasAnyRole('ADMIN', 'MARKETING')")
 @RequiredArgsConstructor
 @Tag(name = "Admin - Brand", description = "Admin brand management")
 public class AdminBrandController {
