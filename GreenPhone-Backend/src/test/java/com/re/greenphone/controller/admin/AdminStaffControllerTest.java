@@ -168,4 +168,32 @@ class AdminStaffControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.role").value("ROLE_WAREHOUSE"));
     }
+
+    @Test
+    @DisplayName("Vai trò ADMIN cập nhật trạng thái nhân viên thành công 200 OK với DTO")
+    void admin_UpdateStaffStatus_Success() throws Exception {
+        StaffDTO updated = StaffDTO.builder()
+                .id(2L)
+                .status("INACTIVE")
+                .build();
+
+        when(adminStaffService.updateStaffStatus(eq(2L), eq("INACTIVE"), any())).thenReturn(updated);
+
+        mvc.perform(put("/api/admin/staff/2/status")
+                        .with(user("admin").roles("ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"INACTIVE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("INACTIVE"));
+    }
+
+    @Test
+    @DisplayName("Vai trò ADMIN cập nhật trạng thái để trống trả về 400 Bad Request do validation DTO")
+    void admin_UpdateStaffStatus_BlankStatus_ReturnsBadRequest() throws Exception {
+        mvc.perform(put("/api/admin/staff/2/status")
+                        .with(user("admin").roles("ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"\"}"))
+                .andExpect(status().isBadRequest());
+    }
 }

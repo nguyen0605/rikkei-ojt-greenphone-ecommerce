@@ -4,6 +4,7 @@ import com.re.greenphone.common.dto.ApiResponse;
 import com.re.greenphone.common.pagination.PageRequest;
 import com.re.greenphone.dto.request.CreateStaffRequest;
 import com.re.greenphone.dto.request.UpdateStaffRoleRequest;
+import com.re.greenphone.dto.request.UpdateStaffStatusRequest;
 import com.re.greenphone.service.admin.AdminStaffService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -14,8 +15,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/staff")
@@ -62,10 +61,10 @@ public class AdminStaffController {
     @Operation(summary = "Khóa hoặc kích hoạt lại trạng thái hoạt động của nhân viên")
     public ResponseEntity<ApiResponse<?>> updateStaffStatus(
             @PathVariable Long id,
-            @RequestBody Map<String, String> body,
+            @Valid @RequestBody UpdateStaffStatusRequest request,
             Authentication authentication) {
         String currentUsername = authentication != null ? authentication.getName() : null;
-        String status = body != null ? body.get("status") : null;
+        String status = request != null ? request.getStatus() : null;
         return ResponseEntity.ok(ApiResponse.success(adminStaffService.updateStaffStatus(id, status, currentUsername)));
     }
 }
