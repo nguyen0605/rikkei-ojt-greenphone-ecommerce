@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,17 +23,17 @@ public class WarrantyController {
 
     @Operation(summary = "Tra cứu thông tin bảo hành điện tử công khai theo IMEI hoặc số điện thoại")
     @GetMapping("/check")
-    public ApiResponse<List<WarrantyResponse>> checkWarranty(@RequestParam("query") String query) {
+    public ResponseEntity<ApiResponse<List<WarrantyResponse>>> checkWarranty(@RequestParam("query") String query) {
         log.info("Khách hàng tra cứu bảo hành với từ khóa: {}", query);
         List<WarrantyResponse> responses = warrantyService.searchWarranties(query);
-        return ApiResponse.success(responses, "Tra cứu thông tin bảo hành thành công");
+        return ResponseEntity.ok(ApiResponse.success(responses, "Tra cứu thông tin bảo hành thành công"));
     }
 
     @Operation(summary = "Tra cứu chi tiết bảo hành điện tử theo mã IMEI duy nhất")
     @GetMapping("/imei/{imei}")
-    public ApiResponse<WarrantyResponse> getWarrantyByImei(@PathVariable("imei") String imei) {
+    public ResponseEntity<ApiResponse<WarrantyResponse>> getWarrantyByImei(@PathVariable("imei") String imei) {
         log.info("Khách hàng tra cứu bảo hành theo IMEI: {}", imei);
         WarrantyResponse response = warrantyService.getWarrantyByImei(imei);
-        return ApiResponse.success(response, "Tra cứu chi tiết bảo hành thành công");
+        return ResponseEntity.ok(ApiResponse.success(response, "Tra cứu chi tiết bảo hành thành công"));
     }
 }

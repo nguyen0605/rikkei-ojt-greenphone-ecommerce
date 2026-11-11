@@ -9,6 +9,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,7 +30,7 @@ class WarrantyControllerTest {
     private WarrantyController warrantyController;
 
     @Test
-    @DisplayName("API công khai checkWarranty: Tra cứu thông tin bảo hành trả về ApiResponse chuẩn 200")
+    @DisplayName("API công khai checkWarranty: Tra cứu thông tin bảo hành trả về ResponseEntity<ApiResponse> chuẩn HTTP 200")
     void checkWarranty_success() {
         WarrantyResponse response = WarrantyResponse.builder()
                 .id(1L)
@@ -46,8 +48,11 @@ class WarrantyControllerTest {
 
         when(warrantyService.searchWarranties("0987654321")).thenReturn(List.of(response));
 
-        ApiResponse<List<WarrantyResponse>> apiResponse = warrantyController.checkWarranty("0987654321");
+        ResponseEntity<ApiResponse<List<WarrantyResponse>>> entity = warrantyController.checkWarranty("0987654321");
 
+        assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.OK);
+        ApiResponse<List<WarrantyResponse>> apiResponse = entity.getBody();
+        assertThat(apiResponse).isNotNull();
         assertThat(apiResponse.getCode()).isEqualTo(200);
         assertThat(apiResponse.getMessage()).contains("thành công");
         assertThat(apiResponse.getData()).hasSize(1);
@@ -57,7 +62,7 @@ class WarrantyControllerTest {
     }
 
     @Test
-    @DisplayName("API getWarrantyByImei: Tra cứu chi tiết bảo hành theo IMEI trả về đúng dữ liệu")
+    @DisplayName("API getWarrantyByImei: Tra cứu chi tiết bảo hành theo IMEI trả về ResponseEntity<ApiResponse> đúng dữ liệu")
     void getWarrantyByImei_success() {
         WarrantyResponse response = WarrantyResponse.builder()
                 .id(1L)
@@ -69,8 +74,11 @@ class WarrantyControllerTest {
 
         when(warrantyService.getWarrantyByImei("861234567890128")).thenReturn(response);
 
-        ApiResponse<WarrantyResponse> apiResponse = warrantyController.getWarrantyByImei("861234567890128");
+        ResponseEntity<ApiResponse<WarrantyResponse>> entity = warrantyController.getWarrantyByImei("861234567890128");
 
+        assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.OK);
+        ApiResponse<WarrantyResponse> apiResponse = entity.getBody();
+        assertThat(apiResponse).isNotNull();
         assertThat(apiResponse.getCode()).isEqualTo(200);
         assertThat(apiResponse.getData().getImei()).isEqualTo("861234567890128");
         verify(warrantyService).getWarrantyByImei("861234567890128");
