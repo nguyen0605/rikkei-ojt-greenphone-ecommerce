@@ -17,6 +17,29 @@ export interface PageResponse<T> {
 }
 
 // Auth
+export interface StaffDTO {
+  id: number;
+  fullName: string;
+  email: string;
+  phone: string;
+  role: string;
+  status: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CreateStaffRequest {
+  fullName: string;
+  email: string;
+  phone: string;
+  password: string;
+  role: string;
+}
+
+export interface UpdateStaffRoleRequest {
+  role: string;
+}
+
 export interface LoginRequest {
   email: string;
   password: string;

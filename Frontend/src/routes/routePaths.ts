@@ -41,6 +41,7 @@ export const ROUTES = {
   ADMIN_OPTIONS: '/admin/tuy-chon',
   ADMIN_ORDERS: '/admin/don-hang',
   ADMIN_CUSTOMERS: '/admin/khach-hang',
+  ADMIN_STAFF: '/admin/nhan-su',
   ADMIN_REVIEWS: '/admin/danh-gia',
   ADMIN_PROMOTIONS: '/admin/khuyen-mai',
   ADMIN_VOUCHERS: '/admin/vouchers',
