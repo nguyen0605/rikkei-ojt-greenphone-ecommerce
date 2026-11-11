@@ -307,5 +307,80 @@ describe('userService', () => {
       expect(cleaned[0].longitude).toBe(106.83);
       expect(cleaned[0].isDefault).toBe(true);
     });
+
+    it('isolates address book data between different user accounts', async () => {
+      // User 1 lưu địa chỉ
+      localStorage.setItem('greenphone.user', JSON.stringify({ id: 101 }));
+      await userService.createAddress({
+        receiverName: 'User 101',
+        receiverPhone: '0911111111',
+        province: 'Hà Nội',
+        streetAddress: '101 Cầu Giấy',
+      });
+
+      const listUser1 = await userService.getAddresses();
+      expect(listUser1.length).toBe(1);
+      expect(listUser1[0].receiverName).toBe('User 101');
+
+      // User 2 đăng nhập -> Sổ địa chỉ phải rỗng và không bị lẫn với User 1
+      localStorage.setItem('greenphone.user', JSON.stringify({ id: 202 }));
+      const listUser2 = await userService.getAddresses();
+      expect(listUser2.length).toBe(0);
+
+      // User 2 tạo địa chỉ riêng
+      await userService.createAddress({
+        receiverName: 'User 202',
+        receiverPhone: '0922222222',
+        province: 'TP. Hồ Chí Minh',
+        streetAddress: '202 Lê Duẩn',
+      });
+      const listUser2After = await userService.getAddresses();
+      expect(listUser2After.length).toBe(1);
+      expect(listUser2After[0].receiverName).toBe('User 202');
+
+      // Quay lại User 1 -> dữ liệu nguyên vẹn
+      localStorage.setItem('greenphone.user', JSON.stringify({ id: 101 }));
+      const listUser1Again = await userService.getAddresses();
+      expect(listUser1Again.length).toBe(1);
+      expect(listUser1Again[0].receiverName).toBe('User 101');
+    });
+
+    it('preserves address locally even when backend PUT /users/profile fails', async () => {
+      localStorage.setItem('greenphone.user', JSON.stringify({ id: 303 }));
+      vi.mocked(api.put).mockRejectedValueOnce(new Error('Network error or 500 Internal Server Error'));
+
+      const newAddr = await userService.createAddress({
+        receiverName: 'Khách Hàng A',
+        receiverPhone: '0933333333',
+        province: 'Đà Nẵng',
+        streetAddress: '123 Nguyễn Văn Linh',
+        isDefault: true,
+      });
+
+      expect(newAddr).toBeDefined();
+      expect(newAddr.receiverName).toBe('Khách Hàng A');
+
+      // Đảm bảo địa chỉ vẫn được lưu trong localStorage
+      const addresses = await userService.getAddresses();
+      expect(addresses.length).toBe(1);
+      expect(addresses[0].streetAddress).toBe('123 Nguyễn Văn Linh');
+    });
+
+    it('safely filters out invalid or corrupted address entries in localStorage', async () => {
+      localStorage.setItem('greenphone.user', JSON.stringify({ id: 404 }));
+      // Dữ liệu mảng chứa phần tử null/undefined hoặc thiếu trường bắt buộc
+      const corruptedData = [
+        null,
+        {},
+        { id: 'addr_invalid' },
+        { id: 'addr_valid', streetAddress: '456 Phố Huế', receiverName: 'Nguyễn Văn B', receiverPhone: '0944444444', province: 'Hà Nội' },
+      ];
+      localStorage.setItem('greenphone.addresses.404', JSON.stringify(corruptedData));
+
+      const addresses = await userService.getAddresses();
+      expect(addresses.length).toBe(1);
+      expect(addresses[0].id).toBe('addr_valid');
+      expect(addresses[0].streetAddress).toBe('456 Phố Huế');
+    });
   });
 });

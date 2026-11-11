@@ -111,6 +111,37 @@ const reverseMemoryCache = new Map<string, string>();
 let latestSearchRequestId = 0;
 
 /**
+ * Helper gọi fetch có timeout an toàn (mặc định 4000ms) để chống treo giao diện
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs = 4000
+): Promise<Response> {
+  const timeoutController = new AbortController();
+  const timer = setTimeout(() => timeoutController.abort(), timeoutMs);
+
+  let signal = timeoutController.signal;
+  if (options.signal) {
+    if ('any' in AbortSignal && typeof AbortSignal.any === 'function') {
+      signal = AbortSignal.any([options.signal, timeoutController.signal]);
+    } else {
+      const merged = new AbortController();
+      const onAbort = () => merged.abort();
+      options.signal.addEventListener('abort', onAbort, { once: true });
+      timeoutController.signal.addEventListener('abort', onAbort, { once: true });
+      signal = merged.signal;
+    }
+  }
+
+  try {
+    return await fetch(url, { ...options, signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Tìm kiếm gợi ý từ từ điển nội bộ (offline, tức thời)
  */
 export function searchLocalDictionary(query: string, maxResults = 5): AddressSuggestion[] {
@@ -263,12 +294,12 @@ export async function searchAddressSuggestions(
       trimmed
     )}&lat=${lat}&lon=${lon}&limit=8`;
 
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       signal,
       headers: {
         Accept: 'application/json',
       },
-    });
+    }, 4000);
 
     if (res.ok) {
       const data = await res.json();
@@ -342,12 +373,12 @@ export async function reverseGeocode(
   // 1. Thử qua Photon Reverse Geocoding
   try {
     const url = `https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`;
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       signal,
       headers: {
         Accept: 'application/json',
       },
-    });
+    }, 4000);
 
     if (res.ok) {
       const data = await res.json();

@@ -121,12 +121,17 @@ export default function CheckoutDeliveryMap({
     tileLayer.on('tileerror', (e) => {
       failedTileCount += 1;
       const targetTile = e.tile as HTMLImageElement;
-      if (targetTile && !targetTile.dataset.fallbackApplied) {
-        targetTile.dataset.fallbackApplied = 'true';
-        const coords = (e as unknown as { coords?: { z: number; x: number; y: number } }).coords;
-        if (coords) {
-          targetTile.src = `https://tile.openstreetmap.org/${coords.z}/${coords.x}/${coords.y}.png`;
-          return;
+      if (targetTile) {
+        if (!targetTile.dataset.fallbackApplied) {
+          targetTile.dataset.fallbackApplied = 'true';
+          const coords = (e as unknown as { coords?: { z: number; x: number; y: number } }).coords;
+          if (coords) {
+            targetTile.src = `https://tile.openstreetmap.org/${coords.z}/${coords.x}/${coords.y}.png`;
+            return;
+          }
+        } else {
+          // Nếu cả primary và fallback đều lỗi, ẩn tile để không hiện icon ảnh vỡ trên bản đồ
+          targetTile.style.opacity = '0';
         }
       }
 

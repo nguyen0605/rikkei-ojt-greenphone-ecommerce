@@ -14,7 +14,12 @@ function getCurrentUserId(): string {
     const raw = localStorage.getItem('greenphone.user');
     if (raw) {
       const u = JSON.parse(raw);
-      if (u?.id) return String(u.id);
+      if (u?.id !== undefined && u?.id !== null && String(u.id).trim() !== '') {
+        return String(u.id);
+      }
+      if (u?.email && typeof u.email === 'string' && u.email.trim() !== '') {
+        return u.email.trim();
+      }
     }
   } catch {
     // ignore parse error
@@ -27,7 +32,12 @@ function getStoredAddresses(userId: string): AddressItem[] {
     const raw = localStorage.getItem(`${ADDRESS_STORAGE_PREFIX}${userId}`);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        // Lọc các bản ghi hợp lệ để tránh dữ liệu rác làm hỏng ứng dụng
+        return parsed.filter(
+          (item) => item && typeof item === 'object' && item.id && item.streetAddress
+        );
+      }
     }
   } catch {
     // ignore
@@ -309,6 +319,14 @@ export const userService = {
         newAddress,
         ...addresses.map((a) => ({ ...a, isDefault: false })),
       ];
+    } else {
+      updatedList = [...addresses, newAddress];
+    }
+
+    // Luôn lưu dữ liệu local trước để bảo toàn thông tin khách hàng
+    saveStoredAddresses(userId, updatedList);
+
+    if (shouldBeDefault) {
       // Đồng bộ địa chỉ mặc định về backend USERS.ADDRESS
       try {
         const fullAddr = formatFullAddress(newAddress);
@@ -318,13 +336,10 @@ export const userService = {
           address: fullAddr,
         });
       } catch {
-        // ignore profile sync failure
+        // Bỏ qua lỗi đồng bộ Backend profile, không làm mất địa chỉ đã lưu
       }
-    } else {
-      updatedList = [...addresses, newAddress];
     }
 
-    saveStoredAddresses(userId, updatedList);
     return newAddress;
   },
 
@@ -379,17 +394,6 @@ export const userService = {
         if (String(a.id) === String(id)) return updatedItem;
         return { ...a, isDefault: false };
       });
-      // Đồng bộ địa chỉ mặc định về backend USERS.ADDRESS
-      try {
-        const fullAddr = formatFullAddress(updatedItem);
-        await put<UserDTO>('/users/profile', {
-          fullName: updatedItem.receiverName,
-          phone: updatedItem.receiverPhone,
-          address: fullAddr,
-        });
-      } catch {
-        // ignore
-      }
     } else {
       // Nếu địa chỉ này đang là mặc định duy nhất mà bỏ tick mặc định -> không cho phép
       const hasOtherDefault = addresses.some(
@@ -402,7 +406,23 @@ export const userService = {
       updatedList = addresses.map((a) => (String(a.id) === String(id) ? updatedItem : a));
     }
 
+    // Luôn lưu dữ liệu local trước để bảo toàn thông tin khách hàng
     saveStoredAddresses(userId, updatedList);
+
+    if (willBeDefault) {
+      // Đồng bộ địa chỉ mặc định về backend USERS.ADDRESS
+      try {
+        const fullAddr = formatFullAddress(updatedItem);
+        await put<UserDTO>('/users/profile', {
+          fullName: updatedItem.receiverName,
+          phone: updatedItem.receiverPhone,
+          address: fullAddr,
+        });
+      } catch {
+        // Bỏ qua lỗi đồng bộ Backend profile, không làm mất địa chỉ đã sửa
+      }
+    }
+
     return updatedItem;
   },
 
@@ -431,6 +451,12 @@ export const userService = {
         ...a,
         isDefault: idx === 0,
       }));
+    }
+
+    // Luôn lưu dữ liệu local trước
+    saveStoredAddresses(userId, remaining);
+
+    if (target.isDefault && remaining.length > 0) {
       // Đồng bộ địa chỉ mặc định mới về backend
       try {
         const newDefault = remaining[0];
@@ -441,11 +467,9 @@ export const userService = {
           address: fullAddr,
         });
       } catch {
-        // ignore
+        // Bỏ qua lỗi đồng bộ Backend profile
       }
     }
-
-    saveStoredAddresses(userId, remaining);
   },
 
   /**
