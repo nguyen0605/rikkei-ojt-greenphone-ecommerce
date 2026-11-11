@@ -15,7 +15,7 @@ import java.util.Map;
 @RequestMapping("/api/admin/orders")
 @RequiredArgsConstructor
 @Tag(name = "Admin - Order", description = "Admin order management")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN', 'SALES', 'WAREHOUSE')")
 public class AdminOrderController {
 
     private final AdminOrderService adminOrderService;

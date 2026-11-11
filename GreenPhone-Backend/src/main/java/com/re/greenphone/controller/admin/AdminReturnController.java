@@ -15,10 +15,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/admin/returns")
+@PreAuthorize("hasAnyRole('ADMIN', 'SALES', 'WAREHOUSE')")
 @RequiredArgsConstructor
 @Tag(name = "Admin Return & Refund", description = "Quản lý và phê duyệt yêu cầu đổi trả, hoàn tiền của khách hàng")
 public class AdminReturnController {

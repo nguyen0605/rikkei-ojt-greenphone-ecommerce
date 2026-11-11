@@ -8,10 +8,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/admin/banners")
+@PreAuthorize("hasAnyRole('ADMIN', 'MARKETING')")
 @RequiredArgsConstructor
 @Tag(name = "Admin - Banner", description = "Admin banner management")
 public class AdminBannerController {

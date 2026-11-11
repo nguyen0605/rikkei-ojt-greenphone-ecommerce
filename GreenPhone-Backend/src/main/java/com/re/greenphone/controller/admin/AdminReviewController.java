@@ -6,12 +6,14 @@ import com.re.greenphone.service.admin.AdminReviewService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/reviews")
+@PreAuthorize("hasAnyRole('ADMIN', 'MARKETING', 'SALES')")
 @RequiredArgsConstructor
 @Tag(name = "Admin - Review", description = "Admin review moderation")
 public class AdminReviewController {

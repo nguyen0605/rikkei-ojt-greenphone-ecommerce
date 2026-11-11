@@ -20,7 +20,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping({"/api/v1/admin/shipments", "/api/admin/shipments"})
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE')")
 @RequiredArgsConstructor
 @Tag(name = "Admin - Shipment", description = "Quản lý điều phối giao vận, bưu cục & vận đơn")
 public class AdminShipmentController {
