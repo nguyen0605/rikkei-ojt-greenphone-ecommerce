@@ -93,8 +93,8 @@ export const addCartItem = createAsyncThunk(
   'cart/addItem',
   async (data: { phoneVariantId: number; quantity: number }, thunkAPI) => {
     const state = thunkAPI.getState() as { cart?: CartState };
-    await cartService.addItem(data);
-    const cart = await fetchCartState();
+    const dto = await cartService.addItem(data);
+    const cart = dto && Array.isArray(dto.items) ? await mapCart(dto) : await fetchCartState();
     return { ...cart, appliedVoucher: state.cart?.appliedVoucher ?? null };
   },
 );

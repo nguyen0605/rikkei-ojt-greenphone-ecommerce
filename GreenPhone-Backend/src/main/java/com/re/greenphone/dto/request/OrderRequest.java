@@ -30,6 +30,8 @@ public class OrderRequest {
 
     private Long userPromotionId;
 
+    private Boolean buyNow;
+
     @NotNull(message = "Order items are required")
     @Size(min = 1, message = "At least one item required")
     private List<OrderItemRequest> items;

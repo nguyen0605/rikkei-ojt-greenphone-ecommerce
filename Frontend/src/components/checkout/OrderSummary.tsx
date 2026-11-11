@@ -1,25 +1,27 @@
 import { useState, useEffect } from 'react';
-import { CheckCircle2, Truck, ShieldCheck, RefreshCw, Headphones, Ticket } from 'lucide-react';
+import { CheckCircle2, Truck, ShieldCheck, RefreshCw, Headphones, Ticket, Minus, Plus } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { App } from 'antd';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { selectCartSummary } from '@/store/selectors/cartSelectors';
+import { selectCheckoutItems, selectCheckoutSummary } from '@/store/selectors/cartSelectors';
 import { formatVND, cn } from '@/utils';
 import { promotionService } from '@/services';
 import type { AvailablePromotionDTO } from '@/types/api';
-import { applyCheckoutVoucher, removeCheckoutVoucher } from '@/store/slices/checkoutSlice';
+import { applyCheckoutVoucher, removeCheckoutVoucher, updateBuyNowQuantity } from '@/store/slices/checkoutSlice';
 import { applyVoucher, removeVoucher } from '@/store/slices/cartSlice';
 
 export default function OrderSummary() {
   const dispatch = useAppDispatch();
   const { message } = App.useApp();
-  const cartItems = useAppSelector((s) => s.cart.items);
+  const buyNowItem = useAppSelector((s) => s.checkout.buyNowItem);
+  const checkoutItems = useAppSelector(selectCheckoutItems);
   const cartVoucher = useAppSelector((s) => s.cart.appliedVoucher);
-  const summary = useAppSelector(selectCartSummary);
+  const summary = useAppSelector(selectCheckoutSummary);
   const voucherCode = useAppSelector((s) => s.checkout.voucherCode);
   const voucherDiscount = useAppSelector((s) => s.checkout.voucherDiscount);
   const isAuthenticated = useAppSelector((s) => s.auth.isAuthenticated);
   const [userDismissedVoucher, setUserDismissedVoucher] = useState(false);
+  const [qtyDraft, setQtyDraft] = useState<string | null>(null);
 
   const { data: myPromos } = useQuery<AvailablePromotionDTO[]>({
     queryKey: ['promotions', 'available', summary.subtotal],
@@ -27,12 +29,12 @@ export default function OrderSummary() {
     enabled: isAuthenticated,
   });
 
-  // Auto-sync cart voucher or auto-apply best eligible voucher
+  // Auto-sync cart voucher (normal checkout only) or auto-apply best eligible voucher
   useEffect(() => {
     if (userDismissedVoucher) return;
 
     if (!voucherCode && myPromos && myPromos.length > 0) {
-      if (cartVoucher?.code) {
+      if (!buyNowItem && cartVoucher?.code) {
         const match = myPromos.find((p) => p.code === cartVoucher.code);
         if (match && match.eligible) {
           dispatch(
@@ -57,16 +59,18 @@ export default function OrderSummary() {
             discount: best.calculatedDiscount,
           }),
         );
-        dispatch(
-          applyVoucher({
-            code: best.code,
-            discountAmount: best.calculatedDiscount,
-            title: best.name || best.code,
-          }),
-        );
+        if (!buyNowItem) {
+          dispatch(
+            applyVoucher({
+              code: best.code,
+              discountAmount: best.calculatedDiscount,
+              title: best.name || best.code,
+            }),
+          );
+        }
       }
     }
-  }, [cartVoucher, voucherCode, myPromos, userDismissedVoucher, dispatch]);
+  }, [buyNowItem, cartVoucher, voucherCode, myPromos, userDismissedVoucher, dispatch]);
 
   // Keep discount updated or remove if subtotal changes and makes voucher ineligible
   useEffect(() => {
@@ -74,7 +78,7 @@ export default function OrderSummary() {
       const current = myPromos.find((p) => p.code === voucherCode);
       if (current && !current.eligible) {
         dispatch(removeCheckoutVoucher());
-        dispatch(removeVoucher());
+        if (!buyNowItem) dispatch(removeVoucher());
         message.warning(`Voucher ${voucherCode} không còn đủ điều kiện áp dụng`);
       } else if (current && current.calculatedDiscount !== voucherDiscount) {
         dispatch(
@@ -84,16 +88,18 @@ export default function OrderSummary() {
             discount: current.calculatedDiscount,
           }),
         );
-        dispatch(
-          applyVoucher({
-            code: current.code,
-            discountAmount: current.calculatedDiscount,
-            title: current.name || current.code,
-          }),
-        );
+        if (!buyNowItem) {
+          dispatch(
+            applyVoucher({
+              code: current.code,
+              discountAmount: current.calculatedDiscount,
+              title: current.name || current.code,
+            }),
+          );
+        }
       }
     }
-  }, [myPromos, voucherCode, voucherDiscount, dispatch, message]);
+  }, [buyNowItem, myPromos, voucherCode, voucherDiscount, dispatch, message]);
 
   const handleSelectVoucher = (promo: AvailablePromotionDTO) => {
     if (!promo.eligible) {
@@ -105,7 +111,7 @@ export default function OrderSummary() {
     if (voucherCode === promo.code) {
       setUserDismissedVoucher(true);
       dispatch(removeCheckoutVoucher());
-      dispatch(removeVoucher());
+      if (!buyNowItem) dispatch(removeVoucher());
       message.info(`Đã bỏ chọn mã ${promo.code}`);
       return;
     }
@@ -118,13 +124,15 @@ export default function OrderSummary() {
         discount: promo.calculatedDiscount,
       }),
     );
-    dispatch(
-      applyVoucher({
-        code: promo.code,
-        discountAmount: promo.calculatedDiscount,
-        title: promo.name || promo.code,
-      }),
-    );
+    if (!buyNowItem) {
+      dispatch(
+        applyVoucher({
+          code: promo.code,
+          discountAmount: promo.calculatedDiscount,
+          title: promo.name || promo.code,
+        }),
+      );
+    }
     message.success(`Đã áp dụng mã ${promo.code}`);
   };
 
@@ -139,7 +147,7 @@ export default function OrderSummary() {
     return true;
   });
 
-  if (cartItems.length === 0) {
+  if (checkoutItems.length === 0) {
     return (
       <div className="rounded-2xl border border-gray-100 bg-white p-6 text-center">
         <p className="text-gray-500">Giỏ hàng của bạn đang trống</p>
@@ -149,20 +157,103 @@ export default function OrderSummary() {
 
   return (
     <div className="space-y-4">
-      {/* Cart items */}
+      {/* Checkout items */}
       <div className="rounded-2xl border border-gray-100 bg-white p-6">
-        <h3 className="mb-4 text-lg font-bold text-gray-900">
-          Đơn hàng của bạn{' '}
-          <span className="text-sm font-normal text-gray-500">({cartItems.length} sản phẩm)</span>
-        </h3>
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <h3 className="text-lg font-bold text-gray-900">
+            Đơn hàng của bạn{' '}
+            <span className="text-sm font-normal text-gray-500">({checkoutItems.length} sản phẩm)</span>
+          </h3>
+          {buyNowItem && (
+            <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700">
+              Mua ngay
+            </span>
+          )}
+        </div>
         <div className="space-y-3">
-          {cartItems.map((item) => (
+          {checkoutItems.map((item) => (
             <div key={item.id} className="flex gap-3">
               <img src={item.product.thumbnail} alt={item.product.name} className="h-16 w-16 rounded-lg object-cover" />
               <div className="flex-1">
                 <div className="text-sm font-medium text-gray-900">{item.product.name}</div>
                 <div className="text-xs text-gray-500">{[item.selectedStorage, item.selectedColor].filter(Boolean).join(' • ')}</div>
-                <div className="mt-1 text-xs text-gray-500">SL: {item.quantity}</div>
+                {buyNowItem ? (
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="inline-flex items-center rounded-lg border border-gray-200 bg-gray-50/70">
+                      <button
+                        type="button"
+                        aria-label="Giảm số lượng"
+                        data-testid="buy-now-qty-decrease"
+                        disabled={item.quantity <= 1}
+                        onClick={() => {
+                          setQtyDraft(null);
+                          dispatch(updateBuyNowQuantity(item.quantity - 1));
+                        }}
+                        className="flex h-7 w-7 items-center justify-center rounded-l-lg text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                      </button>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        aria-label="Số lượng sản phẩm"
+                        data-testid="buy-now-qty-input"
+                        value={qtyDraft ?? String(item.quantity)}
+                        onFocus={(e) => {
+                          setQtyDraft(String(item.quantity));
+                          e.currentTarget.select();
+                        }}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/\D/g, '');
+                          if (digits === '') {
+                            setQtyDraft('');
+                            return;
+                          }
+                          const parsed = parseInt(digits, 10);
+                          if (Number.isNaN(parsed)) return;
+                          const maxStock = item.maxStock;
+                          let nextQty = Math.max(1, parsed);
+                          if (maxStock !== undefined && maxStock > 0 && nextQty > maxStock) {
+                            nextQty = maxStock;
+                            message.warning(`Chỉ còn ${maxStock} sản phẩm trong kho`);
+                          }
+                          setQtyDraft(String(nextQty));
+                          dispatch(updateBuyNowQuantity(nextQty));
+                        }}
+                        onBlur={() => {
+                          if (qtyDraft === '') {
+                            dispatch(updateBuyNowQuantity(1));
+                          }
+                          setQtyDraft(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.currentTarget.blur();
+                          }
+                        }}
+                        className="h-7 w-11 border-x border-gray-200 bg-white px-1 text-center text-xs font-semibold text-gray-900 focus:outline-none focus:ring-1 focus:ring-green-500"
+                      />
+                      <button
+                        type="button"
+                        aria-label="Tăng số lượng"
+                        data-testid="buy-now-qty-increase"
+                        disabled={item.maxStock !== undefined && item.quantity >= item.maxStock}
+                        onClick={() => {
+                          setQtyDraft(null);
+                          dispatch(updateBuyNowQuantity(item.quantity + 1));
+                        }}
+                        className="flex h-7 w-7 items-center justify-center rounded-r-lg text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    {item.maxStock !== undefined && (
+                      <span className="text-[11px] text-gray-400">Còn {item.maxStock}</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-1 text-xs text-gray-500">SL: {item.quantity}</div>
+                )}
               </div>
               <div className="text-sm font-semibold text-gray-900">{formatVND(item.product.price * item.quantity)}</div>
             </div>
@@ -193,7 +284,7 @@ export default function OrderSummary() {
               onClick={() => {
                 setUserDismissedVoucher(true);
                 dispatch(removeCheckoutVoucher());
-                dispatch(removeVoucher());
+                if (!buyNowItem) dispatch(removeVoucher());
               }}
               className="mt-1 text-xs text-red-500 hover:underline"
             >

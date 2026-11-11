@@ -230,6 +230,7 @@ export interface OrderRequest {
   paymentMethod: string;
   note: string;
   userPromotionId: number | null;
+  buyNow?: boolean;
   items: OrderItemRequest[];
 }
 

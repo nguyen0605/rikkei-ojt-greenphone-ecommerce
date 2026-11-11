@@ -132,6 +132,11 @@ public class OrderService {
             PhoneVariant variant = phoneVariantRepository.findByIdWithLock(itemReq.getPhoneVariantId())
                     .orElseThrow(() -> new ResourceNotFoundException("PhoneVariant", "id", itemReq.getPhoneVariantId()));
 
+            if ("INACTIVE".equalsIgnoreCase(variant.getStatus())
+                    || (variant.getPhone() != null && "INACTIVE".equalsIgnoreCase(variant.getPhone().getStatus()))) {
+                throw new BadRequestException("Product variant " + variant.getId() + " is inactive");
+            }
+
             if (variant.getStockQuantity() != null && variant.getStockQuantity() < itemReq.getQuantity()) {
                 throw new BadRequestException("Insufficient stock for variant " + variant.getId());
             }
@@ -234,11 +239,13 @@ public class OrderService {
                 .changedBy(user.getFullName() != null ? user.getFullName() : "CUSTOMER")
                 .build());
 
-        // Clear cart
-        cartRepository.findByUserId(userId).ifPresent(cart -> {
-            cart.getCartItems().clear();
-            cartRepository.save(cart);
-        });
+        // Clear cart only for normal checkout; Buy Now orders only pay for the selected item(s)
+        if (!Boolean.TRUE.equals(request.getBuyNow())) {
+            cartRepository.findByUserId(userId).ifPresent(cart -> {
+                cart.getCartItems().clear();
+                cartRepository.save(cart);
+            });
+        }
 
         // Confirmation email:
         // - COD: confirmed at creation.

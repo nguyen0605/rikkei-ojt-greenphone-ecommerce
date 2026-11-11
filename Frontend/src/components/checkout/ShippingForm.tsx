@@ -30,14 +30,15 @@ export default function ShippingForm() {
   const dispatch = useAppDispatch();
   const shipping = useAppSelector((s) => s.checkout.shipping);
   const authUser = useAppSelector((s) => s.auth.user);
+  const isAuthenticated = useAppSelector((s) => s.auth.isAuthenticated);
   const userEmail = authUser?.email || '';
 
   useEffect(() => {
     if (userEmail) {
       dispatch(updateShipping({ email: userEmail }));
     }
-    // Tự động đồng bộ địa chỉ giao hàng mặc định từ Sổ địa chỉ nếu chưa điền
-    if (!shipping.address && !shipping.fullName) {
+    // Tự động đồng bộ địa chỉ giao hàng mặc định từ Sổ địa chỉ nếu chưa điền (chỉ gọi khi đã đăng nhập)
+    if (isAuthenticated && !shipping.address && !shipping.fullName) {
       userService.getAddresses().then((addresses) => {
         const defaultAddr = addresses.find((a) => a.isDefault) || addresses[0];
         if (defaultAddr) {

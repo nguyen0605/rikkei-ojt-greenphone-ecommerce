@@ -4,6 +4,7 @@ import { Button, Empty, App, Popconfirm, Checkbox } from 'antd';
 import { DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, ShoppingOutlined, TagOutlined, CloseOutlined, RightOutlined } from '@ant-design/icons';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { removeCartItem, updateCartItem, removeFromCart, updateQuantity, clearCart, moveItem as moveCartItem, clearCartRemote, applyVoucher, removeVoucher } from '@/store/slices/cartSlice';
+import { clearBuyNow, setCurrentStep } from '@/store/slices/checkoutSlice';
 import { selectCartSummary } from '@/store/selectors/cartSelectors';
 import type { CartItem } from '@/types';
 import type { AvailablePromotionDTO } from '@/types/api';
@@ -217,7 +218,14 @@ export default function CartPage() {
               <span className="text-red-600">{formatVND(summary.total)}</span>
             </div>
 
-            <Link to={ROUTES.CHECKOUT} className="mt-4 block">
+            <Link
+              to={ROUTES.CHECKOUT}
+              onClick={() => {
+                dispatch(clearBuyNow());
+                dispatch(setCurrentStep(1));
+              }}
+              className="mt-4 block"
+            >
               <Button type="primary" size="large" block icon={<ShoppingOutlined />} className="!h-12 !rounded-full !bg-green-600 hover:!bg-green-700 !text-base">
                 Thanh toán ({selectedSummary.totalItems})
               </Button>
