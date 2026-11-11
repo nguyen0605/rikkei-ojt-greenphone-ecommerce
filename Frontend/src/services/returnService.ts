@@ -73,5 +73,33 @@ export const returnService = {
   getDetail: (id: number): Promise<ReturnResponse> => {
     return get<ReturnResponse>(`/returns/${id}`);
   },
+
+  /**
+   * [ADMIN] Lấy danh sách yêu cầu đổi trả (phân trang + lọc trạng thái)
+   */
+  getAdminReturns: (params?: Record<string, string>): Promise<{ content: ReturnResponse[]; totalElements: number; totalPages: number; number: number; size: number }> => {
+    return get<{ content: ReturnResponse[]; totalElements: number; totalPages: number; number: number; size: number }>('/admin/returns', { params });
+  },
+
+  /**
+   * [ADMIN] Phê duyệt yêu cầu đổi trả (Đổi mới / Hoàn tiền)
+   */
+  approveReturn: (id: number, data?: { adminNote?: string; newImeiNumber?: string }): Promise<ReturnResponse> => {
+    return api.put<ApiResponse<ReturnResponse>>(`/admin/returns/${id}/approve`, data || {}).then(res => res.data.data);
+  },
+
+  /**
+   * [ADMIN] Từ chối yêu cầu đổi trả
+   */
+  rejectReturn: (id: number, data?: { adminNote?: string }): Promise<ReturnResponse> => {
+    return api.put<ApiResponse<ReturnResponse>>(`/admin/returns/${id}/reject`, data || {}).then(res => res.data.data);
+  },
+
+  /**
+   * [ADMIN] Xác nhận hoàn tất quy trình đổi trả
+   */
+  completeReturn: (id: number, data?: { adminNote?: string }): Promise<ReturnResponse> => {
+    return api.put<ApiResponse<ReturnResponse>>(`/admin/returns/${id}/complete`, data || {}).then(res => res.data.data);
+  },
 };
 

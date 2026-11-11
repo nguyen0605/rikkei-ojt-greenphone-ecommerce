@@ -237,6 +237,35 @@ public class ReturnRequestService {
     }
 
     /**
+     * Admin xác nhận hoàn tất quy trình đổi trả (đã bàn giao máy mới hoặc hoàn tiền hoàn tất)
+     */
+    @Transactional
+    public ReturnResponse completeReturn(Long returnId, ReturnReviewRequest request) {
+        ReturnRequest returnRequest = returnRequestRepository.findById(returnId)
+                .orElseThrow(() -> new ResourceNotFoundException("ReturnRequest", "id", returnId));
+
+        if (returnRequest.getStatus() != ReturnStatus.APPROVED) {
+            throw new BadRequestException("Chỉ có thể hoàn tất yêu cầu đã được phê duyệt (trạng thái: " + returnRequest.getStatus() + ")");
+        }
+
+        Long adminId = SecurityUtils.getCurrentUser().getId();
+        User adminUser = userRepository.findById(adminId).orElse(null);
+
+        returnRequest.setStatus(ReturnStatus.COMPLETED);
+        if (request != null && request.getAdminNote() != null && !request.getAdminNote().isBlank()) {
+            String currentNote = returnRequest.getAdminNote() != null ? returnRequest.getAdminNote() + " | " : "";
+            returnRequest.setAdminNote(currentNote + request.getAdminNote());
+        }
+        returnRequest.setReviewedBy(adminUser);
+        returnRequest.setReviewedAt(LocalDateTime.now());
+
+        ReturnRequest updated = returnRequestRepository.save(returnRequest);
+        log.info("Completed return request: code={}", updated.getReturnCode());
+
+        return mapToResponse(updated);
+    }
+
+    /**
      * Lấy danh sách yêu cầu đổi trả của người dùng hiện tại
      */
     @Transactional(readOnly = true)

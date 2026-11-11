@@ -181,3 +181,7 @@ export const settingsService = {
   adminList: () => get<SettingsDTO[]>('/admin/settings'),
   adminUpdate: (values: Record<string, string>) => put<Record<string, string>>('/admin/settings', values),
 };
+
+export { returnService } from './returnService';
+export type { ReturnResponse, ReturnType, ReturnStatus, ReturnCreateRequest } from './returnService';
+
