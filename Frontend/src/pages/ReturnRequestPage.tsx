@@ -216,9 +216,9 @@ export const ReturnRequestPage: React.FC = () => {
                   className="mt-1 h-4 w-4 text-emerald-600 focus:ring-emerald-500"
                 />
                 <div>
-                  <div className="text-sm font-bold">Lỗi 1 đổi 1 máy mới</div>
+                  <div className="text-sm font-bold">Lỗi 1 đổi 1 trong 7 ngày</div>
                   <div className="mt-0.5 text-xs text-gray-500">
-                    Đổi ngay một thiết bị mới cùng phiên bản, kích hoạt bảo hành 12 tháng.
+                    Áp dụng khi thiết bị phát sinh lỗi phần cứng trong 7 ngày, đổi ngay máy mới 100% cùng phiên bản và kích hoạt bảo hành 12 tháng.
                   </div>
                 </div>
               </label>
@@ -237,9 +237,9 @@ export const ReturnRequestPage: React.FC = () => {
                   className="mt-1 h-4 w-4 text-emerald-600 focus:ring-emerald-500"
                 />
                 <div>
-                  <div className="text-sm font-bold">Trả hàng & Hoàn tiền</div>
+                  <div className="text-sm font-bold">Trả hàng & Hoàn tiền trong 7 ngày</div>
                   <div className="mt-0.5 text-xs text-gray-500">
-                    Hoàn lại 100% giá trị sản phẩm về phương thức thanh toán ban đầu.
+                    Trả lại sản phẩm lỗi trong vòng 7 ngày kể từ khi nhận hàng, hoàn trả 100% số tiền đã thanh toán.
                   </div>
                 </div>
               </label>

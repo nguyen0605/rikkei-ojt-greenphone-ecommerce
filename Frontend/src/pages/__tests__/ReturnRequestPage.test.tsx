@@ -47,8 +47,8 @@ describe('ReturnRequestPage (WAR-05)', () => {
 
     expect(screen.getByText('iPhone 15 Pro Max 256GB')).toBeInTheDocument();
     expect(screen.getByText('8GB • 256GB • Titan Tự Nhiên')).toBeInTheDocument();
-    expect(screen.getByText('Lỗi 1 đổi 1 máy mới')).toBeInTheDocument();
-    expect(screen.getByText('Trả hàng & Hoàn tiền')).toBeInTheDocument();
+    expect(screen.getByText('Lỗi 1 đổi 1 trong 7 ngày')).toBeInTheDocument();
+    expect(screen.getByText('Trả hàng & Hoàn tiền trong 7 ngày')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Gửi yêu cầu đổi trả/i })).toBeInTheDocument();
   });
 
