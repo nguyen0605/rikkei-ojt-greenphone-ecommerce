@@ -11,4 +11,10 @@ public interface WarehouseStockRepository extends JpaRepository<WarehouseStock, 
     List<WarehouseStock> findByWarehouseIdOrderByIdAsc(Long warehouseId);
     @EntityGraph(attributePaths = {"warehouse", "phoneVariant"})
     List<WarehouseStock> findByPhoneVariantId(Long variantId);
+
+    @Query("SELECT ws FROM WarehouseStock ws WHERE ws.warehouse.id = :warehouseId AND ws.phoneVariant.id IN :variantIds")
+    List<WarehouseStock> findByWarehouseIdAndPhoneVariantIdIn(@org.springframework.data.repository.query.Param("warehouseId") Long warehouseId, @org.springframework.data.repository.query.Param("variantIds") Collection<Long> variantIds);
+
+    @Query("SELECT ws FROM WarehouseStock ws WHERE ws.warehouse.id IN :warehouseIds AND ws.phoneVariant.id IN :variantIds")
+    List<WarehouseStock> findByWarehouseIdInAndPhoneVariantIdIn(@org.springframework.data.repository.query.Param("warehouseIds") Collection<Long> warehouseIds, @org.springframework.data.repository.query.Param("variantIds") Collection<Long> variantIds);
 }

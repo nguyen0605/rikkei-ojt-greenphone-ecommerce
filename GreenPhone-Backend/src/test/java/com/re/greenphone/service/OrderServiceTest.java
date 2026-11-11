@@ -44,6 +44,7 @@ class OrderServiceTest {
     @Mock private EmailService emailService;
     @Mock private SettingsService settingsService;
     @Mock private InventoryStockHistoryService inventoryStockHistoryService;
+    @Mock private WarehouseRoutingService warehouseRoutingService;
     @Mock private jakarta.persistence.EntityManager entityManager;
     @Mock private RedisTemplate<String, Object> redisTemplate;
     @Mock private ValueOperations<String, Object> valueOperations;
@@ -55,7 +56,14 @@ class OrderServiceTest {
     private static final Long USER_ID = 1L;
     private static final String USER_EMAIL = "test@test.com";
 
-    @BeforeEach void setUp() { securityUtilsMock = mockStatic(SecurityUtils.class); }
+    @BeforeEach void setUp() {
+        securityUtilsMock = mockStatic(SecurityUtils.class);
+        Warehouse mockWarehouse = new Warehouse();
+        mockWarehouse.setId(1L);
+        mockWarehouse.setCode("WH-HN-MAIN");
+        mockWarehouse.setName("Kho Tổng Hà Nội");
+        lenient().when(warehouseRoutingService.routeWarehouseForOrder(any(), any(), any())).thenReturn(mockWarehouse);
+    }
     @AfterEach void tearDown() { securityUtilsMock.close(); }
 
     private User createUser() {
@@ -99,7 +107,7 @@ class OrderServiceTest {
         orderService.createOrder(req);
 
         assertEquals(8, v.getStockQuantity());
-        verify(inventoryStockHistoryService).record(eq(v), eq(10), eq(-2), eq("EXPORT"), anyString());
+        verify(inventoryStockHistoryService).recordAtWarehouse(eq(v), eq(10), eq(-2), eq("EXPORT"), anyString(), eq(1L));
         verify(orderRepository).save(any());
         verify(emailService).sendOrderConfirmation(eq(USER_EMAIL), anyString());
     }

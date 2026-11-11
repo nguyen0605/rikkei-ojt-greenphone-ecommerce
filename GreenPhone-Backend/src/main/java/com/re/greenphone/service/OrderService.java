@@ -47,6 +47,7 @@ public class OrderService {
     private final EmailService emailService;
     private final SettingsService settingsService;
     private final InventoryStockHistoryService inventoryStockHistoryService;
+    private final WarehouseRoutingService warehouseRoutingService;
     private final jakarta.persistence.EntityManager entityManager;
     private final RedisTemplate<String, Object> redisTemplate;
 
@@ -128,6 +129,8 @@ public class OrderService {
                 .sorted(java.util.Comparator.comparing(com.re.greenphone.dto.request.OrderItemRequest::getPhoneVariantId))
                 .toList();
 
+        // 1. Lock all variants first in sorted order
+        List<PhoneVariant> lockedVariants = new java.util.ArrayList<>();
         for (var itemReq : sortedItems) {
             PhoneVariant variant = phoneVariantRepository.findByIdWithLock(itemReq.getPhoneVariantId())
                     .orElseThrow(() -> new ResourceNotFoundException("PhoneVariant", "id", itemReq.getPhoneVariantId()));
@@ -140,12 +143,30 @@ public class OrderService {
             if (variant.getStockQuantity() != null && variant.getStockQuantity() < itemReq.getQuantity()) {
                 throw new BadRequestException("Insufficient stock for variant " + variant.getId());
             }
+            lockedVariants.add(variant);
+        }
 
-            // Reduce stock
+        // 2. Route to the nearest active warehouse that has sufficient stock for ALL items
+        List<com.re.greenphone.dto.request.OrderItemRequirement> itemRequirements = sortedItems.stream()
+                .map(item -> new com.re.greenphone.dto.request.OrderItemRequirement(item.getPhoneVariantId(), item.getQuantity()))
+                .toList();
+
+        Warehouse routedWarehouse = warehouseRoutingService.routeWarehouseForOrder(
+                request.getLatitude(),
+                request.getLongitude(),
+                itemRequirements
+        );
+
+        // 3. Process items: decrement stock at routed warehouse and build order details
+        for (int i = 0; i < sortedItems.size(); i++) {
+            var itemReq = sortedItems.get(i);
+            PhoneVariant variant = lockedVariants.get(i);
+
+            // Reduce stock at routed warehouse
             if (variant.getStockQuantity() != null) {
                 int quantityBefore = variant.getStockQuantity();
                 variant.setStockQuantity(quantityBefore - itemReq.getQuantity());
-                inventoryStockHistoryService.record(variant, quantityBefore, -itemReq.getQuantity(), "EXPORT", "Đặt hàng");
+                inventoryStockHistoryService.recordAtWarehouse(variant, quantityBefore, -itemReq.getQuantity(), "EXPORT", "Đặt hàng", routedWarehouse.getId());
             }
 
             BigDecimal price = variant.getDiscountPrice() != null ? variant.getDiscountPrice() : variant.getPrice();
@@ -159,7 +180,7 @@ public class OrderService {
             String colorVal = variant.getColorItem() != null ? variant.getColorItem().getValue() : "";
 
             OrderDetail detail = OrderDetail.builder()
-                    .warehouseId(inventoryStockHistoryService.defaultWarehouseId())
+                    .warehouseId(routedWarehouse.getId())
                     .order(order)
                     .phoneVariant(variant)
                     .productName(productName)
