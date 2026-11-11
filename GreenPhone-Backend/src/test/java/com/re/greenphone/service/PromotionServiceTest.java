@@ -37,6 +37,7 @@ class PromotionServiceTest {
     @Mock private PromotionRepository promotionRepository;
     @Mock private UserRepository userRepository;
     @Mock private UserPromotionMapper userPromotionMapper;
+    @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private PromotionService promotionService;

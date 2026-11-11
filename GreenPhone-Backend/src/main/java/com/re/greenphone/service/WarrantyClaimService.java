@@ -14,6 +14,9 @@ import com.re.greenphone.repository.WarrantyClaimRepository;
 import com.re.greenphone.repository.WarrantyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.re.greenphone.enums.NotificationType;
+import com.re.greenphone.event.NotificationEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +37,7 @@ public class WarrantyClaimService {
     private final WarrantyRepository warrantyRepository;
     private final WarrantyClaimRepository warrantyClaimRepository;
     private final WarrantyClaimHistoryRepository warrantyClaimHistoryRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
@@ -107,6 +111,21 @@ public class WarrantyClaimService {
 
         log.info("Tạo thành công phiếu tiếp nhận bảo hành: {} cho IMEI: {}, diện bảo hành: {}",
                 claimCode, request.getImeiNumber(), isUnderWarranty);
+
+        // Bắn sự kiện thông báo in-app bất đồng bộ khi tiếp nhận phiếu bảo hành
+        Long userId = (warranty.getOrder() != null && warranty.getOrder().getUser() != null)
+                ? warranty.getOrder().getUser().getId()
+                : null;
+        if (eventPublisher != null && userId != null) {
+            eventPublisher.publishEvent(NotificationEvent.builder()
+                    .userId(userId)
+                    .title("Tiếp nhận phiếu bảo hành #" + claimCode)
+                    .content("Phiếu bảo hành " + claimCode + " cho thiết bị IMEI " + request.getImeiNumber() + " đã được tiếp nhận thành công.")
+                    .type(NotificationType.WARRANTY)
+                    .redirectUrl("/tra-cuu-bao-hanh?imei=" + request.getImeiNumber())
+                    .metadataJson("{\"claimCode\":\"" + claimCode + "\",\"imei\":\"" + request.getImeiNumber() + "\"}")
+                    .build());
+        }
 
         return mapToResponse(savedClaim, List.of(history));
     }
@@ -197,6 +216,22 @@ public class WarrantyClaimService {
                 .build();
 
         warrantyClaimHistoryRepository.save(history);
+
+        // Bắn sự kiện thông báo in-app bất đồng bộ khi cập nhật trạng thái phiếu bảo hành
+        Long userId = (updatedClaim.getWarranty() != null && updatedClaim.getWarranty().getOrder() != null && updatedClaim.getWarranty().getOrder().getUser() != null)
+                ? updatedClaim.getWarranty().getOrder().getUser().getId()
+                : null;
+        if (eventPublisher != null && userId != null) {
+            String imei = updatedClaim.getWarranty() != null ? updatedClaim.getWarranty().getImeiNumber() : "";
+            eventPublisher.publishEvent(NotificationEvent.builder()
+                    .userId(userId)
+                    .title("Cập nhật phiếu bảo hành #" + updatedClaim.getClaimCode())
+                    .content("Phiếu bảo hành " + updatedClaim.getClaimCode() + " đã chuyển sang trạng thái: " + newStatus)
+                    .type(NotificationType.WARRANTY)
+                    .redirectUrl("/tra-cuu-bao-hanh?imei=" + imei)
+                    .metadataJson("{\"claimCode\":\"" + updatedClaim.getClaimCode() + "\",\"status\":\"" + newStatus + "\"}")
+                    .build());
+        }
 
         List<WarrantyClaimHistory> histories = warrantyClaimHistoryRepository.findByWarrantyClaimIdOrderByCreatedAtDesc(updatedClaim.getId());
         return mapToResponse(updatedClaim, histories);

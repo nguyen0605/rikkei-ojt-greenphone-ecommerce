@@ -30,6 +30,9 @@ class WarrantyServiceTest {
     @Mock
     private WarrantyRepository warrantyRepository;
 
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private WarrantyService warrantyService;
 
