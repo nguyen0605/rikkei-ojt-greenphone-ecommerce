@@ -13,6 +13,7 @@ const ProductsPage = lazy(() => import('@/pages/ProductsPage'));
 const ProductDetailPage = lazy(() => import('@/pages/ProductDetailPage'));
 const VouchersPage = lazy(() => import('@/pages/VouchersPage'));
 const CartPage = lazy(() => import('@/pages/cart/CartPage'));
+const WishlistPage = lazy(() => import('@/pages/customer/WishlistPage'));
 const CheckoutPage = lazy(() => import('@/pages/CheckoutPage'));
 const PaymentPage = lazy(() => import('@/pages/PaymentPage'));
 const CheckoutSuccessPage = lazy(() => import('@/pages/CheckoutSuccessPage'));
@@ -65,6 +66,8 @@ export default function AppRoutes() {
         <Route path={ROUTES.PRODUCT_DETAIL()} element={withSuspense(ProductDetailPage)} />
         <Route path={ROUTES.VOUCHERS} element={withSuspense(VouchersPage)} />
         <Route path={ROUTES.CART} element={withSuspense(CartPage)} />
+        <Route path={ROUTES.WISHLIST} element={<Navigate to={ROUTES.ACCOUNT_WISHLIST} replace />} />
+        <Route path="/wishlist" element={<Navigate to={ROUTES.ACCOUNT_WISHLIST} replace />} />
         <Route path={ROUTES.DIEU_KHOAN} element={withSuspense(TermsPage)} />
         <Route path={ROUTES.CHINH_SACH_BAO_MAT} element={withSuspense(PrivacyPage)} />
         <Route path="*" element={withSuspense(NotFoundPage)} />
@@ -94,12 +97,14 @@ export default function AppRoutes() {
         <Route path={ROUTES.ACCOUNT_ORDERS} element={withSuspense(AccountOrdersPage)} />
         <Route path="/tai-khoan/don-hang/:id" element={withSuspense(AccountOrderDetailPage)} />
         <Route path={ROUTES.ACCOUNT_REVIEWS} element={withSuspense(AccountReviewsPage)} />
+        <Route path={ROUTES.ACCOUNT_WISHLIST} element={withSuspense(WishlistPage)} />
         <Route path={ROUTES.ACCOUNT_CHANGE_PASSWORD} element={withSuspense(AccountPasswordPage)} />
         {/* Aliases for English /account routes */}
         <Route path="/account" element={<Navigate to={ROUTES.ACCOUNT_PROFILE} replace />} />
         <Route path="/account/profile" element={<Navigate to={ROUTES.ACCOUNT_PROFILE} replace />} />
         <Route path="/account/addresses" element={<Navigate to={ROUTES.ACCOUNT_ADDRESSES} replace />} />
         <Route path="/account/orders" element={<Navigate to={ROUTES.ACCOUNT_ORDERS} replace />} />
+        <Route path="/account/wishlist" element={<Navigate to={ROUTES.ACCOUNT_WISHLIST} replace />} />
         <Route path="/account/change-password" element={<Navigate to={ROUTES.ACCOUNT_CHANGE_PASSWORD} replace />} />
       </Route>
 

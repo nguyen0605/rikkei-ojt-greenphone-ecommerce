@@ -43,6 +43,9 @@ export const cartService = {
   clear: () => del<void>('/cart'),
 };
 
+// Wishlist
+export { wishlistApi, default as defaultWishlistApi } from '@/api/wishlistApi';
+
 // Order
 export { orderService, default as defaultOrderService } from './orderService';
 

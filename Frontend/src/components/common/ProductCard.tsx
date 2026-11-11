@@ -9,6 +9,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { addCartItem, addToCart } from '@/store/slices/cartSlice';
 import { phoneService } from '@/services';
 import { useMyPromotions } from '@/hooks/useMyPromotions';
+import WishlistButton from '@/components/common/WishlistButton';
 
 interface Props { product: PhoneDTO; className?: string; }
 
@@ -92,6 +93,19 @@ export default function ProductCard({ product, className }: Props) {
               Giảm {discountPercent}%
             </div>
           )}
+          <div className="absolute right-2 top-2 z-10">
+            <WishlistButton
+              productId={String(product.id)}
+              name={product.name}
+              price={bestVoucher ? bestVoucher.finalPrice : (product.lowestPrice ?? undefined)}
+              originalPrice={product.lowestPrice ?? undefined}
+              imageUrl={imgUrl}
+              brandName={product.brandName}
+              inStock={true}
+              className="min-h-[44px] min-w-[44px] sm:h-9 sm:w-9 sm:min-h-[36px] sm:min-w-[36px] border border-gray-100 bg-white/90 shadow-sm"
+              iconSize={18}
+            />
+          </div>
           <img
             src={imgUrl}
             alt={product.name}
