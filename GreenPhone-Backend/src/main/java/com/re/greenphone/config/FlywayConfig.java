@@ -41,6 +41,7 @@ public class FlywayConfig {
             // 1. Tu dong dong bo schema history cho database da co san du lieu tu truoc
             try (Connection conn = dataSource.getConnection()) {
                 syncExistingSchemaHistoryIfEmpty(conn);
+                reconcileMigrationHistory(conn);
             } catch (Exception ex) {
                 log.warn("Kiem tra dong bo schema history: {}", ex.getMessage());
             }
@@ -262,6 +263,57 @@ public class FlywayConfig {
             log.info("Dong bo flyway_schema_history thanh cong. San sang thuc thi migrate tiep theo.");
         } catch (Exception ex) {
             log.warn("Khong the tu dong dong bo flyway_schema_history: {}. Tiep tuc de Flyway xu ly.", ex.getMessage());
+        }
+    }
+
+    /**
+     * Xu ly xung dot version migration lich su giua cac nhanh merge:
+     * - Chuan hoa ban ghi V13: add shipping fee to orders
+     * - Tu dong ghi nhan V13.1 neu bang warranty_claim da duoc bo sung cac cot ma chua co lich su Flyway
+     */
+    private void reconcileMigrationHistory(Connection conn) {
+        try (Statement stmt = conn.createStatement()) {
+            DatabaseMetaData metaData = conn.getMetaData();
+            String catalog = conn.getCatalog();
+
+            // Kiem tra bang flyway_schema_history da ton tai chua
+            if (!tableExists(metaData, catalog, "flyway_schema_history")) {
+                return;
+            }
+
+            // 1. Chuan hoa description cua V13 neu truoc do bi ghi nhan lech script
+            stmt.executeUpdate(
+                "UPDATE `flyway_schema_history` " +
+                "SET `description` = 'add shipping fee to orders' " +
+                "WHERE `version` = '13' AND `script` = 'V13__add_shipping_fee_to_orders.sql'"
+            );
+
+            // 2. Dong bo V13.1 (enhance warranty claim and history) neu cot da ton tai trong DB
+            if (columnExists(metaData, catalog, "warranty_claim", "hardware_issue_type")) {
+                boolean hasVersion13_1 = false;
+                try (ResultSet rs = stmt.executeQuery("SELECT 1 FROM `flyway_schema_history` WHERE `version` = '13.1'")) {
+                    if (rs.next()) {
+                        hasVersion13_1 = true;
+                    }
+                }
+                if (!hasVersion13_1) {
+                    int nextRank = 17;
+                    try (ResultSet rs = stmt.executeQuery("SELECT COALESCE(MAX(installed_rank), 16) + 1 FROM `flyway_schema_history`")) {
+                        if (rs.next()) {
+                            nextRank = rs.getInt(1);
+                        }
+                    }
+                    stmt.execute(String.format(
+                        "INSERT INTO `flyway_schema_history` " +
+                        "(`installed_rank`, `version`, `description`, `type`, `script`, `checksum`, `installed_by`, `execution_time`, `success`) " +
+                        "VALUES (%d, '13.1', 'enhance warranty claim and history', 'SQL', 'V13.1__enhance_warranty_claim_and_history.sql', NULL, 'AUTO_SYNC', 1, 1)",
+                        nextRank
+                    ));
+                    log.info("Da tu dong dong bo version 13.1 vao flyway_schema_history de tranh loi duplicate column.");
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Reconcile migration history: {}", ex.getMessage());
         }
     }
 
