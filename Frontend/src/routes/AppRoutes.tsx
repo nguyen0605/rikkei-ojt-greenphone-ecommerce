@@ -26,6 +26,7 @@ const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage'));
 const ForgotPasswordPage = lazy(() => import('@/pages/auth/ForgotPasswordPage'));
 const VerifyOTPPage = lazy(() => import('@/pages/auth/VerifyOTPPage'));
 const AccountProfilePage = lazy(() => import('@/pages/account/AccountProfilePage'));
+const NotificationCenterPage = lazy(() => import('@/pages/account/NotificationCenterPage'));
 const AddressBookPage = lazy(() => import('@/pages/account/AddressBookPage'));
 const AccountOrdersPage = lazy(() => import('@/pages/account/AccountOrdersPage'));
 const AccountOrderDetailPage = lazy(() => import('@/pages/account/AccountOrderDetailPage'));
@@ -95,6 +96,7 @@ export default function AppRoutes() {
       <Route element={<AccountLayout />}>
         <Route path={ROUTES.ACCOUNT} element={<Navigate to={ROUTES.ACCOUNT_PROFILE} replace />} />
         <Route path={ROUTES.ACCOUNT_PROFILE} element={withSuspense(AccountProfilePage)} />
+        <Route path={ROUTES.ACCOUNT_NOTIFICATIONS} element={withSuspense(NotificationCenterPage)} />
         <Route path={ROUTES.ACCOUNT_ADDRESSES} element={withSuspense(AddressBookPage)} />
         <Route path={ROUTES.ACCOUNT_ORDERS} element={withSuspense(AccountOrdersPage)} />
         <Route path="/tai-khoan/don-hang/:id" element={withSuspense(AccountOrderDetailPage)} />

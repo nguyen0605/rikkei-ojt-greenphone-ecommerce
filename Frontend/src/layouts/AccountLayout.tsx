@@ -7,6 +7,7 @@ import {
   ArrowLeftOutlined,
   StarOutlined,
   HomeOutlined,
+  BellOutlined,
 } from '@ant-design/icons';
 import { useAppSelector } from '@/store/hooks';
 import RequireAuth from '@/components/auth/RequireAuth';
@@ -15,6 +16,7 @@ import Footer from '@/components/layout/Footer';
 
 const links = [
   { to: '/tai-khoan/thong-tin', label: 'Hồ sơ cá nhân', icon: <UserOutlined /> },
+  { to: '/tai-khoan/thong-bao', label: 'Thông báo', icon: <BellOutlined /> },
   { to: '/tai-khoan/dia-chi', label: 'Sổ địa chỉ', icon: <HomeOutlined /> },
   { to: '/tai-khoan/don-hang', label: 'Đơn hàng của tôi', icon: <ShoppingOutlined /> },
   { to: '/tai-khoan/yeu-thich', label: 'Sản phẩm yêu thích', icon: <HeartOutlined /> },

@@ -3,6 +3,7 @@ export { userService, formatFullAddress } from "./userService";
 export { reviewService } from './reviewService';
 export { shipmentService } from './shipmentService';
 export { adminStaffService } from './adminStaffService';
+export { notificationService } from './notificationService';
 import { get, post, put, del } from './api';
 import type {
   CartDTO, CartItemRequest, CartSyncRequest, OrderDTO, AdminOrderDetailDTO,
