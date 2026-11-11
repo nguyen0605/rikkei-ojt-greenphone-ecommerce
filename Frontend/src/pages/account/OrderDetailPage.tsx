@@ -12,8 +12,9 @@ import {
   Star,
   Clock,
   CheckCircle2,
+  ShieldAlert,
 } from 'lucide-react';
-import { message } from 'antd';
+import { message, Tooltip } from 'antd';
 import { orderService } from '@/services/orderService';
 import { paymentService } from '@/services';
 import type { OrderDetailDTO } from '@/types/api';
@@ -80,6 +81,17 @@ export const OrderDetailPage: React.FC = () => {
   const canCancel = order?.orderStatus === 'PENDING' || order?.orderStatus === 'CONFIRMED';
   const canReview = order?.orderStatus === 'DELIVERED';
   const canReorder = order?.orderDetails && order.orderDetails.length > 0;
+
+  // Tính toán thời gian 7 ngày kể từ khi hoàn tất giao hàng (COMPLETED)
+  const isCompletedOrder = order?.orderStatus === 'COMPLETED';
+  const orderCompletedTime = order?.createdAt;
+  const isWithin7Days = (() => {
+    if (!orderCompletedTime) return true;
+    const completedDate = new Date(orderCompletedTime).getTime();
+    const now = new Date().getTime();
+    const diffDays = (now - completedDate) / (1000 * 60 * 60 * 24);
+    return diffDays <= 7;
+  })();
 
   // Xử lý Mua lại
   const handleBuyAgain = async () => {
@@ -431,11 +443,47 @@ export const OrderDetailPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Subtotal */}
-                <div className="text-right shrink-0">
+                {/* Subtotal & Nút Đổi trả */}
+                <div className="text-right shrink-0 flex flex-col items-end gap-2">
                   <span className="text-sm font-bold text-gray-900">
                     {formatVND(item.subtotal || item.unitPrice * item.quantity)}
                   </span>
+
+                  {/* Nút Yêu cầu Đổi trả / Bảo hành (Kiểm tra 7 ngày) */}
+                  {isCompletedOrder && (
+                    <Tooltip
+                      title={
+                        !isWithin7Days
+                          ? 'Đơn hàng đã hoàn tất quá 7 ngày, chính sách đổi trả máy mới đã hết hiệu lực.'
+                          : 'Gửi yêu cầu đổi mới 1-1 hoặc hoàn tiền khi sản phẩm phát sinh lỗi phần cứng.'
+                      }
+                    >
+                      <button
+                        type="button"
+                        disabled={!isWithin7Days}
+                        onClick={() =>
+                          navigate('/tai-khoan/doi-tra', {
+                            state: {
+                              orderId: order.id,
+                              phoneVariantId: item.phoneVariantId,
+                              productName: item.productName,
+                              variantSpecs,
+                              price: item.unitPrice,
+                              imageUrl: resolved.imageUrl,
+                            },
+                          })
+                        }
+                        className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                          isWithin7Days
+                            ? 'border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                            : 'border border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
+                        }`}
+                      >
+                        <ShieldAlert className="h-3 w-3" />
+                        Đổi trả / Bảo hành
+                      </button>
+                    </Tooltip>
+                  )}
                 </div>
               </div>
             );
