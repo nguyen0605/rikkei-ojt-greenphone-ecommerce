@@ -40,7 +40,7 @@ import java.util.List;
 public class AdminOrderService {
 
     private static final List<String> VALID_ORDER_STATUSES = List.of(
-            "PENDING", "CONFIRMED", "PROCESSING", "SHIPPING", "DELIVERED", "CANCELLED"
+            "PENDING", "CONFIRMED", "PROCESSING", "SHIPPING", "DELIVERED", "COMPLETED", "CANCELLED"
     );
 
     private final OrderRepository orderRepository;
@@ -52,6 +52,7 @@ public class AdminOrderService {
     private final OrderMapper orderMapper;
     private final EmailService emailService;
     private final InventoryStockHistoryService inventoryStockHistoryService;
+    private final com.re.greenphone.service.WarrantyService warrantyService;
     private final jakarta.persistence.EntityManager entityManager;
 
     private boolean isValidTransition(String current, String next) {
@@ -59,11 +60,12 @@ public class AdminOrderService {
         if (current.equals(next)) return true;
 
         return switch (current) {
-            case "PENDING" -> "CONFIRMED".equals(next) || "CANCELLED".equals(next);
-            case "CONFIRMED" -> "PROCESSING".equals(next) || "CANCELLED".equals(next);
-            case "PROCESSING" -> "SHIPPING".equals(next) || "CANCELLED".equals(next);
-            case "SHIPPING" -> "DELIVERED".equals(next) || "CANCELLED".equals(next);
-            case "DELIVERED", "CANCELLED" -> false; // Terminal states
+            case "PENDING" -> "CONFIRMED".equals(next) || "CANCELLED".equals(next) || "COMPLETED".equals(next);
+            case "CONFIRMED" -> "PROCESSING".equals(next) || "CANCELLED".equals(next) || "COMPLETED".equals(next);
+            case "PROCESSING" -> "SHIPPING".equals(next) || "CANCELLED".equals(next) || "COMPLETED".equals(next);
+            case "SHIPPING" -> "DELIVERED".equals(next) || "CANCELLED".equals(next) || "COMPLETED".equals(next);
+            case "DELIVERED" -> "COMPLETED".equals(next);
+            case "CANCELLED", "COMPLETED" -> false; // Terminal states
             default -> false;
         };
     }
@@ -206,6 +208,10 @@ public class AdminOrderService {
                 .changedBy("ADMIN")
                 .build());
 
+        if ("DELIVERED".equals(status) || "COMPLETED".equals(status)) {
+            warrantyService.activateWarrantyForOrder(order);
+        }
+
         if ("DELIVERED".equals(status)) {
             sendDeliveredEmail(order);
         }
@@ -268,7 +274,8 @@ public class AdminOrderService {
                 .changedBy("ADMIN")
                 .build());
 
-        if ("DELIVERED".equals(status)) {
+        if ("DELIVERED".equals(status) || "COMPLETED".equals(status)) {
+            warrantyService.activateWarrantyForOrder(order);
             sendDeliveredEmail(order);
         }
 

@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 
 @Getter
 @Setter
@@ -12,36 +13,52 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "WARRANTY")
+@Table(name = "warranty")
 public class Warranty extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ORDER_ID", nullable = false)
+    @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "PHONE_VARIANT_ID", nullable = false)
+    @JoinColumn(name = "phone_variant_id", nullable = false)
     private PhoneVariant phoneVariant;
 
-    @Column(name = "IMEI_NUMBER", nullable = false, unique = true, length = 50)
+    @Column(name = "imei_number", nullable = false, unique = true, length = 50)
     private String imeiNumber;
 
-    @Column(name = "CUSTOMER_NAME", nullable = false, length = 100)
+    @Column(name = "customer_name", nullable = false, length = 100)
     private String customerName;
 
-    @Column(name = "CUSTOMER_PHONE", nullable = false, length = 20)
+    @Column(name = "customer_phone", nullable = false, length = 20)
     private String customerPhone;
 
-    @Column(name = "START_DATE", nullable = false)
+    @Column(name = "start_date", nullable = false)
     private LocalDateTime startDate;
 
-    @Column(name = "END_DATE", nullable = false)
+    @Column(name = "end_date", nullable = false)
     private LocalDateTime endDate;
 
-    @Column(name = "STATUS", nullable = false, length = 30)
+    @Column(name = "status", nullable = false, length = 30)
     @Builder.Default
-    private String status = "ACTIVE"; // ACTIVE, EXPIRED, VOIDED
+    private String status = "ACTIVE"; // ACTIVE, EXPIRED, VOID
 
-    @Column(name = "NOTE", length = 255)
+    @Column(name = "note", length = 255)
     private String note;
+
+    public String getImei() {
+        return this.imeiNumber;
+    }
+
+    public void setImei(String imei) {
+        this.imeiNumber = imei;
+    }
+
+    public int getWarrantyDurationMonths() {
+        if (startDate != null && endDate != null) {
+            long months = ChronoUnit.MONTHS.between(startDate.toLocalDate(), endDate.toLocalDate());
+            return (int) Math.max(1, months);
+        }
+        return 12;
+    }
 }

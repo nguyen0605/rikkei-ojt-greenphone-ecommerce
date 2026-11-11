@@ -58,6 +58,9 @@ class AdminOrderServiceTest {
     @Mock
     private InventoryStockHistoryService inventoryStockHistoryService;
 
+    @Mock
+    private com.re.greenphone.service.WarrantyService warrantyService;
+
     @InjectMocks
     private AdminOrderService adminOrderService;
 
@@ -144,6 +147,26 @@ class AdminOrderServiceTest {
 
         assertThat(order.getPaymentStatus()).isEqualTo("REFUNDED");
         assertThat(order.getNote()).contains("[Kế toán đã hoàn tiền thành công lúc");
+    }
+
+    @Test
+    @DisplayName("Admin chuyển trạng thái đơn hàng sang COMPLETED: Tự động kích hoạt bảo hành điện tử")
+    void updateStatus_completed_triggersWarrantyActivation() {
+        Order order = Order.builder()
+                .orderStatus("SHIPPING")
+                .paymentStatus("PAID")
+                .orderDetails(new ArrayList<>())
+                .build();
+        order.setId(5L);
+
+        when(orderRepository.findById(5L)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderMapper.toDto(any(Order.class))).thenReturn(OrderDTO.builder().id(5L).build());
+
+        adminOrderService.updateStatus(5L, "COMPLETED", "Giao hàng và hoàn tất đơn");
+
+        assertThat(order.getOrderStatus()).isEqualTo("COMPLETED");
+        verify(warrantyService).activateWarrantyForOrder(order);
     }
 }
 
