@@ -464,4 +464,38 @@ class OrderServiceTest {
         assertEquals(101L, result.getOrder().getId());
         verifyNoInteractions(redisTemplate);
     }
+
+    @Test
+    @DisplayName("Buy Now: chỉ tạo đơn cho sản phẩm đã chọn và KHÔNG xóa giỏ hàng hiện có của user")
+    void createOrder_BuyNow_DoesNotClearCart() {
+        stubUser();
+        PhoneVariant v = createVariant(100L, new BigDecimal("1000.00"), null, 10);
+        OrderRequest req = createOrderReq(List.of(createItemReq(100L, 1)), null);
+        req.setBuyNow(true);
+
+        when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(v));
+        when(orderMapper.toDto(any())).thenReturn(OrderDTO.builder().id(202L).build());
+        when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderDTO result = orderService.createOrder(req);
+
+        assertEquals(202L, result.getId());
+        assertEquals(9, v.getStockQuantity());
+        verifyNoInteractions(cartRepository);
+    }
+
+    @Test
+    @DisplayName("Buy Now / Checkout: từ chối đặt hàng nếu biến thể ở trạng thái INACTIVE")
+    void createOrder_InactiveVariant_ThrowsBadRequest() {
+        stubUser();
+        PhoneVariant v = createVariant(100L, new BigDecimal("1000.00"), null, 10);
+        v.setStatus("INACTIVE");
+        OrderRequest req = createOrderReq(List.of(createItemReq(100L, 1)), null);
+        req.setBuyNow(true);
+
+        when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(v));
+
+        assertThrows(BadRequestException.class, () -> orderService.createOrder(req));
+        verify(orderRepository, never()).save(any());
+    }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Radio, App } from 'antd';
 import { ShoppingCart, CheckCircle, Star, Ticket, AlertCircle } from 'lucide-react';
@@ -10,7 +10,10 @@ import { ProductReviewsSection } from '@/components/product/detail';
 import { phoneService } from '@/services';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { addCartItem, addToCart } from '@/store/slices/cartSlice';
+import { startBuyNow } from '@/store/slices/checkoutSlice';
+import { ROUTES } from '@/routes/routePaths';
 import { formatVND, calculateBestVoucherForPrice } from '@/utils';
+import { createBuyNowCartItem } from '@/utils/buyNow';
 import { useMyPromotions } from '@/hooks/useMyPromotions';
 import WishlistButton from '@/components/common/WishlistButton';
 import type { PhoneDetailDTO, PhoneVariantDTO, PhoneImageDTO } from '@/types/api';
@@ -52,12 +55,16 @@ export default function ProductDetailPage() {
   const [searchParams] = useSearchParams();
   const variantIdParam = searchParams.get('variantId') || searchParams.get('variant');
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const { data: myPromotions } = useMyPromotions();
   const { message } = App.useApp();
   const [userSelectedVariantId, setUserSelectedVariantId] = useState<number | null>(null);
   const [userSelectedImageIndex, setUserSelectedImageIndex] = useState<number | null>(null);
   const [prevId, setPrevId] = useState(id);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [isBuyingNow, setIsBuyingNow] = useState(false);
+  const isSubmitting = isAddingToCart || isBuyingNow;
 
   if (id !== prevId) {
     setPrevId(id);
@@ -138,20 +145,31 @@ export default function ProductDetailPage() {
   const currentVariantPrice = selectedVariant?.discountPrice ?? selectedVariant?.price;
   const bestVoucher = calculateBestVoucherForPrice(currentVariantPrice, myPromotions);
 
-  const handleAddToCart = async () => {
-    if (!selectedVariant) return;
+  const canPurchase =
+    Boolean(selectedVariant) &&
+    !isProductInactive &&
+    !isVariantInactive &&
+    (selectedVariant?.stockQuantity ?? 0) > 0;
+
+  const validateSelectedVariant = (): boolean => {
+    if (!selectedVariant) return false;
     if (isProductInactive) {
       message.warning('Sản phẩm này hiện đã ngừng kinh doanh');
-      return;
+      return false;
     }
     if (isVariantInactive) {
       message.warning('Phiên bản này hiện đã ngừng kinh doanh');
-      return;
+      return false;
     }
     if (selectedVariant.stockQuantity <= 0) {
       message.warning('Sản phẩm này đã hết hàng');
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const addSelectedVariantToCart = async (): Promise<boolean> => {
+    if (!selectedVariant || !validateSelectedVariant()) return false;
     if (!isAuthenticated) {
       dispatch(
         addToCart({
@@ -162,21 +180,44 @@ export default function ProductDetailPage() {
           storage: selectedVariant.storage,
         })
       );
-      message.success(`Đã thêm ${phone.name} vào giỏ hàng`);
-      return;
+      return true;
     }
     try {
       await dispatch(addCartItem({ phoneVariantId: selectedVariant.id, quantity: 1 })).unwrap();
+      return true;
     } catch (error) {
       message.error(error instanceof Error ? error.message : 'Không thể thêm vào giỏ hàng');
-      return;
+      return false;
     }
-    message.success(`Đã thêm ${phone.name} vào giỏ hàng`);
+  };
+
+  const handleAddToCart = async () => {
+    if (isSubmitting) return;
+    setIsAddingToCart(true);
+    try {
+      const added = await addSelectedVariantToCart();
+      if (added) {
+        message.success(`Đã thêm ${phone.name} vào giỏ hàng`);
+      }
+    } finally {
+      setIsAddingToCart(false);
+    }
+  };
+
+  const handleBuyNow = async () => {
+    if (isSubmitting || !selectedVariant || !validateSelectedVariant()) return;
+    setIsBuyingNow(true);
+    try {
+      dispatch(startBuyNow(createBuyNowCartItem(toProduct(phone, selectedVariant), selectedVariant, 1)));
+      navigate(ROUTES.CHECKOUT);
+    } finally {
+      setIsBuyingNow(false);
+    }
   };
 
   return (
     <>
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-6 pb-28 sm:pb-6 sm:px-6 lg:px-8">
         <Breadcrumb items={[{ label: 'Trang chủ', href: '/' }, { label: 'Sản phẩm', href: '/san-pham' }, { label: phone.name }]} className="mb-6" />
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
@@ -340,29 +381,41 @@ export default function ProductDetailPage() {
               </div>
             )}
 
-            {/* Add to cart & Wishlist buttons */}
-            <div className="mb-2 flex items-center gap-3">
-              <Button
-                type="primary"
-                size="large"
-                disabled={
-                  !selectedVariant ||
-                  isProductInactive ||
-                  isVariantInactive ||
-                  selectedVariant.stockQuantity <= 0
-                }
-                onClick={handleAddToCart}
-                icon={<ShoppingCart className="h-5 w-5" />}
-                className="!h-12 !flex-1 !rounded-full !bg-green-600 !text-base !font-semibold hover:!bg-green-700 disabled:!bg-gray-200 disabled:!text-gray-400"
-              >
-                {isProductInactive
-                  ? 'Sản phẩm ngừng kinh doanh'
-                  : isVariantInactive
-                    ? 'Phiên bản ngừng kinh doanh'
-                    : selectedVariant && selectedVariant.stockQuantity > 0
-                      ? 'Thêm vào giỏ hàng'
-                      : 'Hết hàng'}
-              </Button>
+            {/* Buy Now, Add to Cart & Wishlist action bar */}
+            <div
+              data-testid="pdp-action-bar"
+              className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-2.5 border-t border-gray-200 bg-white/95 px-4 py-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] backdrop-blur sm:static sm:z-auto sm:mb-2 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-none"
+            >
+              <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:gap-3">
+                <Button
+                  type="primary"
+                  size="large"
+                  data-testid="buy-now-button"
+                  loading={isBuyingNow}
+                  disabled={!canPurchase || isSubmitting}
+                  onClick={handleBuyNow}
+                  className="!h-12 !w-full sm:!flex-1 !rounded-full !border-0 !bg-gradient-to-r !from-green-600 !to-emerald-600 !text-base !font-semibold !text-white !shadow-md hover:!from-green-700 hover:!to-emerald-700 disabled:!bg-none disabled:!bg-gray-200 disabled:!text-gray-400 disabled:!shadow-none"
+                >
+                  Mua ngay
+                </Button>
+                <Button
+                  size="large"
+                  data-testid="add-to-cart-button"
+                  loading={isAddingToCart}
+                  disabled={!canPurchase || isSubmitting}
+                  onClick={handleAddToCart}
+                  icon={<ShoppingCart className="h-5 w-5" />}
+                  className="!h-12 !w-full sm:!flex-1 !rounded-full !border-2 !border-green-600 !bg-white !text-base !font-semibold !text-green-700 hover:!border-green-700 hover:!bg-green-50 hover:!text-green-800 disabled:!border-gray-200 disabled:!bg-gray-100 disabled:!text-gray-400"
+                >
+                  {isProductInactive
+                    ? 'Sản phẩm ngừng kinh doanh'
+                    : isVariantInactive
+                      ? 'Phiên bản ngừng kinh doanh'
+                      : selectedVariant && selectedVariant.stockQuantity > 0
+                        ? 'Thêm vào giỏ hàng'
+                        : 'Hết hàng'}
+                </Button>
+              </div>
               <WishlistButton
                 productId={String(phone.id)}
                 name={phone.name}

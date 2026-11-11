@@ -12,6 +12,8 @@ export interface CartItem {
   variantId?: number;
   product: Product;
   quantity: number;
+  /** Available stock limit when checking out a single Buy Now item */
+  maxStock?: number;
   selectedColor?: string;
   selectedStorage?: string;
   addedAt: string;
