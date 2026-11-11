@@ -13,11 +13,19 @@ const COLOR: Record<string, string> = {
   // payments
   UNPAID: 'orange',
   PAID: 'green',
+  REFUND_PENDING: 'volcano',
   REFUNDED: 'purple',
   // users / entities
   ACTIVE: 'green',
   LOCKED: 'red',
+  BLOCKED: 'red',
   INACTIVE: 'default',
+  // roles
+  ROLE_ADMIN: 'purple',
+  ROLE_SALES: 'blue',
+  ROLE_WAREHOUSE: 'cyan',
+  ROLE_MARKETING: 'orange',
+  ROLE_CUSTOMER: 'default',
   // reviews
   SHOW: 'green',
   HIDDEN: 'default',
@@ -32,9 +40,18 @@ const LABEL: Record<string, string> = {
   CANCELLED: 'Đã hủy',
   UNPAID: 'Chưa thanh toán',
   PAID: 'Đã thanh toán',
+  REFUND_PENDING: 'Chờ hoàn tiền',
   REFUNDED: 'Đã hoàn tiền',
   ACTIVE: 'Hoạt động',
   LOCKED: 'Khóa',
+  BLOCKED: 'Bị khóa',
+  INACTIVE: 'Ngừng hoạt động',
+  // roles
+  ROLE_ADMIN: 'Quản trị viên',
+  ROLE_SALES: 'Kinh doanh',
+  ROLE_WAREHOUSE: 'Thủ kho',
+  ROLE_MARKETING: 'Marketing',
+  ROLE_CUSTOMER: 'Khách hàng',
   SHOW: 'Hiển thị',
   HIDDEN: 'Ẩn',
 };

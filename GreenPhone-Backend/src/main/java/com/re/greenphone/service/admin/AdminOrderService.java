@@ -4,14 +4,21 @@ import com.re.greenphone.common.exception.BadRequestException;
 import com.re.greenphone.common.exception.ResourceNotFoundException;
 import com.re.greenphone.common.pagination.PageRequest;
 import com.re.greenphone.common.pagination.PageResponse;
+import com.re.greenphone.dto.response.AdminOrderDetailDTO;
 import com.re.greenphone.dto.response.OrderDTO;
+import com.re.greenphone.dto.response.OrderHistoryDTO;
 import com.re.greenphone.entity.Order;
+import com.re.greenphone.entity.OrderHistory;
 import com.re.greenphone.entity.Payment;
 import com.re.greenphone.entity.PhoneVariant;
+import com.re.greenphone.entity.Promotion;
+import com.re.greenphone.entity.UserPromotion;
 import com.re.greenphone.mapper.OrderMapper;
+import com.re.greenphone.repository.OrderHistoryRepository;
 import com.re.greenphone.repository.OrderRepository;
 import com.re.greenphone.repository.PaymentRepository;
 import com.re.greenphone.repository.PhoneVariantRepository;
+import com.re.greenphone.repository.PromotionRepository;
 import com.re.greenphone.repository.UserPromotionRepository;
 import com.re.greenphone.service.EmailService;
 import com.re.greenphone.service.admin.InventoryStockHistoryService;
@@ -23,6 +30,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -31,13 +39,36 @@ import java.util.List;
 @Transactional
 public class AdminOrderService {
 
+    private static final List<String> VALID_ORDER_STATUSES = List.of(
+            "PENDING", "CONFIRMED", "PROCESSING", "SHIPPING", "DELIVERED", "COMPLETED", "CANCELLED"
+    );
+
     private final OrderRepository orderRepository;
+    private final OrderHistoryRepository orderHistoryRepository;
     private final PhoneVariantRepository phoneVariantRepository;
     private final PaymentRepository paymentRepository;
     private final UserPromotionRepository userPromotionRepository;
+    private final PromotionRepository promotionRepository;
     private final OrderMapper orderMapper;
     private final EmailService emailService;
     private final InventoryStockHistoryService inventoryStockHistoryService;
+    private final com.re.greenphone.service.WarrantyService warrantyService;
+    private final jakarta.persistence.EntityManager entityManager;
+
+    private boolean isValidTransition(String current, String next) {
+        if (current == null || next == null) return false;
+        if (current.equals(next)) return true;
+
+        return switch (current) {
+            case "PENDING" -> "CONFIRMED".equals(next) || "CANCELLED".equals(next) || "COMPLETED".equals(next);
+            case "CONFIRMED" -> "PROCESSING".equals(next) || "CANCELLED".equals(next) || "COMPLETED".equals(next);
+            case "PROCESSING" -> "SHIPPING".equals(next) || "CANCELLED".equals(next) || "COMPLETED".equals(next);
+            case "SHIPPING" -> "DELIVERED".equals(next) || "CANCELLED".equals(next) || "COMPLETED".equals(next);
+            case "DELIVERED" -> "COMPLETED".equals(next);
+            case "CANCELLED", "COMPLETED" -> false; // Terminal states
+            default -> false;
+        };
+    }
 
     public PageResponse<OrderDTO> getOrders(String status, String search, PageRequest pageRequest) {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(
@@ -58,10 +89,26 @@ public class AdminOrderService {
                 page.getTotalElements(), page.getTotalPages(), page.isLast());
     }
 
-    public OrderDTO getOrderDetail(Long id) {
-        Order order = orderRepository.findById(id)
+    public AdminOrderDetailDTO getOrderDetail(Long id) {
+        Order order = orderRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
-        return orderMapper.toDto(order);
+        AdminOrderDetailDTO dto = orderMapper.toAdminDetailDto(order);
+
+        List<OrderHistoryDTO> histories = orderHistoryRepository.findByOrderIdOrderByCreatedAtDesc(id)
+                .stream()
+                .map(h -> OrderHistoryDTO.builder()
+                        .id(h.getId())
+                        .orderId(id)
+                        .fromStatus(h.getFromStatus())
+                        .toStatus(h.getToStatus())
+                        .note(h.getNote())
+                        .changedBy(h.getChangedBy())
+                        .createdAt(h.getCreatedAt())
+                        .build())
+                .toList();
+
+        dto.setHistories(histories);
+        return dto;
     }
 
     public OrderDTO updateStatus(Long id, String status) {
@@ -69,36 +116,76 @@ public class AdminOrderService {
     }
 
     public OrderDTO updateStatus(Long id, String status, String reason) {
-        Order order = orderRepository.findById(id)
+        Order order = ("CANCELLED".equals(status) ? orderRepository.findByIdForUpdate(id) : orderRepository.findById(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
 
+        if (status == null || !VALID_ORDER_STATUSES.contains(status)) {
+            throw new BadRequestException("Trạng thái đơn hàng không hợp lệ: " + status);
+        }
+
+        String currentStatus = order.getOrderStatus();
+        if (!isValidTransition(currentStatus, status)) {
+            throw new BadRequestException(
+                    String.format("Vi phạm quy trình: Không thể chuyển trạng thái đơn hàng từ %s sang %s", currentStatus, status));
+        }
+
+        if (currentStatus.equals(status)) {
+            return orderMapper.toDto(order);
+        }
+
         if ("CANCELLED".equals(status)) {
-            // State gate: already-cancelled orders are not cancelled twice
-            if ("CANCELLED".equals(order.getOrderStatus())) {
-                throw new BadRequestException("Order is already cancelled");
-            }
             // Restore stock (pessimistic lock per variant — no double-restore)
             for (var detail : order.getOrderDetails()) {
                 PhoneVariant variant = detail.getPhoneVariant();
-                if (variant.getStockQuantity() != null) {
+                if (variant != null && variant.getStockQuantity() != null) {
                     PhoneVariant locked = phoneVariantRepository.findByIdWithLock(variant.getId())
                             .orElse(variant);
+                    entityManager.refresh(locked, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
                     int quantityBefore = locked.getStockQuantity();
                     locked.setStockQuantity(quantityBefore + detail.getQuantity());
-                    inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Admin hủy đơn hàng");
+                    if (detail.getWarehouseId() == null) {
+                        inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Admin hủy đơn hàng");
+                    } else {
+                        inventoryStockHistoryService.recordAtWarehouse(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Admin hủy đơn hàng", detail.getWarehouseId());
+                    }
                     phoneVariantRepository.save(locked);
                 }
             }
-            // Restore the promotion so the voucher can be reused
+
+            // Restore the promotion so the voucher can be reused (only if not expired)
             if (order.getUserPromotion() != null) {
-                order.getUserPromotion().setStatus("AVAILABLE");
-                order.getUserPromotion().setUsedAt(null);
-                userPromotionRepository.save(order.getUserPromotion());
+                UserPromotion up = order.getUserPromotion();
+                Promotion promo = up.getPromotion();
+                LocalDateTime now = LocalDateTime.now();
+
+                if (promo != null && "ACTIVE".equals(promo.getStatus())
+                        && (promo.getEndDate() == null || promo.getEndDate().isAfter(now))) {
+                    up.setStatus("AVAILABLE");
+                } else {
+                    up.setStatus("EXPIRED");
+                }
+                up.setUsedAt(null);
+                userPromotionRepository.save(up);
+
+                if (promo != null && promo.getUsedQuantity() != null && promo.getUsedQuantity() > 0) {
+                    promo.setUsedQuantity(promo.getUsedQuantity() - 1);
+                    promotionRepository.save(promo);
+                }
+
+                // QUAN TRỌNG: Gỡ bỏ khóa ngoại để giải phóng ràng buộc UNIQUE trên bảng orders
+                order.setUserPromotion(null);
             }
-            // Money state: order.paymentStatus is the single source of truth
-            if ("PAID".equals(order.getPaymentStatus())) {
-                order.setPaymentStatus("REFUNDED");
+
+            // Money state: Nếu đơn đã thanh toán (PAID), chuyển sang REFUND_PENDING để kế toán chuyển tiền hoàn
+            boolean isPaid = "PAID".equalsIgnoreCase(order.getPaymentStatus());
+            if (isPaid && reason != null && (reason.trim().equalsIgnoreCase("Lý do khác") || reason.trim().isEmpty())) {
+                throw new BadRequestException("Đối với đơn hàng đã thanh toán, vui lòng nhập chi tiết lý do hủy đơn");
             }
+
+            if (isPaid) {
+                order.setPaymentStatus("REFUND_PENDING");
+            }
+
             if (reason != null && !reason.isBlank()) {
                 String existingNote = order.getNote() != null ? order.getNote().trim() : "";
                 String prefix = "[Lý do hủy: " + reason.trim() + "]";
@@ -113,6 +200,18 @@ public class AdminOrderService {
         order.setOrderStatus(status);
         order = orderRepository.save(order);
 
+        orderHistoryRepository.save(com.re.greenphone.entity.OrderHistory.builder()
+                .order(order)
+                .fromStatus(currentStatus)
+                .toStatus(status)
+                .note(reason != null && !reason.isBlank() ? reason.trim() : "Quản trị viên chuyển trạng thái sang " + status)
+                .changedBy("ADMIN")
+                .build());
+
+        if ("DELIVERED".equals(status) || "COMPLETED".equals(status)) {
+            warrantyService.activateWarrantyForOrder(order);
+        }
+
         if ("DELIVERED".equals(status)) {
             sendDeliveredEmail(order);
         }
@@ -124,11 +223,30 @@ public class AdminOrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
 
-        if (!List.of("UNPAID", "PAID", "REFUNDED").contains(paymentStatus)) {
+        if (!List.of("UNPAID", "PAID", "REFUND_PENDING", "REFUNDED").contains(paymentStatus)) {
             throw new BadRequestException("Invalid payment status: " + paymentStatus);
         }
+
+        String previousPaymentStatus = order.getPaymentStatus();
+        if ("REFUNDED".equalsIgnoreCase(paymentStatus)) {
+            String existingNote = order.getNote() != null ? order.getNote().trim() : "";
+            String refundTag = "[Kế toán đã hoàn tiền thành công lúc " + java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").format(LocalDateTime.now()) + "]";
+            if (!existingNote.contains("[Kế toán đã hoàn tiền")) {
+                order.setNote(existingNote.isEmpty() ? refundTag : existingNote + " " + refundTag);
+            }
+        }
+
         order.setPaymentStatus(paymentStatus);
         order = orderRepository.save(order);
+
+        orderHistoryRepository.save(com.re.greenphone.entity.OrderHistory.builder()
+                .order(order)
+                .fromStatus(previousPaymentStatus)
+                .toStatus(paymentStatus)
+                .note("REFUNDED".equalsIgnoreCase(paymentStatus) ? "Kế toán đã hoàn tiền thành công" : "Cập nhật trạng thái thanh toán sang " + paymentStatus)
+                .changedBy("ADMIN")
+                .build());
+
         return orderMapper.toDto(order);
     }
 
@@ -144,10 +262,20 @@ public class AdminOrderService {
             throw new BadRequestException("Cannot update delivery at status: " + order.getOrderStatus());
         }
 
+        String currentStatus = order.getOrderStatus();
         order.setOrderStatus(status);
         order = orderRepository.save(order);
 
-        if ("DELIVERED".equals(status)) {
+        orderHistoryRepository.save(com.re.greenphone.entity.OrderHistory.builder()
+                .order(order)
+                .fromStatus(currentStatus)
+                .toStatus(status)
+                .note("Cập nhật trạng thái giao hàng sang " + status)
+                .changedBy("ADMIN")
+                .build());
+
+        if ("DELIVERED".equals(status) || "COMPLETED".equals(status)) {
+            warrantyService.activateWarrantyForOrder(order);
             sendDeliveredEmail(order);
         }
 

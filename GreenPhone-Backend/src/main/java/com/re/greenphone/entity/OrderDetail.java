@@ -14,6 +14,8 @@ import java.math.BigDecimal;
 @Entity
 @Table(name = "ORDER_DETAIL")
 public class OrderDetail extends BaseEntity {
+    @Column(name = "WAREHOUSE_ID")
+    private Long warehouseId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ORDER_ID", nullable = false)

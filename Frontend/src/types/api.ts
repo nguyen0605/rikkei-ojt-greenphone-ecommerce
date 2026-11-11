@@ -17,6 +17,29 @@ export interface PageResponse<T> {
 }
 
 // Auth
+export interface StaffDTO {
+  id: number;
+  fullName: string;
+  email: string;
+  phone: string;
+  role: string;
+  status: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CreateStaffRequest {
+  fullName: string;
+  email: string;
+  phone: string;
+  password: string;
+  role: string;
+}
+
+export interface UpdateStaffRoleRequest {
+  role: string;
+}
+
 export interface LoginRequest {
   email: string;
   password: string;
@@ -230,6 +253,7 @@ export interface OrderRequest {
   paymentMethod: string;
   note: string;
   userPromotionId: number | null;
+  buyNow?: boolean;
   items: OrderItemRequest[];
 }
 
@@ -255,6 +279,7 @@ export interface OrderDTO {
   shippingAddress: string;
   totalAmount: number;
   discountAmount: number;
+  shippingFee?: number;
   finalAmount: number;
   orderStatus: string;
   paymentStatus: string;
@@ -263,6 +288,50 @@ export interface OrderDTO {
   promotionCode: string;
   createdAt: string;
   orderDetails: OrderDetailDTO[];
+}
+
+export interface OrderHistoryDTO {
+  id: number;
+  orderId: number;
+  fromStatus: string | null;
+  toStatus: string;
+  note: string | null;
+  changedBy: string | null;
+  createdAt: string;
+}
+
+export interface AdminOrderDetailDTO extends OrderDTO {
+  histories?: OrderHistoryDTO[];
+  shipments?: ShipmentDTO[];
+  payments?: PaymentDTO[];
+}
+
+// Shipment
+export interface ShipmentHistoryDTO {
+  id: number;
+  status: string;
+  hubLocation: string;
+  shipperNote: string;
+  createdAt: string;
+}
+
+export interface ShipmentDTO {
+  id: number;
+  orderId: number;
+  receiverName: string;
+  receiverPhone: string;
+  shippingAddress: string;
+  trackingNumber: string;
+  carrierCode: string;
+  shippingFee: number;
+  codAmount: number;
+  status: string;
+  estimatedDeliveryAt?: string;
+  deliveredAt?: string;
+  note?: string;
+  createdAt: string;
+  updatedAt?: string;
+  histories?: ShipmentHistoryDTO[];
 }
 
 // Payment

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, lazy, Suspense } from 'react';
 import { Input, Tag, Button, Modal } from 'antd';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -20,8 +20,7 @@ import {
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { updateShipping } from '@/store/slices/checkoutSlice';
 import { userService, formatFullAddress } from '@/services';
-import CheckoutDeliveryMap, { type LocationCoords } from './CheckoutDeliveryMap';
-import AddressModal from '@/components/account/AddressModal';
+import type { LocationCoords } from './CheckoutDeliveryMap';
 import type { AddressItem, AddressRequest, AddressLabel } from '@/types/api';
 import {
   searchAddressSuggestions,
@@ -30,6 +29,9 @@ import {
   searchLocalDictionary,
   type AddressSuggestion,
 } from './checkoutGeocodingService';
+
+const CheckoutDeliveryMap = lazy(() => import('./CheckoutDeliveryMap'));
+const AddressModal = lazy(() => import('@/components/account/AddressModal'));
 
 const schema = z.object({
   fullName: z.string().min(2, 'Họ tên tối thiểu 2 ký tự'),
@@ -50,11 +52,12 @@ export default function ShippingForm() {
   const dispatch = useAppDispatch();
   const shipping = useAppSelector((s) => s.checkout.shipping);
   const authUser = useAppSelector((s) => s.auth.user);
+  const isAuthenticated = useAppSelector((s) => s.auth.isAuthenticated);
   const userEmail = authUser?.email || '';
 
   // Quản lý danh sách địa chỉ từ Sổ địa chỉ
   const [savedAddresses, setSavedAddresses] = useState<AddressItem[]>([]);
-  const [selectedAddressId, setSelectedAddressId] = useState<string | number | 'custom' | null>(null);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | number | 'custom' | null>('custom');
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [isAddressSelectorModalOpen, setIsAddressSelectorModalOpen] = useState(false);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
@@ -66,6 +69,7 @@ export default function ShippingForm() {
   const [focusedSuggestionIndex, setFocusedSuggestionIndex] = useState(-1);
   const [selectedLocation, setSelectedLocation] = useState<LocationCoords | null>(null);
   const [pinnedAddressSuggestion, setPinnedAddressSuggestion] = useState<string | null>(null);
+  const [isMapExpanded, setIsMapExpanded] = useState(false);
 
   const selectedAddressIdRef = useRef<string | number | 'custom' | null>(null);
 
@@ -179,49 +183,69 @@ export default function ShippingForm() {
     [setValue, dispatch]
   );
 
-  // Load danh sách địa chỉ từ Sổ địa chỉ khi mount
+  // Load danh sách địa chỉ từ Sổ địa chỉ khi mount hoặc khi tài khoản thay đổi
   useEffect(() => {
     if (userEmail) {
       dispatch(updateShipping({ email: userEmail }));
     }
 
     let isMounted = true;
-    userService
-      .getAddresses()
-      .then((addresses) => {
-        if (!isMounted) return;
-        setSavedAddresses(addresses);
 
-        if (addresses.length > 0) {
-          const defaultAddr = addresses.find((a) => a.isDefault) || addresses[0];
-          if (!shipping.address && !shipping.fullName) {
-            applyAddressSelection(defaultAddr);
-          } else {
-            const matched = addresses.find(
-              (a) =>
-                formatFullAddress(a) === shipping.address &&
-                a.receiverPhone === shipping.phone
-            );
-            if (matched) {
-              setSelectedAddressId(matched.id);
-              if (
-                typeof matched.latitude === 'number' &&
-                typeof matched.longitude === 'number' &&
-                Number.isFinite(matched.latitude) &&
-                Number.isFinite(matched.longitude)
-              ) {
-                setSelectedLocation({
-                  lat: matched.latitude,
-                  lng: matched.longitude,
-                  displayName: formatFullAddress(matched),
-                });
-              }
+    if (isAuthenticated) {
+      userService
+        .getAddresses()
+        .then((addresses) => {
+          if (!isMounted) return;
+          setSavedAddresses(addresses);
+
+          if (addresses.length > 0) {
+            const defaultAddr = addresses.find((a) => a.isDefault) || addresses[0];
+            if (!shipping.address && !shipping.fullName) {
+              applyAddressSelection(defaultAddr);
             } else {
-              setSelectedAddressId('custom');
+              const matched = addresses.find(
+                (a) =>
+                  formatFullAddress(a) === shipping.address &&
+                  a.receiverPhone === shipping.phone
+              );
+              if (matched) {
+                setSelectedAddressId(matched.id);
+                if (
+                  typeof matched.latitude === 'number' &&
+                  typeof matched.longitude === 'number' &&
+                  Number.isFinite(matched.latitude) &&
+                  Number.isFinite(matched.longitude)
+                ) {
+                  setSelectedLocation({
+                    lat: matched.latitude,
+                    lng: matched.longitude,
+                    displayName: formatFullAddress(matched),
+                  });
+                }
+              } else {
+                setSelectedAddressId('custom');
+              }
+            }
+          } else {
+            setSelectedAddressId('custom');
+            if (authUser && !shipping.fullName) {
+              setValue('fullName', authUser.fullName);
+              setValue('phone', authUser.phone || '');
+              setValue('address', authUser.address || '');
+              dispatch(
+                updateShipping({
+                  fullName: authUser.fullName,
+                  phone: authUser.phone || '',
+                  address: authUser.address || '',
+                })
+              );
             }
           }
-        } else {
+        })
+        .catch(() => {
+          if (!isMounted) return;
           setSelectedAddressId('custom');
+          // Fallback sang thông tin authUser khi API địa chỉ lỗi và form chưa có dữ liệu
           if (authUser && !shipping.fullName) {
             setValue('fullName', authUser.fullName);
             setValue('phone', authUser.phone || '');
@@ -234,16 +258,13 @@ export default function ShippingForm() {
               })
             );
           }
-        }
-      })
-      .catch(() => {
-        if (isMounted) setSelectedAddressId('custom');
-      });
+        });
+    }
 
     return () => {
       isMounted = false;
     };
-  }, [userEmail]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userEmail, isAuthenticated, authUser?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Chọn chế độ "Nhập địa chỉ khác"
   const handleSelectCustomAddress = () => {
@@ -355,6 +376,7 @@ export default function ShippingForm() {
       lng: s.lng,
       displayName: s.place_name,
     });
+    setIsMapExpanded(true);
   };
 
   // Điều hướng bằng bàn phím (ArrowUp, ArrowDown, Enter, Escape)
@@ -738,18 +760,68 @@ export default function ShippingForm() {
             </div>
           )}
 
-          {/* Bản đồ tương tác Leaflet + OpenStreetMap */}
-          <div className="mt-3 relative z-10">
-            <CheckoutDeliveryMap
-              selectedLocation={selectedLocation}
-              onLocationSelect={handleMapLocationSelect}
-            />
+          {/* Bản đồ tương tác Leaflet + OpenStreetMap (Lazy Loaded) */}
+          <div className="mt-3">
+            {!isMapExpanded ? (
+              <button
+                type="button"
+                onClick={() => setIsMapExpanded(true)}
+                className="w-full flex items-center justify-between rounded-xl border border-dashed border-green-300 bg-green-50/60 hover:bg-green-50 px-4 py-3 text-xs text-green-800 transition-all group shadow-2xs hover:shadow-xs"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-100 text-green-700 group-hover:scale-105 transition-transform">
+                    <MapPin className="h-4 w-4" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-semibold text-gray-800 text-sm">
+                      {selectedLocation ? 'Xem bản đồ & điều chỉnh vị trí ghim' : 'Xem bản đồ OpenStreetMap & ghim vị trí nhận hàng'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {selectedLocation
+                        ? `Đã ghim tọa độ [${selectedLocation.lat.toFixed(4)}, ${selectedLocation.lng.toFixed(4)}]`
+                        : 'Bấm để mở bản đồ và xác định chính xác cửa vào / vị trí nhận máy'}
+                    </p>
+                  </div>
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-lg bg-white px-3 py-1.5 font-medium text-green-700 shadow-2xs border border-green-200 group-hover:border-green-300 text-xs">
+                  Xem bản đồ
+                </span>
+              </button>
+            ) : (
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-green-600" />
+                    Bản đồ vị trí giao hàng:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsMapExpanded(false)}
+                    className="text-xs text-gray-500 hover:text-gray-700 underline cursor-pointer"
+                  >
+                    Thu gọn bản đồ
+                  </button>
+                </div>
+                <Suspense
+                  fallback={
+                    <div className="h-[280px] w-full rounded-xl border border-gray-200 bg-gray-50 flex flex-col items-center justify-center text-gray-400 gap-2">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-green-600 border-t-transparent" />
+                      <span className="text-xs font-medium text-gray-500">Đang tải bản đồ OpenStreetMap...</span>
+                    </div>
+                  }
+                >
+                  <CheckoutDeliveryMap
+                    selectedLocation={selectedLocation}
+                    onLocationSelect={handleMapLocationSelect}
+                  />
+                </Suspense>
+                <p className="mt-2 text-xs text-gray-500 flex items-center gap-1.5">
+                  <span>💡</span>
+                  <span>Bấm hoặc kéo thả ghim trên bản đồ OpenStreetMap để xác định chính xác cửa vào / vị trí nhận hàng của bạn.</span>
+                </p>
+              </div>
+            )}
           </div>
-
-          <p className="mt-2 text-xs text-gray-500 flex items-center gap-1.5">
-            <span>💡</span>
-            <span>Bấm hoặc kéo thả ghim trên bản đồ OpenStreetMap để xác định chính xác cửa vào / vị trí nhận hàng của bạn.</span>
-          </p>
         </div>
       </div>
 
@@ -941,13 +1013,17 @@ export default function ShippingForm() {
         </div>
       </Modal>
 
-      {/* MODAL THÊM ĐỊA CHỈ NHẬN HÀNG MỚI */}
-      <AddressModal
-        open={isAddressModalOpen}
-        onCancel={() => setIsAddressModalOpen(false)}
-        onSubmit={handleCreateNewAddress}
-        loading={isSavingAddress}
-      />
+      {/* MODAL THÊM ĐỊA CHỈ NHẬN HÀNG MỚI (Lazy Loaded) */}
+      {isAddressModalOpen && (
+        <Suspense fallback={null}>
+          <AddressModal
+            open={isAddressModalOpen}
+            onCancel={() => setIsAddressModalOpen(false)}
+            onSubmit={handleCreateNewAddress}
+            loading={isSavingAddress}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

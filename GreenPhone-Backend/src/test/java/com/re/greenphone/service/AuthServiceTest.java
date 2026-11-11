@@ -174,7 +174,17 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.login(loginReq))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("not active");
+                .hasMessageContaining("chưa được kích hoạt");
+    }
+
+    @Test void login_AccountBlocked() {
+        testUser.setStatus("BLOCKED");
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches("password123", "encoded_password")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.login(loginReq))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Tài khoản đã bị khóa. Vui lòng liên hệ với quản trị viên để được hỗ trợ.");
     }
 
     // === VERIFY OTP ===
@@ -347,7 +357,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.refreshToken("valid-token"))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("Account is not active");
+                .hasMessageContaining("Tài khoản không hoạt động. Vui lòng liên hệ với quản trị viên để được hỗ trợ.");
     }
 
     // === LOGOUT ===

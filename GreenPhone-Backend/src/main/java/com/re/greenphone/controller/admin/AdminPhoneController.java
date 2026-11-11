@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -18,6 +19,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/phones")
+@PreAuthorize("hasAnyRole('ADMIN', 'MARKETING')")
 @RequiredArgsConstructor
 @Tag(name = "Admin - Phone", description = "Admin phone management")
 public class AdminPhoneController {

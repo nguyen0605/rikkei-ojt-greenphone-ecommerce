@@ -13,12 +13,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/admin/shipments")
+@RequestMapping({"/api/v1/admin/shipments", "/api/admin/shipments"})
+@PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE')")
 @RequiredArgsConstructor
 @Tag(name = "Admin - Shipment", description = "Quản lý điều phối giao vận, bưu cục & vận đơn")
 public class AdminShipmentController {

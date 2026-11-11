@@ -5,7 +5,7 @@ import { Breadcrumb } from '@/components/common';
 import { useAppSelector } from '@/store/hooks';
 import { selectCartSummary } from '@/store/selectors/cartSelectors';
 import { formatVND } from '@/utils';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { clearCart } from '@/store/slices/cartSlice';
 import { resetCheckout } from '@/store/slices/checkoutSlice';
 import { useAppDispatch } from '@/store/hooks';
@@ -22,6 +22,8 @@ export default function CheckoutSuccessPage() {
   const [searchParams] = useSearchParams();
   const summary = useAppSelector(selectCartSummary);
   const reduxOrderId = useAppSelector((s) => s.checkout.orderId);
+  const buyNowItem = useAppSelector((s) => s.checkout.buyNowItem);
+  const [isBuyNowOrder] = useState(() => searchParams.get('buyNow') === '1' || Boolean(buyNowItem));
   // URL param survives refresh; redux does not (checkout not persisted)
   const urlOrderId = searchParams.get('orderId');
   const orderId = urlOrderId ?? reduxOrderId;
@@ -35,10 +37,11 @@ export default function CheckoutSuccessPage() {
 
   useEffect(() => {
     dispatch(resetCheckout());
+    if (isBuyNowOrder) return;
     // Sau 5s clear cart để tránh mất state ngay lập tức
     const t = setTimeout(() => dispatch(clearCart()), 5000);
     return () => clearTimeout(t);
-  }, [dispatch]);
+  }, [dispatch, isBuyNowOrder]);
 
   const total = order?.finalAmount ?? summary.total;
   const method = order ? (paymentMethodLabel[order.paymentMethod] ?? order.paymentMethod) : 'COD';

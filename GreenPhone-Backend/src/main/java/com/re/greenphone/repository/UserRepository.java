@@ -17,6 +17,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByEmail(String email);
 
+    boolean existsByPhone(String phone);
+
     @Query(value = "SELECT u FROM User u WHERE LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%'))")
     Page<User> searchByEmailOrName(@Param("search") String search, Pageable pageable);
+
+    @Query("SELECT u FROM User u WHERE u.role.name IN :roles " +
+            "AND (:search IS NULL OR :search = '' OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.phone) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+            "AND (:roleFilter IS NULL OR :roleFilter = '' OR u.role.name = :roleFilter)")
+    Page<User> searchStaff(@Param("roles") java.util.List<String> roles,
+                           @Param("search") String search,
+                           @Param("roleFilter") String roleFilter,
+                           Pageable pageable);
 }

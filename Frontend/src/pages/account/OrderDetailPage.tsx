@@ -6,11 +6,12 @@ import {
   MapPin,
   CreditCard,
   ShoppingBag,
-  Smartphone,
   AlertCircle,
   XCircle,
   RotateCcw,
   Star,
+  Clock,
+  CheckCircle2,
 } from 'lucide-react';
 import { message } from 'antd';
 import { orderService } from '@/services/orderService';
@@ -21,8 +22,11 @@ import { extractCustomerNote } from '@/utils/orderStateMachine';
 import { getStatusBadgeConfig, formatPaymentMethod } from '@/components/order/orderHelpers';
 import OrderTrackingTimeline from '@/components/order/OrderTrackingTimeline';
 import OrderCancelModal from '@/components/order/OrderCancelModal';
+import ShipmentTrackingCard from '@/components/order/ShipmentTrackingCard';
 import BankTransferPaymentCard from '@/components/checkout/BankTransferPaymentCard';
 import { usePaymentCountdown } from '@/hooks/usePaymentCountdown';
+import { useOrderProductLookup } from '@/hooks/useOrderProductLookup';
+import OrderItemThumbnail from '@/components/order/OrderItemThumbnail';
 import { useAppDispatch } from '@/store/hooks';
 import { addCartItem } from '@/store/slices/cartSlice';
 
@@ -31,6 +35,7 @@ export const OrderDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useAppDispatch();
+  const { resolveItem } = useOrderProductLookup();
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
 
@@ -71,8 +76,8 @@ export const OrderDetailPage: React.FC = () => {
 
   const remainingSeconds = usePaymentCountdown(qrData?.expiresAt);
 
-  // Điều kiện nút hành động
-  const canCancel = order?.orderStatus === 'PENDING';
+  // Điều kiện nút hành động: PENDING hoặc CONFIRMED đều có thể gửi yêu cầu hủy đơn
+  const canCancel = order?.orderStatus === 'PENDING' || order?.orderStatus === 'CONFIRMED';
   const canReview = order?.orderStatus === 'DELIVERED';
   const canReorder = order?.orderDetails && order.orderDetails.length > 0;
 
@@ -82,20 +87,33 @@ export const OrderDetailPage: React.FC = () => {
     setIsReordering(true);
     try {
       let addedCount = 0;
+      let failedCount = 0;
       for (const item of order.orderDetails) {
         if (item.phoneVariantId) {
-          await dispatch(
-            addCartItem({
-              phoneVariantId: item.phoneVariantId,
-              quantity: item.quantity || 1,
-            })
-          ).unwrap();
-          addedCount += 1;
+          try {
+            await dispatch(
+              addCartItem({
+                phoneVariantId: item.phoneVariantId,
+                quantity: item.quantity || 1,
+              })
+            ).unwrap();
+            addedCount += 1;
+          } catch {
+            failedCount += 1;
+          }
         }
       }
       if (addedCount > 0) {
-        message.success(`Đã thêm ${addedCount} sản phẩm vào giỏ hàng`);
+        if (failedCount > 0) {
+          message.warning(
+            `Đã thêm ${addedCount} sản phẩm vào giỏ. ${failedCount} sản phẩm đã hết hàng hoặc ngừng kinh doanh đã được bỏ qua.`
+          );
+        } else {
+          message.success(`Đã thêm ${addedCount} sản phẩm vào giỏ hàng`);
+        }
         navigate('/gio-hang');
+      } else {
+        message.error('Các sản phẩm trong đơn hàng này hiện đã hết hàng hoặc không còn khả dụng');
       }
     } catch (err: unknown) {
       const errMsg = (err as { message?: string })?.message || 'Có lỗi khi thêm vào giỏ hàng';
@@ -231,6 +249,35 @@ export const OrderDetailPage: React.FC = () => {
         }}
       />
 
+      {/* 2.5. Banner Chờ hoàn tiền nếu đã hủy và thanh toán online */}
+      {order.paymentStatus === 'REFUND_PENDING' && (
+        <div className="rounded-2xl border border-orange-200 bg-orange-50/80 p-4 sm:p-5 flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-700">
+            <Clock className="h-5 w-5" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold text-orange-900">Yêu cầu hoàn tiền đang được xử lý</h4>
+            <p className="mt-1 text-xs text-orange-800 leading-relaxed">
+              Đơn hàng của bạn đã được hủy. Yêu cầu hoàn tiền đã được chuyển đến bộ phận kế toán để chuyển khoản trả lại theo thông tin tài khoản bạn đã cung cấp (thường trong vòng 24h làm việc).
+            </p>
+          </div>
+        </div>
+      )}
+
+      {order.paymentStatus === 'REFUNDED' && (
+        <div className="rounded-2xl border border-purple-200 bg-purple-50/80 p-4 sm:p-5 flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-700">
+            <CheckCircle2 className="h-5 w-5" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold text-purple-900">Đã hoàn tiền thành công</h4>
+            <p className="mt-1 text-xs text-purple-800 leading-relaxed">
+              Số tiền đơn hàng đã được GreenPhone hoàn trả vào tài khoản ngân hàng của bạn. Xin vui lòng kiểm tra biến động số dư tài khoản.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* 3. Banner Thanh toán chuyển khoản ngân hàng nếu đang chờ */}
       {isPendingBankTransfer && qrData && (
         <div className="rounded-2xl border-2 border-amber-200 bg-amber-50/60 p-4 sm:p-5">
@@ -242,6 +289,12 @@ export const OrderDetailPage: React.FC = () => {
           />
         </div>
       )}
+
+      {/* 3.5. Thông tin kiện hàng & Hành trình vận đơn */}
+      <ShipmentTrackingCard
+        orderId={order.id}
+        orderStatus={order.orderStatus}
+      />
 
       {/* 4. Thông tin giao hàng & Thanh toán (2 Cột trên màn hình lớn) */}
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -327,30 +380,49 @@ export const OrderDetailPage: React.FC = () => {
         <div className="divide-y divide-gray-100 px-5">
           {order.orderDetails?.map((item: OrderDetailDTO) => {
             const variantSpecs = [item.ram, item.storage, item.color].filter(Boolean).join(' • ');
+            const resolved = resolveItem(item);
 
             return (
               <div
                 key={item.id || item.phoneVariantId}
                 className="flex items-center gap-4 py-4"
               >
-                {/* Thumbnail */}
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-gray-100 bg-gray-50 p-1">
-                  {(item as { imageUrl?: string }).imageUrl ? (
-                    <img
-                      src={(item as { imageUrl?: string }).imageUrl}
-                      alt={item.productName}
-                      className="h-full w-full object-contain"
-                    />
-                  ) : (
-                    <Smartphone className="h-8 w-8 text-emerald-600/50" />
-                  )}
-                </div>
+                {/* Thumbnail với ảnh thực tế hoặc fallback */}
+                <OrderItemThumbnail
+                  imageUrl={resolved.imageUrl}
+                  productName={item.productName}
+                  navUrl={resolved.navUrl}
+                  size="md"
+                />
 
                 {/* Info */}
                 <div className="min-w-0 flex-1">
-                  <h4 className="text-sm font-semibold text-gray-900 line-clamp-1">
-                    {item.productName}
-                  </h4>
+                  {resolved.navUrl ? (
+                    <Link
+                      to={resolved.navUrl}
+                      data-testid="order-item-name-link"
+                      className="group inline-block focus:outline-none"
+                    >
+                      <h4 className="text-sm font-semibold text-gray-900 line-clamp-1 group-hover:text-emerald-600 transition-colors">
+                        {item.productName}
+                      </h4>
+                    </Link>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="text-sm font-semibold text-gray-900 line-clamp-1">
+                        {item.productName}
+                      </h4>
+                      {resolved.isInactive && (
+                        <span
+                          data-testid="product-inactive-badge"
+                          className="rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600"
+                        >
+                          Sản phẩm hiện đã ngừng kinh doanh
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {variantSpecs && (
                     <div className="mt-1 text-xs text-gray-500">{variantSpecs}</div>
                   )}
@@ -377,6 +449,13 @@ export const OrderDetailPage: React.FC = () => {
             <span>{formatVND(order.totalAmount)}</span>
           </div>
 
+          <div className="flex justify-between text-gray-600">
+            <span>Phí vận chuyển:</span>
+            <span>
+              {(order.shippingFee ?? 0) > 0 ? formatVND(order.shippingFee ?? 0) : 'Miễn phí'}
+            </span>
+          </div>
+
           {order.discountAmount > 0 && (
             <div className="flex justify-between text-emerald-700 font-medium">
               <span>Giảm giá khuyến mãi:</span>
@@ -394,6 +473,7 @@ export const OrderDetailPage: React.FC = () => {
       {/* Modal Hủy đơn */}
       <OrderCancelModal
         orderId={order.id}
+        paymentStatus={order.paymentStatus}
         open={cancelModalOpen}
         onClose={() => setCancelModalOpen(false)}
       />

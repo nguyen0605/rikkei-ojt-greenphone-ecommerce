@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, lazy, Suspense } from 'react';
 import { Modal, Form, Input, Select, Checkbox, Button, Radio, Tag, message } from 'antd';
 import {
   UserOutlined,
@@ -11,7 +11,9 @@ import {
 } from '@ant-design/icons';
 import { Sparkles, MapPin } from 'lucide-react';
 import { VIETNAM_PROVINCES, findMatchingProvince, parseAddressComponents } from '@/utils/provinces';
-import CheckoutDeliveryMap, { type LocationCoords } from '@/components/checkout/CheckoutDeliveryMap';
+import type { LocationCoords } from '@/components/checkout/CheckoutDeliveryMap';
+
+const CheckoutDeliveryMap = lazy(() => import('@/components/checkout/CheckoutDeliveryMap'));
 import {
   geocodeInitialAddress,
   reverseGeocode,
@@ -700,11 +702,20 @@ export default function AddressModal({
 
           {/* Khung bản đồ */}
           <div className="overflow-hidden rounded-xl border border-gray-200">
-            <CheckoutDeliveryMap
-              selectedLocation={selectedCoords}
-              onLocationSelect={handleMapLocationSelect}
-              className="!h-[240px]"
-            />
+            <Suspense
+              fallback={
+                <div className="h-[240px] w-full bg-gray-50 flex flex-col items-center justify-center text-gray-400 gap-2">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-green-600 border-t-transparent" />
+                  <span className="text-xs font-medium text-gray-500">Đang tải bản đồ...</span>
+                </div>
+              }
+            >
+              <CheckoutDeliveryMap
+                selectedLocation={selectedCoords}
+                onLocationSelect={handleMapLocationSelect}
+                className="!h-[240px]"
+              />
+            </Suspense>
           </div>
         </div>
 

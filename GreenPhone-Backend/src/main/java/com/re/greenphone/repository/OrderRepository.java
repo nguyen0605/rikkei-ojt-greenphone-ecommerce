@@ -15,6 +15,9 @@ import java.util.Optional;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from Order o where o.id = :id")
+    Optional<Order> findByIdForUpdate(@Param("id") Long id);
 
     List<Order> findByUserIdOrderByCreatedAtDesc(Long userId);
 
@@ -53,6 +56,12 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findByOrderStatusAndPaymentStatusAndPaymentMethodInAndCreatedAtBefore(
             String orderStatus, String paymentStatus, List<String> paymentMethods, LocalDateTime dateTime);
 
-    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.orderDetails WHERE o.id = :id")
+    @Query("SELECT DISTINCT o FROM Order o " +
+            "LEFT JOIN FETCH o.orderDetails od " +
+            "LEFT JOIN FETCH od.phoneVariant pv " +
+            "LEFT JOIN FETCH o.user u " +
+            "LEFT JOIN FETCH o.userPromotion up " +
+            "LEFT JOIN FETCH up.promotion " +
+            "WHERE o.id = :id")
     Optional<Order> findByIdWithDetails(@Param("id") Long id);
 }

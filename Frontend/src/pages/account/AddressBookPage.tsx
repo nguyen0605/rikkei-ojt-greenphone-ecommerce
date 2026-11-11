@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, Tag, Popconfirm, App, Skeleton, Empty, Tooltip } from 'antd';
 import {
@@ -13,8 +13,9 @@ import {
   EnvironmentOutlined,
 } from '@ant-design/icons';
 import { userService, formatFullAddress } from '@/services';
-import AddressModal from '@/components/account/AddressModal';
 import type { AddressItem, AddressRequest, AddressLabel } from '@/types/api';
+
+const AddressModal = lazy(() => import('@/components/account/AddressModal'));
 
 const LABEL_MAP: Record<AddressLabel, { text: string; color: string }> = {
   HOME: { text: 'Nhà riêng', color: 'blue' },
@@ -318,17 +319,21 @@ export default function AddressBookPage() {
         </div>
       )}
 
-      {/* Address Form Modal with Leaflet Map */}
-      <AddressModal
-        open={modalOpen}
-        onCancel={() => {
-          setModalOpen(false);
-          setEditingAddress(null);
-        }}
-        onSubmit={handleModalSubmit}
-        initialData={editingAddress}
-        loading={createMutation.isPending || updateMutation.isPending}
-      />
+      {/* Address Form Modal with Leaflet Map (Lazy Loaded) */}
+      {modalOpen && (
+        <Suspense fallback={null}>
+          <AddressModal
+            open={modalOpen}
+            onCancel={() => {
+              setModalOpen(false);
+              setEditingAddress(null);
+            }}
+            onSubmit={handleModalSubmit}
+            initialData={editingAddress}
+            loading={createMutation.isPending || updateMutation.isPending}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

@@ -25,8 +25,9 @@ public class UserPrincipal implements UserDetails {
         this.password = user.getPassword();
         this.fullName = user.getFullName();
         this.active = "ACTIVE".equals(user.getStatus());
-        this.authorities = Collections.singletonList(
-                new SimpleGrantedAuthority("ROLE_" + user.getRole().getName()));
+        String roleName = user.getRole() != null ? user.getRole().getName() : "CUSTOMER";
+        String authority = roleName.startsWith("ROLE_") ? roleName : "ROLE_" + roleName;
+        this.authorities = Collections.singletonList(new SimpleGrantedAuthority(authority));
     }
 
     public static UserPrincipal create(User user) {

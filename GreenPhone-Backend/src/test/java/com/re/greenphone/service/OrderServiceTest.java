@@ -34,6 +34,7 @@ import static org.mockito.Mockito.*;
 class OrderServiceTest {
 
     @Mock private OrderRepository orderRepository;
+    @Mock private com.re.greenphone.repository.OrderHistoryRepository orderHistoryRepository;
     @Mock private UserRepository userRepository;
     @Mock private PhoneVariantRepository phoneVariantRepository;
     @Mock private UserPromotionRepository userPromotionRepository;
@@ -43,6 +44,7 @@ class OrderServiceTest {
     @Mock private EmailService emailService;
     @Mock private SettingsService settingsService;
     @Mock private InventoryStockHistoryService inventoryStockHistoryService;
+    @Mock private jakarta.persistence.EntityManager entityManager;
     @Mock private RedisTemplate<String, Object> redisTemplate;
     @Mock private ValueOperations<String, Object> valueOperations;
 
@@ -270,7 +272,7 @@ class OrderServiceTest {
                 .quantity(2).unitPrice(new BigDecimal("15000000")).build();
         order.setOrderDetails(List.of(detail));
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
         when(orderRepository.save(any())).thenReturn(order);
         when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(v));
         when(phoneVariantRepository.save(any())).thenReturn(v);
@@ -303,7 +305,7 @@ class OrderServiceTest {
         order.setId(3L);
         order.setOrderDetails(List.of());
 
-        when(orderRepository.findById(3L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(3L)).thenReturn(Optional.of(order));
         when(orderRepository.save(any())).thenReturn(order);
         when(orderMapper.toDto(any())).thenReturn(new OrderDTO());
 
@@ -323,7 +325,7 @@ class OrderServiceTest {
                 .user(owner).orderStatus("PENDING").build();
         order.setId(2L);
 
-        when(orderRepository.findById(2L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(order));
 
         assertThrows(BadRequestException.class, () -> orderService.cancelOrder(2L, "Lý do"));
     }
@@ -336,9 +338,38 @@ class OrderServiceTest {
                 .user(u).orderStatus("SHIPPING").build();
         shippingOrder.setId(3L);
 
-        when(orderRepository.findById(3L)).thenReturn(Optional.of(shippingOrder));
+        when(orderRepository.findByIdForUpdate(3L)).thenReturn(Optional.of(shippingOrder));
 
         assertThrows(BadRequestException.class, () -> orderService.cancelOrder(3L, "Lý do"));
+    }
+
+    @Test
+    @DisplayName("A1/Phần 1: Khách hủy đơn đã thanh toán online (PAID) thì chuyển sang REFUND_PENDING và lưu thông tin ngân hàng")
+    void cancelOrder_PaidOrder_TransitionsToRefundPendingAndSavesBankDetails() {
+        User u = createUser(); u.setId(USER_ID);
+        securityUtilsMock.when(SecurityUtils::getCurrentUserId).thenReturn(USER_ID);
+
+        com.re.greenphone.entity.Order order = com.re.greenphone.entity.Order.builder()
+                .user(u).orderStatus("CONFIRMED").paymentStatus("PAID")
+                .orderDetails(new java.util.ArrayList<>()).build();
+        order.setId(55L);
+
+        when(orderRepository.findByIdForUpdate(55L)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(orderMapper.toDto(any())).thenReturn(OrderDTO.builder().id(55L).build());
+
+        com.re.greenphone.dto.request.CancelOrderRequest cancelReq = com.re.greenphone.dto.request.CancelOrderRequest.builder()
+                .reason("Đổi ý không mua nữa")
+                .bankName("MB Bank")
+                .accountNumber("0943941773")
+                .accountHolder("NGUYEN VAN A")
+                .build();
+
+        orderService.cancelOrder(55L, cancelReq);
+
+        assertEquals("CANCELLED", order.getOrderStatus());
+        assertEquals("REFUND_PENDING", order.getPaymentStatus());
+        assertTrue(order.getNote().contains("YÊU CẦU HOÀN TIỀN: Ngân hàng: MB Bank | STK: 0943941773 | Chủ TK: NGUYEN VAN A"));
     }
 
     @Test
@@ -432,5 +463,39 @@ class OrderServiceTest {
         assertTrue(result.isNewlyCreated());
         assertEquals(101L, result.getOrder().getId());
         verifyNoInteractions(redisTemplate);
+    }
+
+    @Test
+    @DisplayName("Buy Now: chỉ tạo đơn cho sản phẩm đã chọn và KHÔNG xóa giỏ hàng hiện có của user")
+    void createOrder_BuyNow_DoesNotClearCart() {
+        stubUser();
+        PhoneVariant v = createVariant(100L, new BigDecimal("1000.00"), null, 10);
+        OrderRequest req = createOrderReq(List.of(createItemReq(100L, 1)), null);
+        req.setBuyNow(true);
+
+        when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(v));
+        when(orderMapper.toDto(any())).thenReturn(OrderDTO.builder().id(202L).build());
+        when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderDTO result = orderService.createOrder(req);
+
+        assertEquals(202L, result.getId());
+        assertEquals(9, v.getStockQuantity());
+        verifyNoInteractions(cartRepository);
+    }
+
+    @Test
+    @DisplayName("Buy Now / Checkout: từ chối đặt hàng nếu biến thể ở trạng thái INACTIVE")
+    void createOrder_InactiveVariant_ThrowsBadRequest() {
+        stubUser();
+        PhoneVariant v = createVariant(100L, new BigDecimal("1000.00"), null, 10);
+        v.setStatus("INACTIVE");
+        OrderRequest req = createOrderReq(List.of(createItemReq(100L, 1)), null);
+        req.setBuyNow(true);
+
+        when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(v));
+
+        assertThrows(BadRequestException.class, () -> orderService.createOrder(req));
+        verify(orderRepository, never()).save(any());
     }
 }

@@ -33,6 +33,9 @@ class InventoryStockConcurrencyIT extends MySQLTestContainer {
     @Test
     void concurrentExportsOfLastUnitAllowExactlyOneAndRecordOneMovement() throws Exception {
         Long variantId = transactions.execute(status -> {
+            Warehouse warehouse = new Warehouse();
+            warehouse.setCode("WH-HN-MAIN"); warehouse.setName("Main warehouse"); warehouse.setAddress("Ha Noi");
+            em.persist(warehouse);
             Brand brand = Brand.builder().name("Concurrency test").status("ACTIVE").build();
             em.persist(brand);
             Phone phone = Phone.builder().name("Last unit").brand(brand).status("ACTIVE").build();

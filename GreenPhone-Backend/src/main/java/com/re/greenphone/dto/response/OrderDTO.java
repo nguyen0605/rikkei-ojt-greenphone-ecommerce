@@ -21,6 +21,7 @@ public class OrderDTO {
     private String shippingAddress;
     private BigDecimal totalAmount;
     private BigDecimal discountAmount;
+    private BigDecimal shippingFee;
     private BigDecimal finalAmount;
     private String orderStatus;
     private String paymentStatus;

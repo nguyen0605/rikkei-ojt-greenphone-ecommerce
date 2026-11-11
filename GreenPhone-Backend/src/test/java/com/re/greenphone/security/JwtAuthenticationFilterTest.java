@@ -129,7 +129,7 @@ class JwtAuthenticationFilterTest {
         filter.doFilterInternal(request, response, filterChain);
 
         verify(response).setStatus(HttpServletResponse.SC_FORBIDDEN);
-        assertThat(responseWriter.toString()).contains("User account is not active");
+        assertThat(responseWriter.toString()).contains("Tài khoản đã bị khóa hoặc không hoạt động. Vui lòng liên hệ với quản trị viên để được hỗ trợ.");
         verify(filterChain, never()).doFilter(request, response);
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
     }

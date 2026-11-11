@@ -34,6 +34,7 @@ public class SecurityConfig {
                         "/api/auth/reset-password",
                         "/api/auth/refresh",
                         "/api/auth/logout",
+                        "/api/admin/auth/**",
                         "/api/phones/**",
                         "/api/brands/**",
                         "/api/banners/**",
@@ -43,6 +44,9 @@ public class SecurityConfig {
                         "/api/settings/**",
                         "/api/options/**",
                         "/api/shipments/track/**",
+                        "/api/v1/shipments/track/**",
+                        "/api/warranties/**",
+                        "/api/v1/warranties/**",
                         "/swagger-ui/**",
                         "/v3/api-docs/**",
                         "/actuator/health/**"
@@ -55,6 +59,9 @@ public class SecurityConfig {
 
         @Bean
         public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+                var warehouseMatcher = org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher
+                                .withDefaults().matcher("/api/v1/admin/**");
+                var errorMapper = new com.fasterxml.jackson.databind.ObjectMapper();
                 http
                                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                                 .csrf(AbstractHttpConfigurer::disable)
@@ -67,11 +74,24 @@ public class SecurityConfig {
                                                 .requestMatchers(HttpMethod.GET, "/api/brands/**").permitAll()
                                                 .requestMatchers(HttpMethod.GET, "/api/banners/**").permitAll()
                                                 .requestMatchers(HttpMethod.GET, "/api/reviews/phone/**").permitAll()
-                                                // Admin endpoints
-                                                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                                                // Admin endpoints - accessible by all admin/staff roles; specific permissions enforced via @PreAuthorize
+                                                .requestMatchers("/api/admin/**", "/api/v1/admin/**").hasAnyRole("ADMIN", "SALES", "WAREHOUSE", "MARKETING")
                                                 // All other API endpoints require authentication
-                                                .requestMatchers("/api/**").authenticated()
+                                                .requestMatchers("/api/**", "/api/v1/**").authenticated()
                                                 .anyRequest().permitAll())
+                                .exceptionHandling(errors -> errors
+                                                .accessDeniedHandler((request, response, exception) -> {
+                                                        response.setStatus(403);
+                                                        response.setContentType("application/json;charset=UTF-8");
+                                                        errorMapper.writeValue(response.getOutputStream(),
+                                                                com.re.greenphone.common.dto.ApiResponse.error(403, "Access denied"));
+                                                })
+                                                .authenticationEntryPoint((request, response, exception) -> {
+                                                        response.setStatus(401);
+                                                        response.setContentType("application/json;charset=UTF-8");
+                                                        errorMapper.writeValue(response.getOutputStream(),
+                                                                com.re.greenphone.common.dto.ApiResponse.error(401, "Authentication required"));
+                                                }))
                                 .addFilterBefore(jwtAuthenticationFilter,
                                                 UsernamePasswordAuthenticationFilter.class);
 

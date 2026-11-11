@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/shipments")
+@RequestMapping({"/api/v1/shipments", "/api/shipments"})
 @RequiredArgsConstructor
 @Tag(name = "Shipment Tracking", description = "API tra cứu vận đơn dành cho khách hàng")
 public class ShipmentController {

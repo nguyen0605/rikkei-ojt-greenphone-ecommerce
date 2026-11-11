@@ -52,11 +52,14 @@ const rootReducer = combineReducers({
 });
 
 type RootTestState = ReturnType<typeof rootReducer>;
+type DeepPartial<T> = {
+  [P in keyof T]?: DeepPartial<T[P]>;
+};
 
-function renderWithStore(preloadedState?: Partial<RootTestState>) {
+function renderWithStore(preloadedState?: DeepPartial<RootTestState>) {
   const store = configureStore({
     reducer: rootReducer,
-    preloadedState,
+    preloadedState: preloadedState as never,
   });
 
   const utils = render(
@@ -71,9 +74,11 @@ function renderWithStore(preloadedState?: Partial<RootTestState>) {
 describe('ShippingForm with OpenStreetMap', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(userService.getAddresses).mockReset();
+    vi.mocked(userService.getAddresses).mockResolvedValue([]);
   });
 
-  it('renders shipping form fields and OpenStreetMap container without Mapbox warning', () => {
+  it('renders shipping form fields and OpenStreetMap container without Mapbox warning', async () => {
     renderWithStore();
 
     expect(screen.getByText('Địa chỉ nhận hàng')).toBeInTheDocument();
@@ -84,8 +89,11 @@ describe('ShippingForm with OpenStreetMap', () => {
       screen.getByPlaceholderText('Nhập địa chỉ, tên đường (ví dụ: 97 Man Thiện, Cầu Giấy...)')
     ).toBeInTheDocument();
 
-    // Map container exists
-    expect(screen.getByTestId('checkout-delivery-map-container')).toBeInTheDocument();
+    // Map button exists; clicking opens the lazy-loaded OpenStreetMap container
+    const viewMapBtn = screen.getByRole('button', { name: /Xem bản đồ/i });
+    expect(viewMapBtn).toBeInTheDocument();
+    fireEvent.click(viewMapBtn);
+    expect(await screen.findByTestId('checkout-delivery-map-container')).toBeInTheDocument();
 
     // KHÔNG còn cảnh báo thiếu Mapbox token
     expect(screen.queryByText(/Chưa có VITE_MAPBOX_TOKEN/i)).not.toBeInTheDocument();
@@ -122,7 +130,19 @@ describe('ShippingForm with OpenStreetMap', () => {
 
     vi.mocked(userService.getAddresses).mockResolvedValueOnce(mockAddresses);
 
-    const { store } = renderWithStore();
+    const { store } = renderWithStore({
+      auth: {
+        isAuthenticated: true,
+        token: 'mock-token',
+        user: {
+          id: 1,
+          email: 'customer@greenphone.vn',
+          fullName: 'Nguyễn Văn Chủ Hộ',
+          phone: '0912121212',
+          role: 'CUSTOMER',
+        },
+      },
+    });
 
     // Ban đầu hiển thị thẻ gộp của địa chỉ mặc định
     await waitFor(() => {
@@ -135,7 +155,7 @@ describe('ShippingForm with OpenStreetMap', () => {
     expect(store.getState().checkout.shipping.phone).toBe('0912121212');
 
     // Bấm nút "Thay đổi" để mở modal chọn địa chỉ
-    const changeBtn = screen.getByRole('button', { name: 'Thay đổi' });
+    const changeBtn = screen.getByRole('button', { name: /^Thay đổi$/i });
     fireEvent.click(changeBtn);
 
     // Modal hiển thị danh sách các địa chỉ đã lưu
@@ -274,6 +294,91 @@ describe('ShippingForm with OpenStreetMap', () => {
       expect(screen.getByText('Họ tên tối thiểu 2 ký tự')).toBeInTheDocument();
       expect(screen.getByText('SĐT không hợp lệ (10 số, bắt đầu 0)')).toBeInTheDocument();
       expect(screen.getByText('Địa chỉ tối thiểu 5 ký tự')).toBeInTheDocument();
+    });
+  });
+
+  it('toggles map expansion and collapse smoothly without unmounting coordinates', async () => {
+    renderWithStore();
+
+    // Ban đầu hiển thị nút bấm xem bản đồ (lazy)
+    const openBtn = screen.getByRole('button', { name: /Xem bản đồ/i });
+    expect(openBtn).toBeInTheDocument();
+    expect(screen.queryByTestId('checkout-delivery-map-container')).not.toBeInTheDocument();
+
+    // Bấm mở bản đồ
+    fireEvent.click(openBtn);
+    expect(await screen.findByTestId('checkout-delivery-map-container')).toBeInTheDocument();
+
+    // Bấm thu gọn bản đồ
+    const collapseBtn = screen.getByRole('button', { name: /Thu gọn bản đồ/i });
+    fireEvent.click(collapseBtn);
+    expect(screen.queryByTestId('checkout-delivery-map-container')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Xem bản đồ/i })).toBeInTheDocument();
+  });
+
+  it('falls back to authUser information when address API fails and form is empty', async () => {
+    vi.mocked(userService.getAddresses).mockRejectedValueOnce(new Error('Network error'));
+
+    const { store } = renderWithStore({
+      auth: {
+        isAuthenticated: true,
+        token: 'mock-token',
+        user: {
+          id: 99,
+          email: 'customer@greenphone.vn',
+          fullName: 'Khách Hàng Dự Phòng',
+          phone: '0933445566',
+          address: '456 Đường Lê Duẩn, Đà Nẵng',
+          role: 'CUSTOMER',
+        },
+      },
+    });
+
+    await waitFor(() => {
+      expect(store.getState().checkout.shipping.fullName).toBe('Khách Hàng Dự Phòng');
+      expect(store.getState().checkout.shipping.phone).toBe('0933445566');
+      expect(store.getState().checkout.shipping.address).toBe('456 Đường Lê Duẩn, Đà Nẵng');
+    });
+  });
+
+  it('does NOT overwrite pre-filled shipping info when saved addresses load', async () => {
+    vi.mocked(userService.getAddresses).mockResolvedValueOnce([
+      {
+        id: 'addr-1',
+        receiverName: 'Tên Khác Trong Sổ',
+        receiverPhone: '0900000000',
+        province: 'Hà Nội',
+        district: 'Cầu Giấy',
+        ward: 'Dịch Vọng',
+        streetAddress: '1 Duy Tân',
+        label: 'HOME',
+        isDefault: true,
+      },
+    ]);
+
+    const { store } = renderWithStore({
+      checkout: {
+        currentStep: 1,
+        shipping: {
+          fullName: 'Tên Người Đã Nhập',
+          phone: '0911223344',
+          email: 'custom@example.com',
+          province: 'TP.HCM',
+          district: 'Quận 1',
+          ward: 'Bến Nghé',
+          address: '100 Nguyễn Huệ, Quận 1, TP.HCM',
+          shipToDifferentAddress: false,
+        },
+        delivery: 'standard',
+        payment: 'cod',
+        voucherDiscount: 0,
+      },
+    });
+
+    await waitFor(() => {
+      // Giữ nguyên thông tin người dùng đã nhập, không bị ghi đè bởi địa chỉ mặc định
+      expect(store.getState().checkout.shipping.fullName).toBe('Tên Người Đã Nhập');
+      expect(store.getState().checkout.shipping.address).toBe('100 Nguyễn Huệ, Quận 1, TP.HCM');
     });
   });
 });

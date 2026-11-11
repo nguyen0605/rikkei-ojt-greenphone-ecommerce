@@ -2,12 +2,14 @@ package com.re.greenphone.service;
 
 import com.re.greenphone.common.exception.BadRequestException;
 import com.re.greenphone.common.exception.ResourceNotFoundException;
+import com.re.greenphone.common.exception.UnauthorizedException;
 import com.re.greenphone.dto.request.CreateShipmentRequest;
 import com.re.greenphone.dto.request.UpdateShipmentStatusRequest;
 import com.re.greenphone.dto.response.ShipmentDTO;
 import com.re.greenphone.dto.response.ShipmentHistoryDTO;
 import com.re.greenphone.entity.*;
 import com.re.greenphone.repository.*;
+import com.re.greenphone.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -54,18 +56,21 @@ public class ShipmentService {
             throw new BadRequestException("Order must be in PROCESSING status to create shipment. Current status: " + order.getOrderStatus());
         }
 
+        String carrierCode = request.getCarrierCode().trim().toUpperCase();
+        if (!VALID_CARRIER_CODES.contains(carrierCode)) {
+            throw new BadRequestException("Invalid carrier code: " + carrierCode + ". Valid carriers: " + VALID_CARRIER_CODES);
+        }
+
         // Tạo hoặc kiểm tra tính duy nhất của mã vận đơn
         String trackingNumber = request.getTrackingNumber();
         if (trackingNumber == null || trackingNumber.trim().isEmpty()) {
-            trackingNumber = generateTrackingNumber(request.getCarrierCode());
+            trackingNumber = generateTrackingNumber();
         } else {
             trackingNumber = trackingNumber.trim().toUpperCase();
             if (shipmentRepository.existsByTrackingNumber(trackingNumber)) {
                 throw new BadRequestException("Tracking number already exists: " + trackingNumber);
             }
         }
-
-        String carrierCode = request.getCarrierCode().trim().toUpperCase();
 
         Shipment shipment = Shipment.builder()
                 .order(order)
@@ -219,6 +224,15 @@ public class ShipmentService {
 
     @Transactional(readOnly = true)
     public List<ShipmentDTO> getShipmentsByOrderId(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+
+        Long currentUserId = SecurityUtils.getCurrentUserId();
+        boolean isAdmin = SecurityUtils.hasRole("ROLE_ADMIN");
+        if (!isAdmin && (order.getUser() == null || !order.getUser().getId().equals(currentUserId))) {
+            throw new UnauthorizedException("You do not have permission to view shipments for this order");
+        }
+
         return shipmentRepository.findByOrderId(orderId).stream()
                 .map(this::mapToDTO)
                 .toList();
@@ -230,20 +244,30 @@ public class ShipmentService {
     }
 
     /**
-     * Sinh mã vận đơn tự động duy nhất (UNIQUE) dựa trên nhà mạng vận chuyển.
-     * Cú pháp: [CARRIER]-[TIMESTAMP]-[RANDOM]
+     * Sinh mã vận đơn tự động duy nhất (UNIQUE) theo định dạng chuẩn: GP-YYYYMMDD-XXXXX.
+     * Trong đó:
+     * - GP: Tiền tố cố định của GreenPhone
+     * - YYYYMMDD: Năm tháng ngày hiện tại
+     * - XXXXX: 5 ký tự ngẫu nhiên bao gồm chữ số và chữ in hoa
      */
-    private String generateTrackingNumber(String carrierCode) {
-        String prefix = (carrierCode != null && !carrierCode.isBlank()) ? carrierCode.trim().toUpperCase() : "GP";
-        for (int i = 0; i < 10; i++) {
-            long ts = System.currentTimeMillis() % 100000000;
-            int rand = 1000 + random.nextInt(9000);
-            String candidate = prefix + "-" + ts + "-" + rand;
+    public String generateTrackingNumber() {
+        String datePart = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String characters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        for (int attempt = 0; attempt < 20; attempt++) {
+            StringBuilder suffix = new StringBuilder(5);
+            for (int i = 0; i < 5; i++) {
+                suffix.append(characters.charAt(random.nextInt(characters.length())));
+            }
+            String candidate = "GP-" + datePart + "-" + suffix;
             if (!shipmentRepository.existsByTrackingNumber(candidate)) {
                 return candidate;
             }
         }
-        return prefix + "-" + System.nanoTime();
+        StringBuilder fallbackSuffix = new StringBuilder(5);
+        for (int i = 0; i < 5; i++) {
+            fallbackSuffix.append(characters.charAt(random.nextInt(characters.length())));
+        }
+        return "GP-" + datePart + "-" + fallbackSuffix;
     }
 
     /**

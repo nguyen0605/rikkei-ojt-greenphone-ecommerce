@@ -6,6 +6,7 @@ import com.re.greenphone.service.admin.AdminOrderService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -14,6 +15,7 @@ import java.util.Map;
 @RequestMapping("/api/admin/orders")
 @RequiredArgsConstructor
 @Tag(name = "Admin - Order", description = "Admin order management")
+@PreAuthorize("hasAnyRole('ADMIN', 'SALES', 'WAREHOUSE')")
 public class AdminOrderController {
 
     private final AdminOrderService adminOrderService;

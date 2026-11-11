@@ -63,6 +63,9 @@ class RefundServiceTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private jakarta.persistence.EntityManager entityManager;
+
     @InjectMocks
     private RefundService refundService;
 
@@ -111,9 +114,13 @@ class RefundServiceTest {
         payment.setId(50L);
     }
 
-    @Test
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(longs = {0L, 42L})
     @DisplayName("Tạo yêu cầu refund thành công: chuyển sang CANCELLED, hoàn kho và lưu REQUESTED")
-    void requestRefund_success() {
+    void requestRefund_success(long warehouseId) {
+        if (warehouseId != 0L) {
+            order.getOrderDetails().get(0).setWarehouseId(warehouseId);
+        }
         try (MockedStatic<SecurityUtils> secMock = mockStatic(SecurityUtils.class)) {
             secMock.when(SecurityUtils::getCurrentUserId).thenReturn(10L);
             secMock.when(SecurityUtils::getCurrentUserRole).thenReturn("ROLE_CUSTOMER");
@@ -140,7 +147,13 @@ class RefundServiceTest {
             assertThat(res.getStatus()).isEqualTo("REQUESTED");
             assertThat(order.getOrderStatus()).isEqualTo("CANCELLED");
             assertThat(variant.getStockQuantity()).isEqualTo(12); // 10 + 2
-            verify(inventoryStockHistoryService).record(eq(variant), eq(10), eq(2), eq("IMPORT"), contains("Hoàn tiền"));
+            if (warehouseId == 0L) {
+                verify(inventoryStockHistoryService).record(eq(variant), eq(10), eq(2), eq("IMPORT"), contains("Hoàn tiền"));
+                verify(inventoryStockHistoryService, never()).recordAtWarehouse(any(), anyInt(), anyInt(), anyString(), anyString(), anyLong());
+            } else {
+                verify(inventoryStockHistoryService).recordAtWarehouse(eq(variant), eq(10), eq(2), eq("IMPORT"), contains("Hoàn tiền"), eq(warehouseId));
+                verify(inventoryStockHistoryService, never()).record(any(), anyInt(), anyInt(), anyString(), anyString());
+            }
             verify(refundTransactionRepository).save(any(RefundTransaction.class));
         }
     }

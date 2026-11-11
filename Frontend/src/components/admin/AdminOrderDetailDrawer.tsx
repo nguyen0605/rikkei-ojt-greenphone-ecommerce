@@ -1,19 +1,24 @@
-import { Drawer, Space, Button, Descriptions, Tag, Table, Divider, type TableColumnsType } from 'antd';
+import { Drawer, Space, Button, Descriptions, Tag, Table, Divider, Popconfirm, message, type TableColumnsType } from 'antd';
+import { Link } from 'react-router-dom';
 import {
   CloseCircleOutlined,
   CheckCircleOutlined,
+  HistoryOutlined,
   UserOutlined,
   PhoneOutlined,
   EnvironmentOutlined,
   FileTextOutlined,
   CreditCardOutlined,
 } from '@ant-design/icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminOrderService } from '@/services';
-import type { OrderDTO, OrderDetailDTO } from '@/types/api';
+import type { OrderDTO, OrderDetailDTO, AdminOrderDetailDTO } from '@/types/api';
 import { formatVND, formatDate } from '@/utils';
 import StatusTag from '@/components/admin/StatusTag';
 import { extractCancelReason, extractCustomerNote, isTerminalOrderStatus } from '@/utils/orderStateMachine';
+import { useOrderProductLookup } from '@/hooks/useOrderProductLookup';
+import OrderItemThumbnail from '@/components/order/OrderItemThumbnail';
+import ShipmentTrackingCard from '@/components/order/ShipmentTrackingCard';
 
 interface AdminOrderDetailDrawerProps {
   open: boolean;
@@ -32,6 +37,9 @@ export default function AdminOrderDetailDrawer({
   onConfirmOrder,
   isConfirming = false,
 }: AdminOrderDetailDrawerProps) {
+  const qc = useQueryClient();
+  const { resolveItem } = useOrderProductLookup();
+
   // Query chi tiết đơn hàng
   const { data: order, isLoading } = useQuery({
     queryKey: ['admin-order-detail', orderId],
@@ -39,19 +47,61 @@ export default function AdminOrderDetailDrawer({
     enabled: !!orderId && open,
   });
 
+  // Mutation xác nhận hoàn tiền
+  const refundMutation = useMutation({
+    mutationFn: (id: number) => adminOrderService.updatePaymentStatus(id, 'REFUNDED'),
+    onSuccess: () => {
+      message.success(`Đã xác nhận hoàn tiền thành công cho đơn hàng #${orderId}`);
+      qc.invalidateQueries({ queryKey: ['admin-order-detail', orderId] });
+      qc.invalidateQueries({ queryKey: ['admin-orders'] });
+    },
+    onError: (err: unknown) => {
+      const errMsg = (err as { message?: string })?.message || 'Có lỗi khi cập nhật trạng thái hoàn tiền';
+      message.error(errMsg);
+    },
+  });
+
   // Bảng chi tiết sản phẩm trong Drawer
   const detailItemColumns: TableColumnsType<OrderDetailDTO> = [
     {
       title: 'Sản phẩm',
       dataIndex: 'productName',
-      render: (name: string, r) => (
-        <div>
-          <div className="font-semibold text-ink">{name}</div>
-          <div className="text-xs text-ink-3">
-            {[r.ram, r.storage, r.color].filter(Boolean).join(' • ')}
+      render: (name: string, r) => {
+        const resolved = resolveItem(r);
+        return (
+          <div className="flex items-center gap-3 py-1">
+            <OrderItemThumbnail
+              imageUrl={resolved.imageUrl}
+              productName={name}
+              navUrl={resolved.navUrl}
+              size="sm"
+            />
+            <div className="min-w-0 flex-1">
+              {resolved.navUrl ? (
+                <Link
+                  to={resolved.navUrl}
+                  data-testid="admin-order-item-name-link"
+                  className="font-semibold text-ink hover:text-primary-600 transition-colors line-clamp-1 block focus:outline-none"
+                >
+                  {name}
+                </Link>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-ink line-clamp-1">{name}</span>
+                  {resolved.isInactive && (
+                    <Tag color="error" className="!m-0 text-[10px]">
+                      Ngừng kinh doanh
+                    </Tag>
+                  )}
+                </div>
+              )}
+              <div className="text-xs text-ink-3">
+                {[r.ram, r.storage, r.color].filter(Boolean).join(' • ')}
+              </div>
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: 'Đơn giá',
@@ -132,6 +182,27 @@ export default function AdminOrderDetailDrawer({
               </Button>
             )}
 
+            {/* Xác nhận hoàn tiền cho đơn đã hủy có thanh toán online */}
+            {order && order.paymentStatus === 'REFUND_PENDING' && (
+              <Popconfirm
+                title="Xác nhận đã chuyển tiền hoàn?"
+                description={`Bạn có chắc chắn đã chuyển ${formatVND(order.finalAmount)} vào tài khoản của khách hàng?`}
+                okText="Xác nhận hoàn tiền"
+                cancelText="Hủy bỏ"
+                okButtonProps={{ loading: refundMutation.isPending }}
+                onConfirm={() => refundMutation.mutate(order.id)}
+              >
+                <Button
+                  type="primary"
+                  className="!bg-emerald-600 hover:!bg-emerald-700"
+                  icon={<CheckCircleOutlined />}
+                  loading={refundMutation.isPending}
+                >
+                  Xác nhận hoàn tiền
+                </Button>
+              </Popconfirm>
+            )}
+
             <Button onClick={onClose}>Đóng</Button>
           </Space>
         </div>
@@ -139,7 +210,56 @@ export default function AdminOrderDetailDrawer({
     >
       {order && (
         <div className="space-y-6">
-          {/* 1. Mục Lý do hủy đơn hàng (hoàn toàn lấy từ API Backend, không qua localStorage) */}
+          {/* 1.5. Yêu cầu hoàn tiền (dành cho đơn đã hủy có thanh toán online) */}
+          {order.paymentStatus === 'REFUND_PENDING' && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50/80 p-4 shadow-2xs">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1.5 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-800">
+                      ⚡ Yêu cầu hoàn tiền khách hàng
+                    </span>
+                    <Tag color="volcano" className="!m-0 !font-semibold">
+                      CHỜ HOÀN TIỀN
+                    </Tag>
+                  </div>
+                  <div className="text-sm font-semibold text-ink">
+                    Số tiền cần hoàn trả: <span className="text-red-600 font-bold text-base">{formatVND(order.finalAmount)}</span>
+                  </div>
+                  {order.note && order.note.includes('YÊU CẦU HOÀN TIỀN') && (
+                    <div className="mt-2 rounded-lg bg-white/90 p-2.5 text-xs text-ink-2 border border-amber-200">
+                      <span className="font-semibold text-amber-900">Thông tin chuyển khoản do khách cung cấp:</span>
+                      <div className="mt-1 font-mono text-ink font-medium select-all">
+                        {order.note.substring(order.note.indexOf('YÊU CẦU HOÀN TIỀN'))}
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-xs text-amber-700 mt-1">
+                    * Kế toán vui lòng chuyển khoản đúng số tiền và thông tin STK trên, sau đó bấm xác nhận bên dưới để hoàn tất đối soát.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3.5 pt-3 border-t border-amber-200 flex justify-end">
+                <Popconfirm
+                  title="Xác nhận đã chuyển tiền hoàn?"
+                  description={`Bạn có chắc chắn đã chuyển ${formatVND(order.finalAmount)} vào tài khoản của khách hàng?`}
+                  okText="Xác nhận hoàn tiền"
+                  cancelText="Hủy bỏ"
+                  okButtonProps={{ loading: refundMutation.isPending }}
+                  onConfirm={() => refundMutation.mutate(order.id)}
+                >
+                  <Button
+                    type="primary"
+                    className="!bg-emerald-600 hover:!bg-emerald-700"
+                    icon={<CheckCircleOutlined />}
+                    loading={refundMutation.isPending}
+                  >
+                    Xác nhận đã chuyển tiền hoàn
+                  </Button>
+                </Popconfirm>
+              </div>
+            </div>
+          )}
           {order.orderStatus === 'CANCELLED' && (
             <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-4">
               <div className="flex items-start gap-3">
@@ -211,7 +331,7 @@ export default function AdminOrderDetailDrawer({
           {/* 3. Phương thức & Trạng thái thanh toán */}
           <div className="rounded-xl border border-line bg-bg-soft/40 p-4">
             <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-ink-2">
-              Thanh toán & Vận chuyển
+              Thanh toán
             </h4>
             <Descriptions size="small" column={{ xs: 1, sm: 2 }}>
               <Descriptions.Item label="Phương thức">
@@ -229,6 +349,15 @@ export default function AdminOrderDetailDrawer({
                 </Descriptions.Item>
               )}
             </Descriptions>
+          </div>
+
+          {/* 3.5. Thông tin Vận chuyển & Kiện hàng */}
+          <div>
+            <ShipmentTrackingCard
+              orderId={order.id}
+              orderStatus={order.orderStatus}
+              isAdmin
+            />
           </div>
 
           {/* 4. Danh sách sản phẩm đặt mua */}
@@ -253,6 +382,12 @@ export default function AdminOrderDetailDrawer({
                 <span>Tạm tính tiền hàng:</span>
                 <span>{formatVND(order.totalAmount)}</span>
               </div>
+              <div className="flex justify-between text-ink-2">
+                <span>Phí vận chuyển:</span>
+                <span>
+                  {(order.shippingFee ?? 0) > 0 ? formatVND(order.shippingFee ?? 0) : 'Miễn phí'}
+                </span>
+              </div>
               {order.discountAmount > 0 && (
                 <div className="flex justify-between text-emerald-600">
                   <span>Chiết khấu Voucher:</span>
@@ -268,6 +403,37 @@ export default function AdminOrderDetailDrawer({
               </div>
             </div>
           </div>
+
+          {/* 6. Lịch sử trạng thái đơn hàng (Audit History) */}
+          {order.histories && order.histories.length > 0 && (
+            <div className="rounded-xl border border-line bg-bg-soft/40 p-4">
+              <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-ink-2 flex items-center gap-2">
+                <HistoryOutlined className="text-primary-600" />
+                Lịch sử xử lý đơn hàng
+              </h4>
+              <div className="space-y-3">
+                {order.histories.map((h) => (
+                  <div key={h.id} className="flex items-start justify-between text-xs border-b border-line/60 pb-2.5 last:border-0 last:pb-0">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Tag color="blue" className="!m-0 text-[11px] font-medium">
+                          {h.toStatus}
+                        </Tag>
+                        {h.fromStatus && (
+                          <span className="text-ink-3">từ <span className="font-medium text-ink-2">{h.fromStatus}</span></span>
+                        )}
+                        <span className="text-ink-3">• bởi <span className="font-semibold text-ink">{h.changedBy || 'Hệ thống'}</span></span>
+                      </div>
+                      {h.note && <div className="text-ink-2 italic font-sans">{h.note}</div>}
+                    </div>
+                    <span className="text-ink-3 shrink-0 whitespace-nowrap pl-2">
+                      {formatDate(h.createdAt)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Drawer>
