@@ -252,8 +252,19 @@ public class ReturnRequestService {
      */
     @Transactional(readOnly = true)
     public Page<ReturnResponse> getAdminReturnRequests(ReturnStatus status, Pageable pageable) {
+        return getAdminReturnRequests(status, null, pageable);
+    }
+
+    /**
+     * Admin lấy danh sách yêu cầu đổi trả có phân trang, lọc trạng thái và tìm kiếm theo mã phiếu / mã đơn / SĐT / tên khách
+     */
+    @Transactional(readOnly = true)
+    public Page<ReturnResponse> getAdminReturnRequests(ReturnStatus status, String keyword, Pageable pageable) {
+        String normalizedKeyword = (keyword != null && !keyword.isBlank()) ? keyword.trim() : null;
         Page<ReturnRequest> page;
-        if (status != null) {
+        if (normalizedKeyword != null) {
+            page = returnRequestRepository.searchAdminRequests(status, normalizedKeyword, pageable);
+        } else if (status != null) {
             page = returnRequestRepository.findByStatus(status, pageable);
         } else {
             page = returnRequestRepository.findAll(pageable);
@@ -271,9 +282,11 @@ public class ReturnRequestService {
 
         Long currentUserId = SecurityUtils.getCurrentUser().getId();
         String currentRole = SecurityUtils.getCurrentUserRole();
-        boolean isAdmin = "ROLE_ADMIN".equalsIgnoreCase(currentRole);
+        boolean isStaff = "ROLE_ADMIN".equalsIgnoreCase(currentRole)
+                || "ROLE_WAREHOUSE".equalsIgnoreCase(currentRole)
+                || "ROLE_SALES".equalsIgnoreCase(currentRole);
 
-        if (!isAdmin && (returnRequest.getUser() == null || !returnRequest.getUser().getId().equals(currentUserId))) {
+        if (!isStaff && (returnRequest.getUser() == null || !returnRequest.getUser().getId().equals(currentUserId))) {
             throw new ForbiddenException("Bạn không có quyền xem chi tiết yêu cầu đổi trả này");
         }
 
@@ -374,6 +387,12 @@ public class ReturnRequestService {
 
     private ReturnResponse mapToResponse(ReturnRequest req) {
         List<String> images = deserializeProofImages(req.getProofImagesJson());
+        String customerName = req.getUser() != null && req.getUser().getFullName() != null && !req.getUser().getFullName().isBlank()
+                ? req.getUser().getFullName()
+                : (req.getOrder() != null ? req.getOrder().getReceiverName() : null);
+        String customerPhone = req.getOrder() != null && req.getOrder().getReceiverPhone() != null && !req.getOrder().getReceiverPhone().isBlank()
+                ? req.getOrder().getReceiverPhone()
+                : (req.getUser() != null ? req.getUser().getPhone() : null);
         return ReturnResponse.builder()
                 .id(req.getId())
                 .returnCode(req.getReturnCode())
@@ -383,7 +402,8 @@ public class ReturnRequestService {
                         ? req.getPhoneVariant().getPhone().getName() : null)
                 .variantSku(req.getPhoneVariant() != null ? req.getPhoneVariant().getSku() : null)
                 .userId(req.getUser() != null ? req.getUser().getId() : null)
-                .customerName(req.getUser() != null ? req.getUser().getFullName() : null)
+                .customerName(customerName)
+                .customerPhone(customerPhone)
                 .reason(req.getReason())
                 .errorDescription(req.getErrorDescription())
                 .proofImages(images)

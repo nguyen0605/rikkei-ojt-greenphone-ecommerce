@@ -5,6 +5,7 @@ import {
   UserOutlined, StarOutlined, GiftOutlined, PictureOutlined,
   LogoutOutlined, MenuFoldOutlined, MenuUnfoldOutlined, SettingOutlined,
   MenuOutlined, TagsOutlined, DatabaseOutlined, TeamOutlined,
+  SwapOutlined, SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import { Button, Tag } from 'antd';
 import RequireAuth from '@/components/auth/RequireAuth';
@@ -33,6 +34,8 @@ const MAIN_GROUP: MenuItemConfig[] = [
 
 const ORDER_GROUP: MenuItemConfig[] = [
   { to: '/admin/don-hang', label: 'Đơn hàng', icon: <ShoppingCartOutlined />, allowedRoles: ['ROLE_ADMIN', 'ROLE_SALES', 'ROLE_WAREHOUSE'] },
+  { to: ROUTES.ADMIN_RETURNS, label: 'Đổi trả & Hoàn tiền', icon: <SwapOutlined />, allowedRoles: ['ROLE_ADMIN', 'ROLE_WAREHOUSE', 'ROLE_SALES'] },
+  { to: ROUTES.ADMIN_WARRANTY_CLAIMS, label: 'Bảo hành IMEI', icon: <SafetyCertificateOutlined />, allowedRoles: ['ROLE_ADMIN', 'ROLE_WAREHOUSE'] },
   { to: '/admin/khach-hang', label: 'Khách hàng', icon: <UserOutlined />, allowedRoles: ['ROLE_ADMIN', 'ROLE_SALES'] },
 ];
 

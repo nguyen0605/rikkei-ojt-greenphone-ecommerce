@@ -40,6 +40,8 @@ const AdminWarehouseDetailPage = lazy(() => import('@/pages/admin/inventory/Admi
 const AdminBrandsPage = lazy(() => import('@/pages/admin/AdminBrandsPage'));
 const AdminOptionsPage = lazy(() => import('@/pages/admin/AdminOptionsPage'));
 const AdminOrdersPage = lazy(() => import('@/pages/admin/AdminOrdersPage'));
+const AdminReturnsPage = lazy(() => import('@/pages/admin/AdminReturnsPage'));
+const AdminWarrantyClaimsPage = lazy(() => import('@/pages/admin/AdminWarrantyClaimsPage'));
 const AdminUsersPage = lazy(() => import('@/pages/admin/AdminUsersPage'));
 const AdminReviewsPage = lazy(() => import('@/pages/admin/AdminReviewsPage'));
 const AdminPromotionsPage = lazy(() => import('@/pages/admin/marketing/AdminVoucherPage'));
@@ -122,6 +124,8 @@ export default function AppRoutes() {
         <Route path={ROUTES.ADMIN_BRANDS} element={<RequireRole allowedRoles={['ROLE_ADMIN', 'ROLE_MARKETING']}>{withSuspense(AdminBrandsPage)}</RequireRole>} />
         <Route path={ROUTES.ADMIN_OPTIONS} element={<RequireRole allowedRoles={['ROLE_ADMIN', 'ROLE_MARKETING']}>{withSuspense(AdminOptionsPage)}</RequireRole>} />
         <Route path={ROUTES.ADMIN_ORDERS} element={<RequireRole allowedRoles={['ROLE_ADMIN', 'ROLE_SALES', 'ROLE_WAREHOUSE']}>{withSuspense(AdminOrdersPage)}</RequireRole>} />
+        <Route path={ROUTES.ADMIN_RETURNS} element={<RequireRole allowedRoles={['ROLE_ADMIN', 'ROLE_WAREHOUSE', 'ROLE_SALES']}>{withSuspense(AdminReturnsPage)}</RequireRole>} />
+        <Route path={ROUTES.ADMIN_WARRANTY_CLAIMS} element={<RequireRole allowedRoles={['ROLE_ADMIN', 'ROLE_WAREHOUSE']}>{withSuspense(AdminWarrantyClaimsPage)}</RequireRole>} />
         <Route path={ROUTES.ADMIN_CUSTOMERS} element={<RequireRole allowedRoles={['ROLE_ADMIN', 'ROLE_SALES']}>{withSuspense(AdminUsersPage)}</RequireRole>} />
         <Route path={ROUTES.ADMIN_STAFF} element={<RequireRole allowedRoles={['ROLE_ADMIN']}>{withSuspense(AdminStaffPage)}</RequireRole>} />
         <Route path={ROUTES.ADMIN_REVIEWS} element={<RequireRole allowedRoles={['ROLE_ADMIN', 'ROLE_MARKETING', 'ROLE_SALES']}>{withSuspense(AdminReviewsPage)}</RequireRole>} />
