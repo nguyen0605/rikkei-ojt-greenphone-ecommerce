@@ -482,4 +482,3 @@ export default function AdminWarrantyClaimsPage() {
     </div>
   );
 }
-

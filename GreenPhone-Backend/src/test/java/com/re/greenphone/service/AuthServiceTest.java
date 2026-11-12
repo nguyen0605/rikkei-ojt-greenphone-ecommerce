@@ -113,7 +113,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.register(registerReq))
                 .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("Email already registered");
+                .hasMessageContaining("Email này đã được đăng ký");
     }
 
     @Test void register_AlwaysCustomerRole() {
@@ -155,7 +155,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.login(loginReq))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("Invalid email or password");
+                .hasMessageContaining("Email hoặc mật khẩu không đúng");
     }
 
     @Test void login_EmailNotFound_DoesNotRevealExistence() {
@@ -164,7 +164,7 @@ class AuthServiceTest {
         assertThatThrownBy(() -> {
             LoginRequest r = new LoginRequest(); r.setEmail("nobody@example.com"); r.setPassword("x");
             authService.login(r);
-        }).isInstanceOf(BadRequestException.class).hasMessageContaining("Invalid email or password");
+        }).isInstanceOf(BadRequestException.class).hasMessageContaining("Email hoặc mật khẩu không đúng");
     }
 
     @Test void login_AccountNotActive() {
@@ -339,7 +339,7 @@ class AuthServiceTest {
     @Test void refreshToken_Blank_ThrowsBadRequest() {
         assertThatThrownBy(() -> authService.refreshToken("   "))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("cannot be blank");
+                .hasMessageContaining("không được để trống");
     }
 
     @Test void refreshToken_InvalidOrExpired_ThrowsUnauthorized() {
@@ -347,7 +347,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.refreshToken("invalid-token"))
                 .isInstanceOf(com.re.greenphone.common.exception.UnauthorizedException.class)
-                .hasMessageContaining("Invalid or expired refresh token");
+                .hasMessageContaining("Phiên đăng nhập đã hết hạn");
     }
 
     @Test void refreshToken_AccountNotActive_ThrowsBadRequest() {

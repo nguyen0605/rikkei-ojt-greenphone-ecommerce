@@ -87,6 +87,16 @@ export default function CheckoutPage() {
           quantity: item.quantity,
         })),
       );
+      const hasCoords =
+        typeof shipping.latitude === 'number' &&
+        typeof shipping.longitude === 'number' &&
+        Number.isFinite(shipping.latitude) &&
+        Number.isFinite(shipping.longitude) &&
+        shipping.latitude >= -90 &&
+        shipping.latitude <= 90 &&
+        shipping.longitude >= -180 &&
+        shipping.longitude <= 180;
+
       const orderReq = {
         receiverName: shipping.fullName,
         receiverPhone: shipping.phone,
@@ -95,6 +105,8 @@ export default function CheckoutPage() {
         note: '',
         userPromotionId: userPromotionId ?? null,
         buyNow: isBuyNow,
+        latitude: hasCoords ? shipping.latitude : undefined,
+        longitude: hasCoords ? shipping.longitude : undefined,
         items,
       };
       const order = await orderService.create(orderReq);

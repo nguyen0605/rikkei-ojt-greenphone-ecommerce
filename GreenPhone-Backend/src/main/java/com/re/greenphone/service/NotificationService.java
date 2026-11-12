@@ -19,4 +19,3 @@ public interface NotificationService {
 
     NotificationResponse createNotification(Long userId, String title, String content, NotificationType type, String redirectUrl, String metadataJson);
 }
-

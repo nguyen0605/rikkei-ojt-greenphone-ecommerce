@@ -73,4 +73,3 @@ class NotificationEventListenerTest {
         verify(notificationService, times(1)).createNotification(any(), any(), any(), any(), any(), any());
     }
 }
-

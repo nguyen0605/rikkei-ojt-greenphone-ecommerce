@@ -43,4 +43,3 @@ public class Notification extends BaseEntity {
     @Column(name = "metadata_json", columnDefinition = "TEXT")
     private String metadataJson;
 }
-

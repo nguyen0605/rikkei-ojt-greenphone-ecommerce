@@ -34,6 +34,10 @@ public class User extends BaseEntity {
     @JoinColumn(name = "ROLE_ID", nullable = false)
     private Role role;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "WAREHOUSE_ID")
+    private Warehouse warehouse;
+
     @Column(name = "STATUS", nullable = false, length = 30)
     private String status = "ACTIVE";
 

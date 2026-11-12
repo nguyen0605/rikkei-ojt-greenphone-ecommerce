@@ -32,6 +32,10 @@ public class OrderRequest {
 
     private Boolean buyNow;
 
+    private Double latitude;
+
+    private Double longitude;
+
     @NotNull(message = "Order items are required")
     @Size(min = 1, message = "At least one item required")
     private List<OrderItemRequest> items;

@@ -3,6 +3,11 @@ import { test, expect } from '@playwright/test';
 test('guest can edit, reload and remove a cart item without cart API requests', async ({ page }) => {
   const cartRequests: string[] = [];
   await page.route('**/api/**', async (route) => {
+    const requestUrl = new URL(route.request().url());
+    if (!requestUrl.pathname.startsWith('/api/')) {
+      await route.continue();
+      return;
+    }
     const url = route.request().url();
     if (/\/api\/cart(?:\/|$)/.test(url)) cartRequests.push(url);
     const data = /\/brands/.test(url) ? [] : /\/phones/.test(url)

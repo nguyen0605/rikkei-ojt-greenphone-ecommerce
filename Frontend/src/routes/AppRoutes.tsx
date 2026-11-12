@@ -121,6 +121,7 @@ export default function AppRoutes() {
         <Route path={ROUTES.ADMIN} element={withSuspense(AdminDashboardPage)} />
         <Route path={ROUTES.ADMIN_PRODUCTS} element={<RequireRole allowedRoles={['ROLE_ADMIN', 'ROLE_MARKETING']}>{withSuspense(AdminProductsPage)}</RequireRole>} />
         <Route path={ROUTES.ADMIN_INVENTORY} element={<RequireRole allowedRoles={['ROLE_ADMIN', 'ROLE_WAREHOUSE']}>{withSuspense(AdminInventoryPage)}</RequireRole>} />
+        <Route path="/admin/inventory" element={<Navigate to={ROUTES.ADMIN_INVENTORY} replace />} />
         <Route path={ROUTES.ADMIN_WAREHOUSES} element={<RequireRole allowedRoles={['ROLE_ADMIN', 'ROLE_WAREHOUSE']}>{withSuspense(AdminWarehousesPage)}</RequireRole>} />
         <Route path={ROUTES.ADMIN_SUPPLIERS} element={<RequireRole allowedRoles={['ROLE_ADMIN']}>{withSuspense(AdminSuppliersPage)}</RequireRole>} />
         <Route path={ROUTES.ADMIN_PURCHASE_ORDERS} element={<RequireRole allowedRoles={['ROLE_ADMIN']}>{withSuspense(AdminPurchaseOrdersPage)}</RequireRole>} />

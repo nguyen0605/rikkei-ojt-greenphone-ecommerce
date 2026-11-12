@@ -102,4 +102,3 @@ export const returnService = {
     return api.put<ApiResponse<ReturnResponse>>(`/admin/returns/${id}/complete`, data || {}).then(res => res.data.data);
   },
 };
-
