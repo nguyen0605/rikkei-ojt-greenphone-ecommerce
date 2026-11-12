@@ -85,6 +85,8 @@ export const OrderDetailPage: React.FC = () => {
     queryKey: ['my-returns'],
     queryFn: () => returnService.getMyRequests(),
     enabled: !!order,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   const remainingSeconds = usePaymentCountdown(qrData?.expiresAt);

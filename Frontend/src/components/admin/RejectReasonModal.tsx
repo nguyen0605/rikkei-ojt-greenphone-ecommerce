@@ -57,15 +57,18 @@ export default function RejectReasonModal({
     <Modal
       open={open}
       onCancel={onCancel}
+      centered
+      width={520}
+      className="[&_.ant-modal-content]:!rounded-2xl [&_.ant-modal-content]:!p-6"
       title={
-        <div className="flex items-center gap-2 text-red-600">
+        <div className="flex items-center gap-2 text-red-600 font-bold text-base pr-6 border-b border-gray-100 pb-3">
           <ExclamationCircleOutlined />
           <span>Từ chối tiếp nhận yêu cầu {returnItem?.returnCode || ''}</span>
         </div>
       }
       footer={
-        <div className="flex items-center justify-end gap-2">
-          <Button onClick={onCancel} disabled={loading}>
+        <div className="flex items-center justify-end gap-2 border-t border-gray-100 pt-3">
+          <Button onClick={onCancel} disabled={loading} className="!rounded-xl">
             Quay lại
           </Button>
           <Button
@@ -74,6 +77,7 @@ export default function RejectReasonModal({
             loading={loading}
             onClick={handleSubmit}
             data-testid="confirm-reject-btn"
+            className="!rounded-xl font-medium shadow-sm"
           >
             Xác nhận từ chối
           </Button>
@@ -109,10 +113,10 @@ export default function RejectReasonModal({
           </div>
         </div>
 
-        <div>
+        <div className="pb-3">
           <label
             htmlFor="reject-reason-textarea"
-            className="mb-1.5 block text-sm font-medium text-ink"
+            className="mb-1.5 block text-xs font-semibold text-gray-700"
           >
             Lý do từ chối <span className="text-red-500">*</span>
           </label>
@@ -130,6 +134,7 @@ export default function RejectReasonModal({
             }}
             placeholder="Nhập kết quả kiểm tra và lý do từ chối (tối đa 255 ký tự)..."
             status={errorMsg ? 'error' : undefined}
+            className="!rounded-xl"
           />
           {errorMsg && (
             <p className="mt-1.5 text-xs font-medium text-red-600" role="alert">
