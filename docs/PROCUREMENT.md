@@ -62,8 +62,8 @@ Hai request nhận cùng PO: chỉ request đầu thành công; request sau bị
 
 V6 giữ nguyên. V20 bổ sung supplier.tax_code nullable; không bịa mã số thuế cho 3 NCC seed.
 Chạy bằng Flyway trên DB đã có lịch sử đúng; không coi Hibernate update của local là bằng chứng migration.
-Chuỗi nền V10/V11 trước đây trùng constraint fk_refund_order với V1; nếu còn lỗi phải xử lý upstream
-trước khi nâng cấp DB sạch qua V20. Task này không thay đổi các migration cũ.
+V13 đã được develop dùng cho phí vận chuyển nên phần MST sử dụng V20.
+Task này giữ nguyên mọi migration cũ từ develop; test migration kiểm tra toàn chuỗi V6 đến V20.
 
 Demo: chọn Digiworld, kho đích HN hoặc HCM, biến thể có thật, 50 x 25.000.000 VND; nhận hàng ->
 RECEIVED, tổng tồn +50, kho đã chọn +50, lịch sử IMPORT chứa mã PO. Nhận lại phải bị từ chối.

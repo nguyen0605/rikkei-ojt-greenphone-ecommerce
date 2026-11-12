@@ -8,7 +8,7 @@ test('supplier create/edit/deactivate and draft PO edit', async ({ page }) => {
   let supplier = { id: 3, code: 'SUP-DGW', name: 'Digiworld', taxCode: '', email: '', phone: '', address: '', status: 'ACTIVE' };
   let po = { id: 1, poNumber: 'PO-DRAFT', supplierId: 3, supplierName: 'Digiworld', warehouseId: 2, warehouseName: 'Kho TP.HCM', status: 'DRAFT', totalCost: 500, note: '', createdAt: '2026-11-11T10:00:00',
     items: [{ id: 1, variantId: 7, sku: 'IP16-PRO', quantityOrdered: 50, quantityReceived: 0, unitCost: 10 }] };
-  await page.route('**/api/**', async (route) => {
+  await page.route((url) => url.pathname.startsWith('/api/'), async (route) => {
     const path = new URL(route.request().url()).pathname; const method = route.request().method(); let data: unknown = [];
     if (path === '/api/v1/admin/suppliers') {
       if (method === 'POST') { supplier = { ...supplier, ...route.request().postDataJSON() }; data = supplier; } else data = [supplier];

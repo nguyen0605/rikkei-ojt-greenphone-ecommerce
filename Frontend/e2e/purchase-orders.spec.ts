@@ -9,7 +9,7 @@ test('admin creates and receives PO into selected warehouse with updated invento
   let createCalls = 0;
   const po = () => ({ id: 1, poNumber: 'PO-DEMO-50', supplierId: 3, supplierName: 'Digiworld', warehouseId: 2, warehouseName: 'Kho TP.HCM', status: received ? 'RECEIVED' : 'ORDERED', totalCost: 1250000000, note: '', createdAt: '2026-11-11T10:00:00',
     items: [{ id: 1, variantId: 7, sku: 'IP16-PRO', quantityOrdered: 50, quantityReceived: received ? 50 : 0, unitCost: 25000000 }] });
-  await page.route('**/api/**', async (route) => {
+  await page.route((url) => url.pathname.startsWith('/api/'), async (route) => {
     const path = new URL(route.request().url()).pathname;
     let data: unknown = [];
     if (path === '/api/v1/admin/suppliers') data = [{ id: 3, code: 'SUP-DGW', name: 'Digiworld', status: 'ACTIVE', taxCode: null }];
