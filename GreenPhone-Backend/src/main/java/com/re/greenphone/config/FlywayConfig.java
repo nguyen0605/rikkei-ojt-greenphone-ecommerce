@@ -312,6 +312,32 @@ public class FlywayConfig {
                     log.info("Da tu dong dong bo version 13.1 vao flyway_schema_history de tranh loi duplicate column.");
                 }
             }
+
+            // 3. Dong bo V16 (add coordinates to warehouses) neu cot latitude da ton tai trong DB
+            if (columnExists(metaData, catalog, "warehouse", "latitude")) {
+                stmt.executeUpdate("DELETE FROM `flyway_schema_history` WHERE `version` = '16' AND (`success` = 0 OR `type` = 'DELETE')");
+                boolean hasVersion16 = false;
+                try (ResultSet rs = stmt.executeQuery("SELECT 1 FROM `flyway_schema_history` WHERE `version` = '16' AND `success` = 1")) {
+                    if (rs.next()) {
+                        hasVersion16 = true;
+                    }
+                }
+                if (!hasVersion16) {
+                    int nextRank = 21;
+                    try (ResultSet rs = stmt.executeQuery("SELECT COALESCE(MAX(installed_rank), 20) + 1 FROM `flyway_schema_history`")) {
+                        if (rs.next()) {
+                            nextRank = rs.getInt(1);
+                        }
+                    }
+                    stmt.execute(String.format(
+                        "INSERT INTO `flyway_schema_history` " +
+                        "(`installed_rank`, `version`, `description`, `type`, `script`, `checksum`, `installed_by`, `execution_time`, `success`) " +
+                        "VALUES (%d, '16', 'add coordinates to warehouses', 'SQL', 'V16__add_coordinates_to_warehouses.sql', NULL, 'AUTO_SYNC', 1, 1)",
+                        nextRank
+                    ));
+                    log.info("Da tu dong dong bo version 16 vao flyway_schema_history de tranh loi duplicate column latitude.");
+                }
+            }
         } catch (Exception ex) {
             log.warn("Reconcile migration history: {}", ex.getMessage());
         }
