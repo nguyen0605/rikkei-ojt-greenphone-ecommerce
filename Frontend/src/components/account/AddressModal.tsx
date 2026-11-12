@@ -22,6 +22,7 @@ import {
   type AddressSuggestion,
 } from '@/components/checkout/checkoutGeocodingService';
 import type { AddressItem, AddressRequest, AddressLabel } from '@/types/api';
+import { userService, checkDuplicateAddress } from '@/services/userService';
 
 interface AddressModalProps {
   open: boolean;
@@ -29,6 +30,7 @@ interface AddressModalProps {
   onSubmit: (values: AddressRequest) => Promise<void>;
   initialData?: AddressItem | null;
   loading?: boolean;
+  existingAddresses?: AddressItem[];
 }
 
 export default function AddressModal({
@@ -37,8 +39,10 @@ export default function AddressModal({
   onSubmit,
   initialData,
   loading = false,
+  existingAddresses,
 }: AddressModalProps) {
   const [form] = Form.useForm<AddressRequest>();
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
   const [selectedCoords, setSelectedCoords] = useState<LocationCoords | null>(null);
   const [isLocatingAddress, setIsLocatingAddress] = useState(false);
   const [isEstimateLocation, setIsEstimateLocation] = useState(false);
@@ -141,6 +145,7 @@ export default function AddressModal({
 
   useEffect(() => {
     if (open) {
+      setDuplicateError(null);
       hasUserOverriddenCoords.current = false;
       queueMicrotask(() => {
         setStreetSuggestions([]);
@@ -398,7 +403,30 @@ export default function AddressModal({
       longitude: lng,
     };
 
-    await onSubmit(submitValues);
+    setDuplicateError(null);
+
+    // Kiểm tra trùng lặp trên Form UI trước khi gọi onSubmit
+    try {
+      const addressList = existingAddresses ?? (await userService.getAddresses());
+      const isDup = checkDuplicateAddress(submitValues, addressList, initialData?.id);
+      if (isDup) {
+        const errorMsg = 'Địa chỉ này đã tồn tại trong sổ địa chỉ của bạn.';
+        setDuplicateError(errorMsg);
+        message.error(errorMsg);
+        return;
+      }
+    } catch {
+      // nếu lấy getAddresses thất bại, để onSubmit xử lý tiếp
+    }
+
+    try {
+      await onSubmit(submitValues);
+    } catch (err: any) {
+      if (err?.message?.includes('tồn tại') || err?.message?.includes('trùng')) {
+        setDuplicateError(err.message);
+      }
+      throw err;
+    }
   };
 
   return (
@@ -424,6 +452,16 @@ export default function AddressModal({
         className="pt-2"
         requiredMark="optional"
       >
+        {duplicateError && (
+          <div
+            role="alert"
+            className="mb-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50/80 p-3 text-sm font-medium text-red-700"
+          >
+            <InfoCircleOutlined className="text-red-500" />
+            <span>{duplicateError}</span>
+          </div>
+        )}
+
         {/* Recipient Information */}
         <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
           {/* Receiver Name */}
