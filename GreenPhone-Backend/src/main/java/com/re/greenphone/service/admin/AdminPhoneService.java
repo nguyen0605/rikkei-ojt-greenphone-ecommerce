@@ -203,7 +203,7 @@ public class AdminPhoneService {
     @CacheEvict(value = "phones", key = "#id")
     public PhoneDTO updateStatus(Long id, String status) {
         if (!List.of("ACTIVE", "INACTIVE").contains(status)) {
-            throw new BadRequestException("Invalid status: " + status);
+            throw new BadRequestException("Trạng thái không hợp lệ: " + status + ". Chỉ chấp nhận ACTIVE hoặc INACTIVE.");
         }
         Phone phone = phoneRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Phone", "id", id));

@@ -36,13 +36,13 @@ public class PaymentService {
         // Ownership: only the order's owner can create a payment for it
         Long userId = SecurityUtils.getCurrentUserId();
         if (!order.getUser().getId().equals(userId)) {
-            throw new BadRequestException("Cannot pay for another user's order");
+            throw new BadRequestException("Bạn không có quyền thanh toán đơn hàng này.");
         }
 
         // Reject terminal orders
         if (List.of("DELIVERED", "CANCELLED", "REFUNDED").contains(order.getOrderStatus())
                 || "REFUNDED".equalsIgnoreCase(order.getPaymentStatus())) {
-            throw new BadRequestException("Order is in terminal state: " + order.getOrderStatus());
+            throw new BadRequestException("Đơn hàng đã ở trạng thái cuối (" + order.getOrderStatus() + "), không thể thanh toán.");
         }
 
         // Dedup: reuse the existing payment row instead of creating a second one
@@ -67,11 +67,11 @@ public class PaymentService {
         // Ownership: don't leak other users' payment info (IDOR)
         Long userId = SecurityUtils.getCurrentUserId();
         if (!order.getUser().getId().equals(userId)) {
-            throw new BadRequestException("Cannot view another user's payment");
+            throw new BadRequestException("Bạn không có quyền xem thông tin thanh toán của đơn hàng này.");
         }
 
         List<Payment> payments = paymentRepository.findByOrderIdOrderByIdAsc(orderId);
-        if (payments.isEmpty()) throw new ResourceNotFoundException("Payment for order: " + orderId);
+        if (payments.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy thông tin thanh toán cho đơn hàng #" + orderId);
         return paymentMapper.toDto(payments.get(0));
     }
 
@@ -82,7 +82,7 @@ public class PaymentService {
         // Ownership: QR code (amount + account) must not leak to other users
         Long userId = SecurityUtils.getCurrentUserId();
         if (!order.getUser().getId().equals(userId)) {
-            throw new BadRequestException("Cannot view another user's payment QR");
+            throw new BadRequestException("Bạn không có quyền xem mã QR thanh toán của đơn hàng này.");
         }
 
         // Exact amount to the VND — longValue() would truncate fractional amounts

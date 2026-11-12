@@ -67,7 +67,7 @@ public class AuthService {
         checkAccountLocked(request.getEmail());
 
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new ConflictException("Email already registered");
+            throw new ConflictException("Email này đã được đăng ký. Vui lòng sử dụng email khác.");
         }
 
         // Customer self-registration is ALWAYS CUSTOMER role
@@ -98,10 +98,10 @@ public class AuthService {
     public AuthResponse login(LoginRequest request) {
         // Don't reveal whether email exists → use same error message for both cases
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new BadRequestException("Invalid email or password"));
+                .orElseThrow(() -> new BadRequestException("Email hoặc mật khẩu không đúng."));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new BadRequestException("Invalid email or password");
+            throw new BadRequestException("Email hoặc mật khẩu không đúng.");
         }
 
         if ("BLOCKED".equalsIgnoreCase(user.getStatus())) {
@@ -124,19 +124,19 @@ public class AuthService {
 
     public AuthResponse refreshToken(String refreshToken) {
         if (refreshToken == null || refreshToken.isBlank()) {
-            throw new BadRequestException("Refresh token cannot be blank");
+            throw new BadRequestException("Refresh token không được để trống.");
         }
 
         String userIdStr = redisTemplate.opsForValue().get(REFRESH_TOKEN_PREFIX + refreshToken.trim());
         if (userIdStr == null) {
-            throw new UnauthorizedException("Invalid or expired refresh token");
+            throw new UnauthorizedException("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
         }
 
         Long userId;
         try {
             userId = Long.parseLong(userIdStr);
         } catch (NumberFormatException e) {
-            throw new UnauthorizedException("Invalid refresh token");
+            throw new UnauthorizedException("Token làm mới không hợp lệ.");
         }
 
         User user = userRepository.findById(userId)
@@ -202,7 +202,7 @@ public class AuthService {
     public UserDTO getCurrentUser() {
         UserPrincipal principal = SecurityUtils.getCurrentUser();
         if (principal == null) {
-            throw new UnauthorizedException("Not authenticated");
+            throw new UnauthorizedException("Bạn chưa đăng nhập.");
         }
         User user = userRepository.findByEmail(principal.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));

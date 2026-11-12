@@ -224,7 +224,7 @@ public class AdminOrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
 
         if (!List.of("UNPAID", "PAID", "REFUND_PENDING", "REFUNDED").contains(paymentStatus)) {
-            throw new BadRequestException("Invalid payment status: " + paymentStatus);
+            throw new BadRequestException("Trạng thái thanh toán không hợp lệ: " + paymentStatus);
         }
 
         String previousPaymentStatus = order.getPaymentStatus();
@@ -259,7 +259,7 @@ public class AdminOrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
 
         if (!List.of("CONFIRMED", "PROCESSING", "SHIPPING").contains(order.getOrderStatus())) {
-            throw new BadRequestException("Cannot update delivery at status: " + order.getOrderStatus());
+            throw new BadRequestException("Không thể cập nhật thông tin giao hàng khi đơn ở trạng thái: " + order.getOrderStatus());
         }
 
         String currentStatus = order.getOrderStatus();

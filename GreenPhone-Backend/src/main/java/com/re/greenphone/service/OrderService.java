@@ -138,11 +138,11 @@ public class OrderService {
 
             if ("INACTIVE".equalsIgnoreCase(variant.getStatus())
                     || (variant.getPhone() != null && "INACTIVE".equalsIgnoreCase(variant.getPhone().getStatus()))) {
-                throw new BadRequestException("Product variant " + variant.getId() + " is inactive");
+                throw new BadRequestException("Sản phẩm #" + variant.getId() + " hiện không còn được bán. Vui lòng xóa khỏi giỏ hàng và thử lại.");
             }
 
             if (variant.getStockQuantity() != null && variant.getStockQuantity() < itemReq.getQuantity()) {
-                throw new BadRequestException("Insufficient stock for variant " + variant.getId());
+                throw new BadRequestException("Sản phẩm #" + variant.getId() + " không đủ số lượng trong kho (còn " + variant.getStockQuantity() + " sản phẩm).");
             }
 
             // Reduce stock
@@ -342,7 +342,7 @@ public class OrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
         if (!order.getUser().getId().equals(userId)) {
-            throw new BadRequestException("Cannot view another user's order");
+            throw new BadRequestException("Bạn không có quyền xem đơn hàng này.");
         }
 
         return orderMapper.toDto(order);
@@ -362,11 +362,11 @@ public class OrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
         if (!order.getUser().getId().equals(userId)) {
-            throw new BadRequestException("Cannot cancel another user's order");
+            throw new BadRequestException("Bạn không có quyền hủy đơn hàng này.");
         }
 
         if (!List.of("PENDING", "CONFIRMED").contains(order.getOrderStatus())) {
-            throw new BadRequestException("Order cannot be cancelled at current status: " + order.getOrderStatus());
+            throw new BadRequestException("Đơn hàng đang ở trạng thái \"" + order.getOrderStatus() + "\" không thể hủy. Vui lòng liên hệ hỗ trợ.");
         }
 
         // Restore stock (pessimistic lock per variant — no double-restore with concurrent cancels)
