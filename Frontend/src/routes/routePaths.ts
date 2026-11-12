@@ -13,6 +13,7 @@ export const ROUTES = {
   CHECKOUT_PAYMENT: (id = ':orderId') => `/thanh-toan/${id}`,
   CHECKOUT_SUCCESS: '/thanh-toan/hoan-tat',
   WISHLIST: '/yeu-thich',
+  WARRANTY_CHECK: '/tra-cuu-bao-hanh',
   // Legal
   DIEU_KHOAN: '/dieu-khoan',
   CHINH_SACH_BAO_MAT: '/chinh-sach-bao-mat',
@@ -73,4 +74,5 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   '/tai-khoan/thong-bao': 'Thông báo',
   '/yeu-thich': 'Sản phẩm yêu thích',
   '/tai-khoan/yeu-thich': 'Sản phẩm yêu thích',
+  '/tra-cuu-bao-hanh': 'Tra cứu bảo hành',
 };

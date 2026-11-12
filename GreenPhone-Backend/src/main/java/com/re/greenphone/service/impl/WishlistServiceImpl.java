@@ -117,7 +117,9 @@ public class WishlistServiceImpl implements WishlistService {
             }
 
             PhoneVariant lowestVariant = activeVariants.stream()
-                    .min(Comparator.comparing(v -> v.getDiscountPrice() != null ? v.getDiscountPrice() : v.getPrice()))
+                    .filter(v -> v.getDiscountPrice() != null || v.getPrice() != null)
+                    .min(Comparator.comparing(v -> v.getDiscountPrice() != null ? v.getDiscountPrice()
+                            : (v.getPrice() != null ? v.getPrice() : BigDecimal.ZERO)))
                     .orElse(null);
 
             if (lowestVariant != null) {

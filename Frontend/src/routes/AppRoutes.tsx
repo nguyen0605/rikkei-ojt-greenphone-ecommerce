@@ -20,6 +20,7 @@ const PaymentPage = lazy(() => import('@/pages/PaymentPage'));
 const CheckoutSuccessPage = lazy(() => import('@/pages/CheckoutSuccessPage'));
 const TermsPage = lazy(() => import('@/pages/terms/TermsPageShell'));
 const PrivacyPage = lazy(() => import('@/pages/terms/PrivacyPage'));
+const WarrantyCheckPage = lazy(() => import('@/pages/warranty/WarrantyCheckPage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
 const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage'));
@@ -74,6 +75,7 @@ export default function AppRoutes() {
         <Route path="/wishlist" element={<Navigate to={ROUTES.ACCOUNT_WISHLIST} replace />} />
         <Route path={ROUTES.DIEU_KHOAN} element={withSuspense(TermsPage)} />
         <Route path={ROUTES.CHINH_SACH_BAO_MAT} element={withSuspense(PrivacyPage)} />
+        <Route path={ROUTES.WARRANTY_CHECK} element={withSuspense(WarrantyCheckPage)} />
         <Route path="*" element={withSuspense(NotFoundPage)} />
       </Route>
 
