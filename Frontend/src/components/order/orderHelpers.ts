@@ -130,6 +130,7 @@ export function getTimelineStep(status: string): number {
     case 'SHIPPING':
       return 3;
     case 'DELIVERED':
+    case 'COMPLETED':
       return 4;
     case 'CANCELLED':
       return 0;

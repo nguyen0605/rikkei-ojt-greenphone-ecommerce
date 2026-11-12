@@ -64,9 +64,10 @@ public class ReturnRequestService {
             throw new BadRequestException("Bạn không có quyền thực hiện yêu cầu đổi trả trên đơn hàng này");
         }
 
-        // 2. Validate trạng thái đơn hàng: BẮT BUỘC COMPLETED
-        if (!OrderStatus.COMPLETED.name().equalsIgnoreCase(order.getOrderStatus())) {
-            throw new BadRequestException("Chỉ đơn hàng đã giao thành công (COMPLETED) mới đủ điều kiện đổi trả");
+        // 2. Validate trạng thái đơn hàng: BẮT BUỘC COMPLETED hoặc DELIVERED
+        String currentStatus = order.getOrderStatus();
+        if (!OrderStatus.COMPLETED.name().equalsIgnoreCase(currentStatus) && !OrderStatus.DELIVERED.name().equalsIgnoreCase(currentStatus)) {
+            throw new BadRequestException("Chỉ đơn hàng đã giao thành công (DELIVERED hoặc COMPLETED) mới đủ điều kiện đổi trả");
         }
 
         // 3. Kiểm tra biến thể điện thoại có trong chi tiết đơn hàng không (Null-safe check)
