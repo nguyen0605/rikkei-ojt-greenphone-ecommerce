@@ -26,6 +26,7 @@ const footerLinks = {
     { label: 'Điều khoản sử dụng', to: ROUTES.DIEU_KHOAN },
   ],
   support: [
+    { label: 'Tra cứu bảo hành', to: ROUTES.WARRANTY_CHECK },
     { label: 'Hướng dẫn mua hàng', href: '#' },
     { label: 'Hướng dẫn bán góp', href: '#' },
     { label: 'Câu hỏi thường gặp', href: '#' },
@@ -116,12 +117,21 @@ export default function Footer() {
             <ul className="space-y-2">
               {footerLinks.support.map((link) => (
                 <li key={link.label}>
-                  <a
-                    href={link.href}
-                    className="text-sm text-gray-600 hover:text-green-600"
-                  >
-                    {link.label}
-                  </a>
+                  {'to' in link && link.to ? (
+                    <Link
+                      to={link.to}
+                      className="text-sm text-gray-600 hover:text-green-600"
+                    >
+                      {link.label}
+                    </Link>
+                  ) : (
+                    <a
+                      href={'href' in link ? link.href : '#'}
+                      className="text-sm text-gray-600 hover:text-green-600"
+                    >
+                      {link.label}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>
