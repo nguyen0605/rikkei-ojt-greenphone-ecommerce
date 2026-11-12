@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Table,
@@ -18,15 +19,18 @@ import {
   EyeOutlined,
   SyncOutlined,
   ClockCircleOutlined,
+  ExportOutlined,
 } from '@ant-design/icons';
 import { returnService, type ReturnResponse, type ReturnStatus } from '@/services/returnService';
 import { formatVND, formatDate } from '@/utils';
 import StatusTag from '@/components/admin/StatusTag';
+import { ROUTES } from '@/routes/routePaths';
 
 const { TextArea } = Input;
 const { Text } = Typography;
 
 export default function AdminReturnsTab() {
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
@@ -264,6 +268,15 @@ export default function AdminReturnsTab() {
             ]}
           />
         </div>
+
+        <Button
+          type="primary"
+          icon={<ExportOutlined />}
+          className="!bg-emerald-600 hover:!bg-emerald-700"
+          onClick={() => navigate(ROUTES.ADMIN_RETURNS)}
+        >
+          Mở trang thẩm định chuyên sâu (/admin/doi-tra)
+        </Button>
       </div>
 
       <Table<ReturnResponse>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -60,6 +61,12 @@ const REASONS = [
 export const ReturnRequestPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  let queryClient: QueryClient | null = null;
+  try {
+    queryClient = useQueryClient();
+  } catch {
+    // Không ném lỗi nếu component được render mà không có QueryClientProvider (như trong unit test độc lập)
+  }
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdRequest, setCreatedRequest] = useState<ReturnResponse | null>(null);
   const [progressModalOpen, setProgressModalOpen] = useState(false);
@@ -128,6 +135,13 @@ export const ReturnRequestPage: React.FC = () => {
         type: values.type as ReturnType,
         proofImages: values.proofImages,
       });
+
+      // Tự động làm mới cache danh sách đổi trả và chi tiết đơn hàng
+      if (queryClient) {
+        queryClient.invalidateQueries({ queryKey: ['my-returns'] });
+        queryClient.invalidateQueries({ queryKey: ['order', String(stateData.orderId)] });
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+      }
 
       message.success('Gửi yêu cầu đổi trả thành công!');
       setCreatedRequest(response);
