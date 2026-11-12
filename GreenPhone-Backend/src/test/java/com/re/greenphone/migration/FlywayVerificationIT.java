@@ -7,6 +7,9 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -15,12 +18,28 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@Testcontainers
 public class FlywayVerificationIT {
 
-    private static final String DB_USER = "root";
-    private static final String DB_PASS = System.getenv("DB_PASSWORD") != null ? System.getenv("DB_PASSWORD") : "12345678";
-    private static final String BASE_URL = "jdbc:mysql://localhost:3306/";
     private static final String PARAMS = "?useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8";
+
+    @Container
+    private static final MySQLContainer<?> FRESH_MYSQL = new MySQLContainer<>("mysql:8.0")
+            .withDatabaseName("greenphone_test_migration_v24")
+            .withUrlParam("useSSL", "false")
+            .withUrlParam("allowPublicKeyRetrieval", "true")
+            .withUrlParam("useUnicode", "true")
+            .withUrlParam("characterEncoding", "UTF-8")
+            .withReuse(false);
+
+    @Container
+    private static final MySQLContainer<?> EXISTING_MYSQL = new MySQLContainer<>("mysql:8.0")
+            .withDatabaseName("greenphone_test_migration_existing")
+            .withUrlParam("useSSL", "false")
+            .withUrlParam("allowPublicKeyRetrieval", "true")
+            .withUrlParam("useUnicode", "true")
+            .withUrlParam("characterEncoding", "UTF-8")
+            .withReuse(false);
 
     @org.junit.jupiter.api.BeforeAll
     static void setupMigrationsDirectory() throws Exception {
@@ -64,19 +83,13 @@ public class FlywayVerificationIT {
     @Order(1)
     @DisplayName("1. Kiểm chứng Migration trên Database Mới Hoàn Toàn (V1 -> V19 -> V20 -> V21 -> V22 -> V23 -> V24)")
     void testFreshDatabaseMigration() throws Exception {
-        String dbName = "greenphone_test_migration_v24";
-        String jdbcUrl = BASE_URL + dbName + PARAMS;
+        String dbName = FRESH_MYSQL.getDatabaseName();
+        String jdbcUrl = FRESH_MYSQL.getJdbcUrl();
 
         // Đảm bảo database sạch
-        try (Connection rootConn = DriverManager.getConnection(BASE_URL + "mysql" + PARAMS, DB_USER, DB_PASS);
-             Statement stmt = rootConn.createStatement()) {
-            stmt.execute("DROP DATABASE IF EXISTS " + dbName);
-            stmt.execute("CREATE DATABASE " + dbName + " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-        }
-
         // Cấu hình Flyway nghiêm ngặt (Strict Configuration)
         Flyway flyway = Flyway.configure()
-                .dataSource(jdbcUrl, DB_USER, DB_PASS)
+                .dataSource(jdbcUrl, FRESH_MYSQL.getUsername(), FRESH_MYSQL.getPassword())
                 .locations("filesystem:build/test-migrations")
                 .baselineOnMigrate(false) // Bắt buộc chạy từ migration đầu tiên, không dùng baseline bypass
                 .validateOnMigrate(true)  // Kiểm tra nghiêm ngặt checksum và thứ tự
@@ -92,7 +105,7 @@ public class FlywayVerificationIT {
         assertDoesNotThrow(() -> flyway.validate(), "Flyway validate phải thành công 100% không có lỗi checksum");
 
         // 3. Kiểm tra dữ liệu và cấu trúc chi tiết
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, DB_USER, DB_PASS);
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, FRESH_MYSQL.getUsername(), FRESH_MYSQL.getPassword());
              Statement stmt = conn.createStatement()) {
 
             // Kiểm tra các bảng nghiệp vụ mới từ develop:
@@ -171,27 +184,21 @@ public class FlywayVerificationIT {
     @Order(2)
     @DisplayName("2. Kiểm chứng Phương Án Chuyển Đổi An Toàn cho Database Đã Áp Dụng V20/V21 Cũ")
     void testExistingDatabaseTransition() throws Exception {
-        String dbName = "greenphone_test_migration_existing";
-        String jdbcUrl = BASE_URL + dbName + PARAMS;
+        String dbName = EXISTING_MYSQL.getDatabaseName();
+        String jdbcUrl = EXISTING_MYSQL.getJdbcUrl();
 
         // Tạo DB mô phỏng môi trường hiện tại của dev
-        try (Connection rootConn = DriverManager.getConnection(BASE_URL + "mysql" + PARAMS, DB_USER, DB_PASS);
-             Statement stmt = rootConn.createStatement()) {
-            stmt.execute("DROP DATABASE IF EXISTS " + dbName);
-            stmt.execute("CREATE DATABASE " + dbName + " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-        }
-
         // Bước 1: Mô phỏng DB đã chạy các migration cũ của nhánh task:
         // V1 -> V18, và V20 (Danang cũ), V21 (Warehouse transfer cũ)
         Flyway initialFlyway = Flyway.configure()
-                .dataSource(jdbcUrl, DB_USER, DB_PASS)
+                .dataSource(jdbcUrl, EXISTING_MYSQL.getUsername(), EXISTING_MYSQL.getPassword())
                 .locations("filesystem:build/test-migrations-legacy")
                 .baselineOnMigrate(false)
                 .load();
         initialFlyway.migrate();
 
         // Bước 2: Kiểm tra DB đang ở version 21 của task (chưa có V19, V20 của develop)
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, DB_USER, DB_PASS);
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, EXISTING_MYSQL.getUsername(), EXISTING_MYSQL.getPassword());
              Statement stmt = conn.createStatement()) {
             try (ResultSet rs = stmt.executeQuery("SELECT max(CAST(version AS SIGNED)) FROM flyway_schema_history")) {
                 assertTrue(rs.next());
@@ -201,7 +208,7 @@ public class FlywayVerificationIT {
 
         // Bước 3: Áp dụng kịch bản chuyển đổi an toàn (Safe Transition Script):
         // Cập nhật version trong flyway_schema_history từ 20 -> 23 và 21 -> 24
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, DB_USER, DB_PASS);
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, EXISTING_MYSQL.getUsername(), EXISTING_MYSQL.getPassword());
              Statement stmt = conn.createStatement()) {
             stmt.executeUpdate("UPDATE flyway_schema_history SET version = '23', description = 'add danang warehouse and distribute stock', script = 'V23__add_danang_warehouse_and_distribute_stock.sql' WHERE version = '20' AND script LIKE '%danang%';");
             stmt.executeUpdate("UPDATE flyway_schema_history SET version = '24', description = 'create warehouse transfer', script = 'V24__create_warehouse_transfer.sql' WHERE version = '21' AND script LIKE '%warehouse_transfer%';");
@@ -210,7 +217,7 @@ public class FlywayVerificationIT {
         // Bước 4: Chạy Flyway migrate với thư mục migrations đã hợp nhất (gồm V19, V20 develop, V21 develop, V22 develop, V23 task, V24 task)
         // Với outOfOrder = true (đã có sẵn trong application.yml của dự án)
         Flyway upgradedFlyway = Flyway.configure()
-                .dataSource(jdbcUrl, DB_USER, DB_PASS)
+                .dataSource(jdbcUrl, EXISTING_MYSQL.getUsername(), EXISTING_MYSQL.getPassword())
                 .locations("filesystem:build/test-migrations")
                 .outOfOrder(true)
                 .validateOnMigrate(false)
@@ -221,7 +228,7 @@ public class FlywayVerificationIT {
         assertEquals(4, upgradeResult.migrationsExecuted, "Phải chạy đúng 4 migration còn thiếu từ develop (V19, V20, V21, V22)");
 
         // Bước 5: Xác minh cấu trúc sau khi chuyển đổi hoàn chỉnh
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, DB_USER, DB_PASS);
+        try (Connection conn = DriverManager.getConnection(jdbcUrl, EXISTING_MYSQL.getUsername(), EXISTING_MYSQL.getPassword());
              Statement stmt = conn.createStatement()) {
             try (ResultSet rs = stmt.executeQuery("SHOW TABLES LIKE 'notification'")) {
                 assertTrue(rs.next(), "Bảng notification (V19 bù) phải tồn tại");

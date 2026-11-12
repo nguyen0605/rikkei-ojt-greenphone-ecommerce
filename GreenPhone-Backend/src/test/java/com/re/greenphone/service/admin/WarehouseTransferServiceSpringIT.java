@@ -48,9 +48,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -77,11 +82,9 @@ import static org.mockito.Mockito.mockStatic;
  * INV-08: Spring Service-level Integration Tests verifying real service execution,
  * proxy transactions, Hibernate flush lifecycles, and concurrency invariant conservation.
  */
+@Testcontainers
 @SpringBootTest
 @TestPropertySource(properties = {
-        "spring.datasource.url=jdbc:mysql://localhost:3306/greenphone_test_services?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&useUnicode=true&characterEncoding=UTF-8",
-        "spring.datasource.username=root",
-        "spring.datasource.password=12345678",
         "spring.jpa.hibernate.ddl-auto=none",
         "spring.flyway.enabled=true",
         "spring.flyway.baseline-on-migrate=true",
@@ -105,6 +108,22 @@ import static org.mockito.Mockito.mockStatic;
 })
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class WarehouseTransferServiceSpringIT {
+
+    @Container
+    static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+            .withDatabaseName("greenphone_test_services")
+            .withUrlParam("connectionTimeZone", "UTC")
+            .withUrlParam("forceConnectionTimeZoneToSession", "true")
+            .withUrlParam("useUnicode", "true")
+            .withUrlParam("characterEncoding", "UTF-8")
+            .withReuse(false);
+
+    @DynamicPropertySource
+    static void configureDatasource(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
+        registry.add("spring.datasource.username", MYSQL::getUsername);
+        registry.add("spring.datasource.password", MYSQL::getPassword);
+    }
 
     @Autowired private OrderService orderService;
     @Autowired private RefundService refundService;
