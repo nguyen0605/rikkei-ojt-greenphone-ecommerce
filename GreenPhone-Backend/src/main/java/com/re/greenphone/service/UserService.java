@@ -47,7 +47,7 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", SecurityUtils.getCurrentUserId()));
 
         if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
-            throw new BadRequestException("Current password is incorrect");
+            throw new BadRequestException("Mật khẩu hiện tại không đúng.");
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));

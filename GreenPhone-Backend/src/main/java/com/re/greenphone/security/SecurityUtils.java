@@ -12,7 +12,7 @@ public final class SecurityUtils {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()
                 || !(authentication.getPrincipal() instanceof UserPrincipal)) {
-            throw new UnauthorizedException("Not authenticated");
+            throw new UnauthorizedException("Bạn chưa đăng nhập.");
         }
         return (UserPrincipal) authentication.getPrincipal();
     }

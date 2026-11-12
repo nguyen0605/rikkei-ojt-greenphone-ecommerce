@@ -7,6 +7,7 @@ import {
   Modal,
   Space,
   Radio,
+  Tabs,
   message,
   type TableColumnsType,
 } from 'antd';
@@ -268,7 +269,7 @@ export default function AdminOrdersPage() {
     <div>
       <AdminPageHeader
         title="Quản lý đơn hàng"
-        subtitle="Theo dõi toàn bộ đơn đặt hàng, quản lý quy trình State Machine duyệt và cập nhật giao hàng"
+        subtitle="Theo dõi toàn bộ đơn đặt hàng và quy trình duyệt giao hàng"
       />
 
       <AdminCard>

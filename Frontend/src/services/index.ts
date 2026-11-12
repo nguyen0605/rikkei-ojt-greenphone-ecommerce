@@ -3,6 +3,8 @@ export { userService, formatFullAddress } from "./userService";
 export { reviewService } from './reviewService';
 export { shipmentService } from './shipmentService';
 export { adminStaffService } from './adminStaffService';
+export { notificationService } from './notificationService';
+export { adminReturnService, adminWarrantyClaimService } from './adminReturnService';
 import { get, post, put, del } from './api';
 import type {
   CartDTO, CartItemRequest, CartSyncRequest, OrderDTO, AdminOrderDetailDTO,
@@ -180,3 +182,6 @@ export const settingsService = {
   adminList: () => get<SettingsDTO[]>('/admin/settings'),
   adminUpdate: (values: Record<string, string>) => put<Record<string, string>>('/admin/settings', values),
 };
+
+export { returnService } from './returnService';
+export type { ReturnResponse, ReturnType, ReturnStatus, ReturnCreateRequest } from './returnService';

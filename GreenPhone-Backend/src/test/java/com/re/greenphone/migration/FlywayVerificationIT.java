@@ -25,11 +25,16 @@ public class FlywayVerificationIT {
     @org.junit.jupiter.api.BeforeAll
     static void setupMigrationsDirectory() throws Exception {
         java.io.File targetDir = new java.io.File("build/test-migrations");
-        if (!targetDir.exists()) {
+        if (targetDir.exists()) {
+            for (java.io.File f : targetDir.listFiles()) f.delete();
+        } else {
             targetDir.mkdirs();
         }
+
         java.io.File legacyDir = new java.io.File("build/test-migrations-legacy");
-        if (!legacyDir.exists()) {
+        if (legacyDir.exists()) {
+            for (java.io.File f : legacyDir.listFiles()) f.delete();
+        } else {
             legacyDir.mkdirs();
         }
 
@@ -37,27 +42,29 @@ public class FlywayVerificationIT {
         if (srcDir.exists() && srcDir.isDirectory()) {
             for (java.io.File file : srcDir.listFiles()) {
                 java.nio.file.Files.copy(file.toPath(), new java.io.File(targetDir, file.getName()).toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                if (!file.getName().startsWith("V22__") && !file.getName().startsWith("V23__")) {
+                // Legacy directory only contains pre-merge migrations (V1 to V18)
+                String fn = file.getName();
+                if (!fn.startsWith("V19__") && !fn.startsWith("V20__") && !fn.startsWith("V21__") && !fn.startsWith("V22__") && !fn.startsWith("V23__") && !fn.startsWith("V24__")) {
                     java.nio.file.Files.copy(file.toPath(), new java.io.File(legacyDir, file.getName()).toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 }
             }
         }
-        // Legacy directory has V20 and V21 for legacy database simulation
-        java.io.File v22Src = new java.io.File("src/main/resources/db/migration/V22__add_danang_warehouse_and_distribute_stock.sql");
-        if (v22Src.exists()) {
-            java.nio.file.Files.copy(v22Src.toPath(), new java.io.File(legacyDir, "V20__add_danang_warehouse_and_distribute_stock.sql").toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-        }
-        java.io.File v23Src = new java.io.File("src/main/resources/db/migration/V23__create_warehouse_transfer.sql");
+        // Legacy directory has task migrations as V20 and V21 for legacy database simulation
+        java.io.File v23Src = new java.io.File("src/main/resources/db/migration/V23__add_danang_warehouse_and_distribute_stock.sql");
         if (v23Src.exists()) {
-            java.nio.file.Files.copy(v23Src.toPath(), new java.io.File(legacyDir, "V21__create_warehouse_transfer.sql").toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            java.nio.file.Files.copy(v23Src.toPath(), new java.io.File(legacyDir, "V20__add_danang_warehouse_and_distribute_stock.sql").toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+        java.io.File v24Src = new java.io.File("src/main/resources/db/migration/V24__create_warehouse_transfer.sql");
+        if (v24Src.exists()) {
+            java.nio.file.Files.copy(v24Src.toPath(), new java.io.File(legacyDir, "V21__create_warehouse_transfer.sql").toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
     @Test
     @Order(1)
-    @DisplayName("1. Kiểm chứng Migration trên Database Mới Hoàn Toàn (V1 -> V19 -> V20 -> V21 -> V22 -> V23)")
+    @DisplayName("1. Kiểm chứng Migration trên Database Mới Hoàn Toàn (V1 -> V19 -> V20 -> V21 -> V22 -> V23 -> V24)")
     void testFreshDatabaseMigration() throws Exception {
-        String dbName = "greenphone_test_migration_v23";
+        String dbName = "greenphone_test_migration_v24";
         String jdbcUrl = BASE_URL + dbName + PARAMS;
 
         // Đảm bảo database sạch
@@ -79,7 +86,7 @@ public class FlywayVerificationIT {
         // 1. Thực thi Migrate
         MigrateResult result = flyway.migrate();
         assertTrue(result.success, "Flyway migrate phải thành công");
-        assertTrue(result.migrationsExecuted >= 22, "Phải thực thi đủ các file migration (>= 22)");
+        assertTrue(result.migrationsExecuted >= 24, "Phải thực thi đủ các file migration (>= 24)");
 
         // 2. Validate nghiêm ngặt sau khi migrate
         assertDoesNotThrow(() -> flyway.validate(), "Flyway validate phải thành công 100% không có lỗi checksum");
@@ -105,7 +112,13 @@ public class FlywayVerificationIT {
                 assertEquals("longtext", rs.getString("DATA_TYPE").toLowerCase(), "Cột proof_images_json phải là longtext");
             }
 
-            // V22 task: 3 kho đầy đủ tọa độ và kho Đà Nẵng
+            // V22 develop: oppo a78 variants
+            try (ResultSet rs = stmt.executeQuery("SELECT count(*) FROM phone_variant WHERE sku LIKE '%OPPO-A78%'")) {
+                assertTrue(rs.next());
+                assertTrue(rs.getInt(1) >= 1, "Biến thể Oppo A78 (V22 develop) phải tồn tại");
+            }
+
+            // V23 task: 3 kho đầy đủ tọa độ và kho Đà Nẵng
             try (ResultSet rs = stmt.executeQuery("SELECT count(*) FROM warehouse WHERE code = 'WH-DN-HAI' AND latitude IS NOT NULL AND longitude IS NOT NULL")) {
                 assertTrue(rs.next());
                 assertEquals(1, rs.getInt(1), "Kho WH-DN-HAI phải có mặt và đầy đủ tọa độ");
@@ -116,13 +129,13 @@ public class FlywayVerificationIT {
                 assertTrue(rs.getInt(1) >= 3, "Phải có ít nhất 3 chi nhánh kho ACTIVE");
             }
 
-            // V23 task: warehouse_transfer & warehouse_transfer_item tables
+            // V24 task: warehouse_transfer & warehouse_transfer_item tables
             try (ResultSet rs = stmt.executeQuery("SHOW TABLES LIKE 'warehouse_transfer'")) {
-                assertTrue(rs.next(), "Bảng warehouse_transfer (V23 task) phải tồn tại");
+                assertTrue(rs.next(), "Bảng warehouse_transfer (V24 task) phải tồn tại");
             }
 
             try (ResultSet rs = stmt.executeQuery("SHOW TABLES LIKE 'warehouse_transfer_item'")) {
-                assertTrue(rs.next(), "Bảng warehouse_transfer_item (V23 task) phải tồn tại");
+                assertTrue(rs.next(), "Bảng warehouse_transfer_item (V24 task) phải tồn tại");
             }
 
             // Kiểm tra cột reserved_quantity trong warehouse_stock
@@ -187,14 +200,14 @@ public class FlywayVerificationIT {
         }
 
         // Bước 3: Áp dụng kịch bản chuyển đổi an toàn (Safe Transition Script):
-        // Cập nhật version trong flyway_schema_history từ 20 -> 22 và 21 -> 23
+        // Cập nhật version trong flyway_schema_history từ 20 -> 23 và 21 -> 24
         try (Connection conn = DriverManager.getConnection(jdbcUrl, DB_USER, DB_PASS);
              Statement stmt = conn.createStatement()) {
-            stmt.executeUpdate("UPDATE flyway_schema_history SET version = '22', description = 'add danang warehouse and distribute stock', script = 'V22__add_danang_warehouse_and_distribute_stock.sql' WHERE version = '20' AND script LIKE '%danang%';");
-            stmt.executeUpdate("UPDATE flyway_schema_history SET version = '23', description = 'create warehouse transfer', script = 'V23__create_warehouse_transfer.sql' WHERE version = '21' AND script LIKE '%warehouse_transfer%';");
+            stmt.executeUpdate("UPDATE flyway_schema_history SET version = '23', description = 'add danang warehouse and distribute stock', script = 'V23__add_danang_warehouse_and_distribute_stock.sql' WHERE version = '20' AND script LIKE '%danang%';");
+            stmt.executeUpdate("UPDATE flyway_schema_history SET version = '24', description = 'create warehouse transfer', script = 'V24__create_warehouse_transfer.sql' WHERE version = '21' AND script LIKE '%warehouse_transfer%';");
         }
 
-        // Bước 4: Chạy Flyway migrate với thư mục migrations đã hợp nhất (gồm V19, V20 develop, V21 develop, V22 task, V23 task)
+        // Bước 4: Chạy Flyway migrate với thư mục migrations đã hợp nhất (gồm V19, V20 develop, V21 develop, V22 develop, V23 task, V24 task)
         // Với outOfOrder = true (đã có sẵn trong application.yml của dự án)
         Flyway upgradedFlyway = Flyway.configure()
                 .dataSource(jdbcUrl, DB_USER, DB_PASS)
@@ -204,8 +217,8 @@ public class FlywayVerificationIT {
                 .load();
 
         MigrateResult upgradeResult = upgradedFlyway.migrate();
-        assertTrue(upgradeResult.success, "Quá trình migrate bù V19, V20, V21 phải thành công");
-        assertEquals(3, upgradeResult.migrationsExecuted, "Phải chạy đúng 3 migration còn thiếu từ develop (V19, V20, V21)");
+        assertTrue(upgradeResult.success, "Quá trình migrate bù V19, V20, V21, V22 phải thành công");
+        assertEquals(4, upgradeResult.migrationsExecuted, "Phải chạy đúng 4 migration còn thiếu từ develop (V19, V20, V21, V22)");
 
         // Bước 5: Xác minh cấu trúc sau khi chuyển đổi hoàn chỉnh
         try (Connection conn = DriverManager.getConnection(jdbcUrl, DB_USER, DB_PASS);

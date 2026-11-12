@@ -14,6 +14,7 @@ import {
 import BrandLogo from '@/components/common/BrandLogo';
 import HeaderSearch from '@/components/layout/HeaderSearch';
 import BrandDropdown from '@/components/layout/BrandDropdown';
+import NotificationBell from '@/components/layout/NotificationBell';
 const navItems = [{ key: 'home', label: 'Trang chủ', href: '/' }, { key: 'products', label: 'Sản phẩm', href: '/san-pham' }, { key: 'vouchers', label: 'Khuyến mãi', href: '/khuyen-mai' }];
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { selectCartTotalItems } from '@/store/selectors/cartSelectors';
@@ -132,6 +133,9 @@ export default function Header() {
               <ShoppingCart className="h-5 w-5" />
             </Badge>
           </Link>
+
+          {/* Notifications */}
+          <NotificationBell />
 
           {/* User dropdown / login link */}
           {isAuthenticated && user ? (

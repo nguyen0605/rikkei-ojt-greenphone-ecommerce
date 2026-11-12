@@ -107,7 +107,7 @@ public class CartService {
                 .orElseThrow(() -> new ResourceNotFoundException("PhoneVariant", "id", request.getPhoneVariantId()));
 
         if (variant.getStockQuantity() != null && variant.getStockQuantity() < request.getQuantity()) {
-            throw new BadRequestException("Insufficient stock");
+            throw new BadRequestException("Số lượng sản phẩm trong kho không đủ.");
         }
 
         // Check if item already exists
@@ -144,7 +144,7 @@ public class CartService {
         } else {
             PhoneVariant variant = item.getPhoneVariant();
             if (variant.getStockQuantity() != null && variant.getStockQuantity() < quantity) {
-                throw new BadRequestException("Insufficient stock");
+                throw new BadRequestException("Số lượng sản phẩm trong kho không đủ.");
             }
             item.setQuantity(quantity);
         }

@@ -7,6 +7,9 @@ import com.re.greenphone.entity.*;
 import com.re.greenphone.repository.WarrantyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.re.greenphone.enums.NotificationType;
+import com.re.greenphone.event.NotificationEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +28,7 @@ import java.util.Random;
 public class WarrantyService {
 
     private final WarrantyRepository warrantyRepository;
+    private final ApplicationEventPublisher eventPublisher;
     private final Random random = new SecureRandom();
 
     /**
@@ -81,6 +85,23 @@ public class WarrantyService {
         }
 
         log.info("Đã kích hoạt thành công {} phiếu bảo hành điện tử cho đơn hàng #{}", createdWarranties.size(), order.getId());
+
+        // Bắn sự kiện thông báo in-app bất đồng bộ cho từng thiết bị được kích hoạt bảo hành
+        if (eventPublisher != null && order.getUser() != null) {
+            for (Warranty w : createdWarranties) {
+                eventPublisher.publishEvent(NotificationEvent.builder()
+                        .userId(order.getUser().getId())
+                        .title("Bảo hành điện tử đã được kích hoạt")
+                        .content(String.format("Thiết bị với mã IMEI %s của đơn hàng #%d đã được kích hoạt bảo hành điện tử 12 tháng.",
+                                w.getImeiNumber(), order.getId()))
+                        .type(NotificationType.WARRANTY)
+                        .redirectUrl("/tra-cuu-bao-hanh?imei=" + w.getImeiNumber())
+                        .metadataJson(String.format("{\"warrantyId\":%d,\"imei\":\"%s\",\"orderId\":%d}",
+                                w.getId(), w.getImeiNumber(), order.getId()))
+                        .build());
+            }
+        }
+
         return createdWarranties;
     }
 

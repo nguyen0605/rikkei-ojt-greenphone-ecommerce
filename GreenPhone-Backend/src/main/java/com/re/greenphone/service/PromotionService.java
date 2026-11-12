@@ -15,6 +15,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import com.re.greenphone.enums.NotificationType;
+import com.re.greenphone.event.NotificationEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +38,7 @@ public class PromotionService {
     private final PromotionRepository promotionRepository;
     private final UserRepository userRepository;
     private final UserPromotionMapper userPromotionMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     public List<Map<String, Object>> getAvailablePromotions(BigDecimal orderAmount) {
         Long userId = SecurityUtils.getCurrentUserId();
@@ -128,6 +132,53 @@ public class PromotionService {
                 .build();
 
         up = userPromotionRepository.save(up);
+
+        // Bắn sự kiện thông báo in-app bất đồng bộ khi người dùng nhận được voucher
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(NotificationEvent.builder()
+                    .userId(user.getId())
+                    .title("Nhận voucher ưu đãi mới: " + promo.getCode())
+                    .content("Bạn đã nhận thành công mã khuyến mãi " + promo.getName() + " (" + promo.getCode() + ").")
+                    .type(NotificationType.PROMOTION)
+                    .redirectUrl("/khuyen-mai")
+                    .metadataJson("{\"promotionCode\":\"" + promo.getCode() + "\",\"promotionId\":" + promo.getId() + "}")
+                    .build());
+        }
+
+        return userPromotionMapper.toDto(up);
+    }
+
+    /**
+     * Cấp mã voucher cá nhân cho người dùng và tự động bắn thông báo in-app
+     */
+    @CacheEvict(value = "promotions", allEntries = true)
+    public UserPromotionDTO grantPromotionToUser(Long userId, Long promotionId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+        Promotion promo = promotionRepository.findById(promotionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Promotion", "id", promotionId));
+
+        LocalDateTime now = LocalDateTime.now();
+        UserPromotion up = UserPromotion.builder()
+                .user(user)
+                .promotion(promo)
+                .status("AVAILABLE")
+                .receivedAt(now)
+                .build();
+
+        up = userPromotionRepository.save(up);
+
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(NotificationEvent.builder()
+                    .userId(user.getId())
+                    .title("Tặng voucher cá nhân: " + promo.getCode())
+                    .content("Hệ thống gửi tặng bạn mã khuyến mãi " + promo.getName() + " (" + promo.getCode() + ").")
+                    .type(NotificationType.PROMOTION)
+                    .redirectUrl("/khuyen-mai")
+                    .metadataJson("{\"promotionCode\":\"" + promo.getCode() + "\",\"promotionId\":" + promo.getId() + "}")
+                    .build());
+        }
+
         return userPromotionMapper.toDto(up);
     }
 

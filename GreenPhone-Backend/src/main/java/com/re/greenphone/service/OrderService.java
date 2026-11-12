@@ -17,6 +17,9 @@ import com.re.greenphone.security.SecurityUtils;
 import com.re.greenphone.service.admin.InventoryStockHistoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
+import com.re.greenphone.event.NotificationEvent;
+import com.re.greenphone.enums.NotificationType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -51,6 +54,7 @@ public class OrderService {
     private final WarehouseTransferService warehouseTransferService;
     private final jakarta.persistence.EntityManager entityManager;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final ApplicationEventPublisher eventPublisher;
 
     public OrderCreationResult createOrderWithIdempotency(OrderRequest request, String idempotencyKey) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
@@ -138,11 +142,11 @@ public class OrderService {
 
             if ("INACTIVE".equalsIgnoreCase(variant.getStatus())
                     || (variant.getPhone() != null && "INACTIVE".equalsIgnoreCase(variant.getPhone().getStatus()))) {
-                throw new BadRequestException("Product variant " + variant.getId() + " is inactive");
+                throw new BadRequestException("Sản phẩm #" + variant.getId() + " hiện không còn được bán. Vui lòng xóa khỏi giỏ hàng và thử lại.");
             }
 
             if (variant.getStockQuantity() != null && variant.getStockQuantity() < itemReq.getQuantity()) {
-                throw new BadRequestException("Insufficient stock for variant " + variant.getId());
+                throw new BadRequestException("Sản phẩm #" + variant.getId() + " không đủ số lượng trong kho (còn " + variant.getStockQuantity() + " sản phẩm).");
             }
             lockedVariants.add(variant);
         }
@@ -303,6 +307,18 @@ public class OrderService {
             emailService.sendOrderConfirmation(user.getEmail(), String.valueOf(order.getId()));
         }
 
+        // Bắn sự kiện thông báo in-app bất đồng bộ
+        if (eventPublisher != null && user != null) {
+            eventPublisher.publishEvent(NotificationEvent.builder()
+                    .userId(user.getId())
+                    .title("Đơn hàng #" + order.getId() + " đã được tiếp nhận thành công")
+                    .content("Đơn hàng #" + order.getId() + " của bạn đã được đặt thành công. Chúng tôi sẽ sớm liên hệ và xử lý đơn hàng.")
+                    .type(NotificationType.ORDER)
+                    .redirectUrl("/tai-khoan/don-hang/" + order.getId())
+                    .metadataJson("{\"orderId\":" + order.getId() + ",\"status\":\"" + order.getOrderStatus() + "\"}")
+                    .build());
+        }
+
         return orderMapper.toDto(order);
     }
 
@@ -374,7 +390,7 @@ public class OrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
         if (!order.getUser().getId().equals(userId)) {
-            throw new BadRequestException("Cannot view another user's order");
+            throw new BadRequestException("Bạn không có quyền xem đơn hàng này.");
         }
 
         return orderMapper.toDto(order);
@@ -394,11 +410,11 @@ public class OrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
         if (!order.getUser().getId().equals(userId)) {
-            throw new BadRequestException("Cannot cancel another user's order");
+            throw new BadRequestException("Bạn không có quyền hủy đơn hàng này.");
         }
 
         if (!List.of("PENDING", "CONFIRMED", "WAITING_FOR_TRANSFER").contains(order.getOrderStatus())) {
-            throw new BadRequestException("Order cannot be cancelled at current status: " + order.getOrderStatus());
+            throw new BadRequestException("Đơn hàng đang ở trạng thái \"" + order.getOrderStatus() + "\" không thể hủy. Vui lòng liên hệ hỗ trợ.");
         }
 
         boolean wasWaitingForTransfer = "WAITING_FOR_TRANSFER".equals(order.getOrderStatus());
@@ -504,7 +520,65 @@ public class OrderService {
                 .changedBy(order.getUser() != null ? order.getUser().getFullName() : "CUSTOMER")
                 .build());
 
+        // Bắn sự kiện thông báo in-app bất đồng bộ khi hủy đơn
+        if (eventPublisher != null && order.getUser() != null) {
+            eventPublisher.publishEvent(NotificationEvent.builder()
+                    .userId(order.getUser().getId())
+                    .title("Đơn hàng #" + order.getId() + " đã bị hủy")
+                    .content("Đơn hàng #" + order.getId() + " đã được hủy thành công.")
+                    .type(NotificationType.ORDER)
+                    .redirectUrl("/tai-khoan/don-hang/" + order.getId())
+                    .metadataJson("{\"orderId\":" + order.getId() + ",\"status\":\"CANCELLED\"}")
+                    .build());
+        }
+
         return orderMapper.toDto(order);
+    }
+
+    /**
+     * Bắn sự kiện thông báo in-app khi đơn hàng thay đổi trạng thái từ nhân viên hoặc hệ thống
+     */
+    public void notifyOrderStatusChanged(Order order, String newStatus, String trackingNumber) {
+        if (eventPublisher == null || order == null || order.getUser() == null) return;
+        String title;
+        String content;
+        switch (newStatus != null ? newStatus : "") {
+            case "CONFIRMED":
+                title = "Đơn hàng #" + order.getId() + " đã được duyệt";
+                content = "Đơn hàng #" + order.getId() + " của bạn đã được nhân viên xác nhận và đang được chuẩn bị.";
+                break;
+            case "SHIPPING":
+                title = "Đơn hàng #" + order.getId() + " đang được giao";
+                content = "Đơn hàng #" + order.getId() + " đang trên đường giao đến bạn." +
+                        (trackingNumber != null && !trackingNumber.isBlank() ? " Mã vận đơn: " + trackingNumber : "");
+                break;
+            case "DELIVERED":
+            case "COMPLETED":
+                title = "Đơn hàng #" + order.getId() + " đã giao thành công";
+                content = "Đơn hàng #" + order.getId() + " đã được giao thành công. Cảm ơn bạn đã mua sắm tại GreenPhone!";
+                break;
+            case "CANCELLED":
+                title = "Đơn hàng #" + order.getId() + " đã bị hủy";
+                content = "Đơn hàng #" + order.getId() + " đã được hủy thành công.";
+                break;
+            case "REFUNDED":
+                title = "Đơn hàng #" + order.getId() + " đã được hoàn tiền";
+                content = "Giao dịch hoàn tiền cho đơn hàng #" + order.getId() + " đã được xử lý thành công.";
+                break;
+            default:
+                title = "Cập nhật đơn hàng #" + order.getId();
+                content = "Đơn hàng #" + order.getId() + " đã chuyển sang trạng thái " + newStatus;
+                break;
+        }
+
+        eventPublisher.publishEvent(NotificationEvent.builder()
+                .userId(order.getUser().getId())
+                .title(title)
+                .content(content)
+                .type(NotificationType.ORDER)
+                .redirectUrl("/tai-khoan/don-hang/" + order.getId())
+                .metadataJson("{\"orderId\":" + order.getId() + ",\"status\":\"" + newStatus + "\"}")
+                .build());
     }
 
     public OrderDTO applyPromotionToOrder(Long orderId, Long userPromotionId) {

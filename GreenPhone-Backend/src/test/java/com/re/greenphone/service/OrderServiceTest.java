@@ -49,6 +49,7 @@ class OrderServiceTest {
     @Mock private jakarta.persistence.EntityManager entityManager;
     @Mock private RedisTemplate<String, Object> redisTemplate;
     @Mock private ValueOperations<String, Object> valueOperations;
+    @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private OrderService orderService;

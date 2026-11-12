@@ -12,3 +12,5 @@ export { default as Breadcrumb } from './Breadcrumb';
 export { default as NewsletterCTA } from './NewsletterCTA';
 export { default as CTABanner } from './CTABanner';
 export { default as SectionHeader } from './SectionHeader';
+export { default as GlobalPageLoader } from './GlobalPageLoader';
+export { default as TopProgressBar } from './TopProgressBar';

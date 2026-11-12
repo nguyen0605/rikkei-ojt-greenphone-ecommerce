@@ -37,7 +37,6 @@ export function isValidCoordinate(lat?: number | null, lng?: number | null): boo
     lng <= 180
   );
 }
-
 interface KnownLocation {
   name: string;
   keywords: string[];

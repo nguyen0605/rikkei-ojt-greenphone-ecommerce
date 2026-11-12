@@ -87,7 +87,7 @@ public class AdminBrandService {
     @CacheEvict(value = "brands", allEntries = true)
     public BrandDTO updateStatus(Long id, String status) {
         if (!List.of("ACTIVE", "INACTIVE").contains(status)) {
-            throw new BadRequestException("Invalid status: " + status);
+            throw new BadRequestException("Trạng thái không hợp lệ: " + status + ". Chỉ chấp nhận ACTIVE hoặc INACTIVE.");
         }
         Brand brand = brandRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", id));

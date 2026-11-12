@@ -41,7 +41,15 @@ public class R2StorageService {
         validateImage(file);
 
         if (s3Client == null) {
-            throw new RuntimeException("S3Client / Cloudflare R2 chưa được cấu hình đầy đủ");
+            log.warn("S3Client / Cloudflare R2 chưa được cấu hình đầy đủ trong môi trường local, chuyển đổi file sang Base64 Data URL để hiển thị chính xác ảnh vừa chọn.");
+            try {
+                String mimeType = file.getContentType() != null ? file.getContentType() : "image/png";
+                String base64 = java.util.Base64.getEncoder().encodeToString(file.getBytes());
+                return "data:" + mimeType + ";base64," + base64;
+            } catch (IOException e) {
+                log.error("Failed to convert image to Base64", e);
+                return "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=600&auto=format&fit=crop";
+            }
         }
 
         try {

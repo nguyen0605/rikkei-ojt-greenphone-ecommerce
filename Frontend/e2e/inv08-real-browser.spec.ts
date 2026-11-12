@@ -3,13 +3,26 @@ import { execSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 
-// Database query helper via MySQL CLI
+const E2E_BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:8080';
+const E2E_DB_HOST = process.env.E2E_DB_HOST || '127.0.0.1';
+const E2E_DB_PORT = process.env.E2E_DB_PORT || '3306';
+const E2E_DB_NAME = process.env.E2E_DB_NAME;
+const E2E_DB_PASSWORD = process.env.E2E_DB_PASSWORD;
+
+// Database query helper via MySQL CLI. The database must be provided explicitly
+// so this suite cannot accidentally mutate a developer or production database.
 function queryDb(sql: string): string {
-  const password = process.env.DB_PASSWORD || '12345678';
+  if (!E2E_DB_NAME || !/^[A-Za-z0-9_]+$/.test(E2E_DB_NAME) || !E2E_DB_PASSWORD) {
+    throw new Error('Set E2E_DB_NAME and E2E_DB_PASSWORD to an isolated test database before running this suite.');
+  }
   const singleLineSql = sql.replace(/\r?\n/g, ' ').trim();
-  const cmd = `"C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysql.exe" --default-character-set=utf8mb4 -u root -p${password} greenphone -e "${singleLineSql.replace(/"/g, '\\"')}"`;
+  const cmd = `"C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysql.exe" --default-character-set=utf8mb4 --host=${E2E_DB_HOST} --port=${E2E_DB_PORT} -u root ${E2E_DB_NAME} -e "${singleLineSql.replace(/"/g, '\\"')}"`;
   try {
-    const out = execSync(cmd, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
+    const out = execSync(cmd, {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, MYSQL_PWD: E2E_DB_PASSWORD },
+    });
     return out.trim();
   } catch (err: unknown) {
     const error = err as { stderr?: string; message?: string };
@@ -43,7 +56,7 @@ test.beforeAll(() => {
 
 // Helper to authenticate via API and get JWT token
 async function getAuthToken(email: string, password: string): Promise<string> {
-  const res = await fetch('http://localhost:8080/api/auth/login', {
+  const res = await fetch(`${E2E_BASE_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
@@ -279,7 +292,7 @@ test.describe('GreenPhone INV-07 / INV-08 Real Browser E2E Suite', () => {
         items: [{ phoneVariantId: 1, quantity: 1 }],
       };
 
-      const res = await fetch('http://localhost:8080/api/orders', {
+      const res = await fetch(`${E2E_BASE_URL}/api/orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -324,7 +337,7 @@ test.describe('GreenPhone INV-07 / INV-08 Real Browser E2E Suite', () => {
       items: [{ phoneVariantId: 1, quantity: 10 }],
     };
 
-    const res = await fetch('http://localhost:8080/api/orders', {
+    const res = await fetch(`${E2E_BASE_URL}/api/orders`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -356,7 +369,7 @@ test.describe('GreenPhone INV-07 / INV-08 Real Browser E2E Suite', () => {
 
     // Dispatch and Receive ALL transfers so destination warehouse collects full 10 units
     for (const tId of transferIds) {
-      const dispatchRes = await fetch(`http://localhost:8080/api/admin/transfers/${tId}/dispatch`, {
+      const dispatchRes = await fetch(`${E2E_BASE_URL}/api/admin/transfers/${tId}/dispatch`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -369,7 +382,7 @@ test.describe('GreenPhone INV-07 / INV-08 Real Browser E2E Suite', () => {
       const transferStatusInTransit = queryDb(`SELECT status FROM warehouse_transfer WHERE id = ${tId};`);
       expect(transferStatusInTransit).toContain('DISPATCHED');
 
-      const receiveRes = await fetch(`http://localhost:8080/api/admin/transfers/${tId}/receive`, {
+      const receiveRes = await fetch(`${E2E_BASE_URL}/api/admin/transfers/${tId}/receive`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -392,7 +405,7 @@ test.describe('GreenPhone INV-07 / INV-08 Real Browser E2E Suite', () => {
     expect(destStockBeforeShip).toMatch(/10\s+10/);
 
     // 7. Single Fulfillment: Create shipment for the aggregated order
-    const shipmentRes = await fetch('http://localhost:8080/api/admin/shipments', {
+    const shipmentRes = await fetch(`${E2E_BASE_URL}/api/admin/shipments`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -432,7 +445,7 @@ test.describe('GreenPhone INV-07 / INV-08 Real Browser E2E Suite', () => {
     expect(historyDetail).toContain('-10');
 
     // 11. Duplicate prevention: Call create shipment a second time -> Must be rejected
-    const secondShipmentRes = await fetch('http://localhost:8080/api/admin/shipments', {
+    const secondShipmentRes = await fetch(`${E2E_BASE_URL}/api/admin/shipments`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -482,7 +495,7 @@ test.describe('GreenPhone INV-07 / INV-08 Real Browser E2E Suite', () => {
       items: [{ phoneVariantId: 1, quantity: 10 }],
     };
 
-    const res = await fetch('http://localhost:8080/api/orders', {
+    const res = await fetch(`${E2E_BASE_URL}/api/orders`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -501,7 +514,7 @@ test.describe('GreenPhone INV-07 / INV-08 Real Browser E2E Suite', () => {
     expect(Number(reservedBefore.split('\n')[1].trim())).toBeGreaterThanOrEqual(10);
 
     // 3. Cancel order
-    const cancelRes = await fetch(`http://localhost:8080/api/orders/${orderId}/cancel`, {
+    const cancelRes = await fetch(`${E2E_BASE_URL}/api/orders/${orderId}/cancel`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -524,7 +537,7 @@ test.describe('GreenPhone INV-07 / INV-08 Real Browser E2E Suite', () => {
     expect(Number(reservedAfter.split('\n')[1].trim())).toBe(0);
 
     // 7. Test Idempotency / Double cancellation rejection
-    const secondCancelRes = await fetch(`http://localhost:8080/api/orders/${orderId}/cancel`, {
+    const secondCancelRes = await fetch(`${E2E_BASE_URL}/api/orders/${orderId}/cancel`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
