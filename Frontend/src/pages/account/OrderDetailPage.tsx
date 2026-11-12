@@ -12,12 +12,16 @@ import {
   Star,
   Clock,
   CheckCircle2,
+  ShieldAlert,
 } from 'lucide-react';
-import { message } from 'antd';
+import { message, Tooltip } from 'antd';
 import { orderService } from '@/services/orderService';
 import { paymentService } from '@/services';
+import { returnService, type ReturnResponse } from '@/services/returnService';
+import ClaimProgressModal from '@/components/warranty/ClaimProgressModal';
 import type { OrderDetailDTO } from '@/types/api';
 import { formatVND } from '@/utils';
+import { ROUTES } from '@/routes/routePaths';
 import { extractCustomerNote } from '@/utils/orderStateMachine';
 import { getStatusBadgeConfig, formatPaymentMethod } from '@/components/order/orderHelpers';
 import OrderTrackingTimeline from '@/components/order/OrderTrackingTimeline';
@@ -38,6 +42,8 @@ export const OrderDetailPage: React.FC = () => {
   const { resolveItem } = useOrderProductLookup();
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
+  const [selectedReturnRequest, setSelectedReturnRequest] = useState<ReturnResponse | null>(null);
+  const [progressModalOpen, setProgressModalOpen] = useState(false);
 
   // Lấy đường dẫn quay lại danh sách từ state (nếu có giữ filter)
   const backUrl = `/tai-khoan/don-hang${(location.state as { fromSearch?: string })?.fromSearch || ''}`;
@@ -74,12 +80,31 @@ export const OrderDetailPage: React.FC = () => {
     enabled: isPendingBankTransfer,
   });
 
+  // Lấy danh sách yêu cầu đổi trả của khách hàng để map trạng thái nút
+  const { data: myReturns = [] } = useQuery({
+    queryKey: ['my-returns'],
+    queryFn: () => returnService.getMyRequests(),
+    enabled: !!order,
+  });
+
   const remainingSeconds = usePaymentCountdown(qrData?.expiresAt);
 
   // Điều kiện nút hành động: PENDING hoặc CONFIRMED đều có thể gửi yêu cầu hủy đơn
   const canCancel = order?.orderStatus === 'PENDING' || order?.orderStatus === 'CONFIRMED';
   const canReview = order?.orderStatus === 'DELIVERED';
   const canReorder = order?.orderDetails && order.orderDetails.length > 0;
+
+  // Tính toán thời gian 7 ngày kể từ khi hoàn tất giao hàng (COMPLETED)
+  const isCompletedOrder = order?.orderStatus === 'COMPLETED';
+  // Ưu tiên thời điểm đơn hàng hoàn tất (updatedAt), nếu chưa có mới dùng createdAt
+  const orderCompletedTime = order?.updatedAt || order?.createdAt;
+  const isWithin7Days = (() => {
+    if (!orderCompletedTime) return true;
+    const completedDate = new Date(orderCompletedTime).getTime();
+    const now = new Date().getTime();
+    const diffDays = (now - completedDate) / (1000 * 60 * 60 * 24);
+    return diffDays <= 7;
+  })();
 
   // Xử lý Mua lại
   const handleBuyAgain = async () => {
@@ -382,6 +407,11 @@ export const OrderDetailPage: React.FC = () => {
             const variantSpecs = [item.ram, item.storage, item.color].filter(Boolean).join(' • ');
             const resolved = resolveItem(item);
 
+            // Tìm yêu cầu đổi trả hiện có của biến thể này trong đơn
+            const existingReturn = myReturns.find(
+              (r) => r.orderId === order.id && r.phoneVariantId === item.phoneVariantId
+            );
+
             return (
               <div
                 key={item.id || item.phoneVariantId}
@@ -431,11 +461,61 @@ export const OrderDetailPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Subtotal */}
-                <div className="text-right shrink-0">
+                {/* Subtotal & Nút Đổi trả */}
+                <div className="text-right shrink-0 flex flex-col items-end gap-2">
                   <span className="text-sm font-bold text-gray-900">
                     {formatVND(item.subtotal || item.unitPrice * item.quantity)}
                   </span>
+
+                  {/* Nút Yêu cầu Đổi trả / Bảo hành hoặc Nút Xem tiến độ */}
+                  {isCompletedOrder && (
+                    existingReturn ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedReturnRequest(existingReturn);
+                          setProgressModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-100 transition-all shadow-2xs"
+                      >
+                        <Clock className="h-3 w-3" />
+                        Tiến độ đổi trả ({existingReturn.status === 'PENDING' ? 'Chờ duyệt' : existingReturn.status === 'APPROVED' ? 'Đã duyệt' : existingReturn.status})
+                      </button>
+                    ) : (
+                      <Tooltip
+                        title={
+                          !isWithin7Days
+                            ? 'Đơn hàng đã hoàn tất quá 7 ngày, chính sách đổi trả máy mới đã hết hiệu lực.'
+                            : 'Gửi yêu cầu đổi mới 1-1 hoặc hoàn tiền khi sản phẩm phát sinh lỗi phần cứng.'
+                        }
+                      >
+                        <button
+                          type="button"
+                          disabled={!isWithin7Days}
+                          onClick={() =>
+                            navigate(ROUTES.ACCOUNT_RETURN_REQUEST, {
+                              state: {
+                                orderId: order.id,
+                                phoneVariantId: item.phoneVariantId,
+                                productName: item.productName,
+                                variantSpecs,
+                                price: item.unitPrice,
+                                imageUrl: resolved.imageUrl,
+                              },
+                            })
+                          }
+                          className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                            isWithin7Days
+                              ? 'border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                              : 'border border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
+                          }`}
+                        >
+                          <ShieldAlert className="h-3 w-3" />
+                          Đổi trả / Bảo hành
+                        </button>
+                      </Tooltip>
+                    )
+                  )}
                 </div>
               </div>
             );
@@ -476,6 +556,13 @@ export const OrderDetailPage: React.FC = () => {
         paymentStatus={order.paymentStatus}
         open={cancelModalOpen}
         onClose={() => setCancelModalOpen(false)}
+      />
+
+      {/* Modal Xem tiến độ thẩm định đổi trả */}
+      <ClaimProgressModal
+        open={progressModalOpen}
+        onClose={() => setProgressModalOpen(false)}
+        returnRequest={selectedReturnRequest}
       />
     </div>
   );

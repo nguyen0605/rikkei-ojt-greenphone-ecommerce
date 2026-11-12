@@ -39,7 +39,7 @@ public class ReturnRequest extends BaseEntity {
     @Column(name = "error_description", nullable = false, columnDefinition = "TEXT")
     private String errorDescription;
 
-    @Column(name = "proof_images_json", columnDefinition = "TEXT")
+    @Column(name = "proof_images_json", columnDefinition = "LONGTEXT")
     private String proofImagesJson;
 
     @Enumerated(EnumType.STRING)

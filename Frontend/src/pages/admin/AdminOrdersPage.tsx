@@ -7,6 +7,7 @@ import {
   Modal,
   Space,
   Radio,
+  Tabs,
   message,
   type TableColumnsType,
 } from 'antd';
@@ -14,7 +15,9 @@ import {
   ShoppingCartOutlined,
   EyeOutlined,
   CloseCircleOutlined,
+  SyncOutlined,
 } from '@ant-design/icons';
+import AdminReturnsTab from './AdminReturnsTab';
 import { adminOrderService } from '@/services';
 import type { OrderDTO } from '@/types/api';
 import { formatVND, formatDate } from '@/utils';
@@ -267,49 +270,77 @@ export default function AdminOrdersPage() {
   return (
     <div>
       <AdminPageHeader
-        title="Quản lý đơn hàng"
-        subtitle="Theo dõi toàn bộ đơn đặt hàng, quản lý quy trình State Machine duyệt và cập nhật giao hàng"
+        title="Quản lý đơn hàng & Đổi trả"
+        subtitle="Theo dõi toàn bộ đơn đặt hàng, yêu cầu đổi trả / hoàn tiền và quy trình duyệt giao hàng"
       />
 
       <AdminCard>
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          <Input
-            placeholder="Tìm mã đơn, tên, SĐT..."
-            allowClear
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="!w-64"
-          />
-          <Select
-            placeholder="Lọc trạng thái đơn"
-            allowClear
-            value={statusFilter}
-            onChange={(v) => {
-              setStatusFilter(v);
-              setPage(1);
-            }}
-            className="!w-44"
-            options={ORDER_STATUSES.map((s) => ({
-              value: s,
-              label: `${s} (${ORDER_STATUS_LABEL[s] || s})`,
-            }))}
-          />
-        </div>
+        <Tabs
+          defaultActiveKey="orders"
+          items={[
+            {
+              key: 'orders',
+              label: (
+                <span className="flex items-center gap-2 font-medium">
+                  <ShoppingCartOutlined />
+                  Đơn hàng
+                </span>
+              ),
+              children: (
+                <>
+                  <div className="mb-4 flex flex-wrap items-center gap-3">
+                    <Input
+                      placeholder="Tìm mã đơn, tên, SĐT..."
+                      allowClear
+                      value={searchInput}
+                      onChange={(e) => setSearchInput(e.target.value)}
+                      className="!w-64"
+                    />
+                    <Select
+                      placeholder="Lọc trạng thái đơn"
+                      allowClear
+                      value={statusFilter}
+                      onChange={(v) => {
+                        setStatusFilter(v);
+                        setPage(1);
+                      }}
+                      className="!w-44"
+                      options={ORDER_STATUSES.map((s) => ({
+                        value: s,
+                        label: `${s} (${ORDER_STATUS_LABEL[s] || s})`,
+                      }))}
+                    />
+                  </div>
 
-        <Table<OrderDTO>
-          columns={columns}
-          dataSource={data?.content || []}
-          rowKey="id"
-          loading={isLoading}
-          size="middle"
-          pagination={{
-            current: page,
-            pageSize: 15,
-            total: data?.totalElements || 0,
-            onChange: (p) => setPage(p),
-            showSizeChanger: false,
-          }}
-          className="[&_.ant-table-thead>tr>th]:!bg-bg-soft [&_.ant-table-thead>tr>th]:!text-xs [&_.ant-table-thead>tr>th]:!uppercase [&_.ant-table-thead>tr>th]:!tracking-wide [&_.ant-table-thead>tr>th]:!text-ink-2 [&_.ant-table-thead>tr>th]:!font-semibold"
+                  <Table<OrderDTO>
+                    columns={columns}
+                    dataSource={data?.content || []}
+                    rowKey="id"
+                    loading={isLoading}
+                    size="middle"
+                    pagination={{
+                      current: page,
+                      pageSize: 15,
+                      total: data?.totalElements || 0,
+                      onChange: (p) => setPage(p),
+                      showSizeChanger: false,
+                    }}
+                    className="[&_.ant-table-thead>tr>th]:!bg-bg-soft [&_.ant-table-thead>tr>th]:!text-xs [&_.ant-table-thead>tr>th]:!uppercase [&_.ant-table-thead>tr>th]:!tracking-wide [&_.ant-table-thead>tr>th]:!text-ink-2 [&_.ant-table-thead>tr>th]:!font-semibold"
+                  />
+                </>
+              ),
+            },
+            {
+              key: 'returns',
+              label: (
+                <span className="flex items-center gap-2 font-medium">
+                  <SyncOutlined />
+                  Yêu cầu Đổi trả & Hoàn tiền
+                </span>
+              ),
+              children: <AdminReturnsTab />,
+            },
+          ]}
         />
       </AdminCard>
 
