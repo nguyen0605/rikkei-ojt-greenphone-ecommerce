@@ -181,10 +181,10 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
   };
   const handleInventoryExpand = async (expanded: boolean, phone: PhoneDTO) => {
     setExpandedInventoryRows((current) => expanded ? [...current, phone.id] : current.filter((id) => id !== phone.id));
-    if (!expanded || inventoryVariants[phone.id]) return;
+    if (!expanded) return;
     setInventoryVariantLoading((current) => ({ ...current, [phone.id]: true }));
     try {
-      const loadedVariants = await adminPhoneService.variants(phone.id);
+      const loadedVariants = await qc.fetchQuery({ queryKey: ['admin-variants', phone.id], queryFn: () => adminPhoneService.variants(phone.id), staleTime: 0 });
       setInventoryVariants((current) => ({ ...current, [phone.id]: loadedVariants }));
     } finally {
       setInventoryVariantLoading((current) => ({ ...current, [phone.id]: false }));

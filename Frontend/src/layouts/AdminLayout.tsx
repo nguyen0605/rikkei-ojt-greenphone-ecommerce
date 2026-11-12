@@ -47,6 +47,8 @@ const CATALOG_GROUP: MenuItemConfig[] = [
 ];
 
 const WAREHOUSE_GROUP: MenuItemConfig[] = [
+  { to: ROUTES.ADMIN_SUPPLIERS, label: 'Nhà cung cấp', icon: <DatabaseOutlined />, allowedRoles: ['ROLE_ADMIN'] },
+  { to: ROUTES.ADMIN_PURCHASE_ORDERS, label: 'Đơn Nhập Hàng (PO)', icon: <DatabaseOutlined />, allowedRoles: ['ROLE_ADMIN'] },
   { to: '/admin/ton-kho', label: 'Tồn kho', icon: <DatabaseOutlined />, allowedRoles: ['ROLE_ADMIN', 'ROLE_WAREHOUSE'] },
   { to: ROUTES.ADMIN_WAREHOUSES, label: 'Chi nhánh', icon: <DatabaseOutlined />, allowedRoles: ['ROLE_ADMIN', 'ROLE_WAREHOUSE'] },
 ];
