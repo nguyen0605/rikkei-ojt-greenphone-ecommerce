@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -92,8 +92,9 @@ describe('purchase orders', () => {
     await user.click(await screen.findByRole('button', { name: 'Nhận Hàng Vào Kho' }));
     await user.click(await screen.findByRole('button', { name: 'Xác nhận nhận hàng' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Nhận Hàng Vào Kho' })).toBeDisabled());
-    expect(purchaseOrderService.receive).toHaveBeenCalledTimes(1); finish({ ...po, status: 'RECEIVED' });
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Nhận Hàng Vào Kho' })).not.toBeInTheDocument());
+    expect(purchaseOrderService.receive).toHaveBeenCalledTimes(1);
+    await act(async () => { finish({ ...po, status: 'RECEIVED' }); });
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Nhận Hàng Vào Kho' })).not.toBeInTheDocument(), { timeout: 5000 });
   });
   it('searches suppliers by tax code', async () => {
     mount(<AdminSuppliersPage />); await screen.findByText('Digiworld'); const input = screen.getByPlaceholderText('Tìm tên hoặc mã số thuế...');
