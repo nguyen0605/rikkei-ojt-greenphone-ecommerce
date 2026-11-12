@@ -34,6 +34,8 @@ const menu = [
 const MAIN_GROUP = menu.slice(0, 1);
 const CATALOG_GROUP = menu.slice(1, 7);
 const WAREHOUSE_GROUP = [
+  { to: ROUTES.ADMIN_SUPPLIERS, label: 'Nhà cung cấp', icon: <DatabaseOutlined /> },
+  { to: ROUTES.ADMIN_PURCHASE_ORDERS, label: 'Đơn Nhập Hàng (PO)', icon: <DatabaseOutlined /> },
   { to: ROUTES.ADMIN_WAREHOUSES, label: 'Chi nhánh', icon: <DatabaseOutlined /> },
 ];
 const PROMO_GROUP = menu.slice(7, 10);

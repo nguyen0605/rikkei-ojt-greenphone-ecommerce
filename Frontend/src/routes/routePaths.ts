@@ -36,6 +36,8 @@ export const ROUTES = {
   ADMIN_PRODUCTS: '/admin/san-pham',
   ADMIN_INVENTORY: '/admin/ton-kho',
   ADMIN_WAREHOUSES: '/admin/warehouses',
+  ADMIN_SUPPLIERS: '/admin/suppliers',
+  ADMIN_PURCHASE_ORDERS: '/admin/purchase-orders',
   ADMIN_WAREHOUSE_DETAIL: '/admin/warehouses/:id',
   ADMIN_BRANDS: '/admin/hang',
   ADMIN_OPTIONS: '/admin/tuy-chon',

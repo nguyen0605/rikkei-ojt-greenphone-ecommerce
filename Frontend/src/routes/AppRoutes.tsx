@@ -33,6 +33,8 @@ const AdminDashboardPage = lazy(() => import('@/pages/admin/AdminDashboardPage')
 const AdminProductsPage = lazy(() => import('@/pages/admin/AdminProductsPage'));
 const AdminInventoryPage = lazy(() => import('@/pages/admin/AdminInventoryPage'));
 const AdminWarehousesPage = lazy(() => import('@/pages/admin/inventory/AdminWarehousesPage'));
+const AdminSuppliersPage = lazy(() => import('@/pages/admin/inventory/AdminSuppliersPage'));
+const AdminPurchaseOrdersPage = lazy(() => import('@/pages/admin/inventory/AdminPurchaseOrdersPage'));
 const AdminWarehouseDetailPage = lazy(() => import('@/pages/admin/inventory/AdminWarehouseDetailPage'));
 const AdminBrandsPage = lazy(() => import('@/pages/admin/AdminBrandsPage'));
 const AdminOptionsPage = lazy(() => import('@/pages/admin/AdminOptionsPage'));
@@ -109,6 +111,8 @@ export default function AppRoutes() {
         <Route path={ROUTES.ADMIN_PRODUCTS} element={withSuspense(AdminProductsPage)} />
         <Route path={ROUTES.ADMIN_INVENTORY} element={withSuspense(AdminInventoryPage)} />
         <Route path={ROUTES.ADMIN_WAREHOUSES} element={withSuspense(AdminWarehousesPage)} />
+        <Route path={ROUTES.ADMIN_SUPPLIERS} element={withSuspense(AdminSuppliersPage)} />
+        <Route path={ROUTES.ADMIN_PURCHASE_ORDERS} element={withSuspense(AdminPurchaseOrdersPage)} />
         <Route path={ROUTES.ADMIN_WAREHOUSE_DETAIL} element={withSuspense(AdminWarehouseDetailPage)} />
         <Route path={ROUTES.ADMIN_BRANDS} element={withSuspense(AdminBrandsPage)} />
         <Route path={ROUTES.ADMIN_OPTIONS} element={withSuspense(AdminOptionsPage)} />
