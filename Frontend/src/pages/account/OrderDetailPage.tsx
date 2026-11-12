@@ -96,8 +96,8 @@ export const OrderDetailPage: React.FC = () => {
   const canReview = order?.orderStatus === 'DELIVERED';
   const canReorder = order?.orderDetails && order.orderDetails.length > 0;
 
-  // Tính toán thời gian 7 ngày kể từ khi hoàn tất giao hàng (COMPLETED)
-  const isCompletedOrder = order?.orderStatus === 'COMPLETED';
+  // Tính toán thời gian 7 ngày kể từ khi giao hàng thành công (DELIVERED hoặc COMPLETED)
+  const isCompletedOrder = order?.orderStatus === 'COMPLETED' || order?.orderStatus === 'DELIVERED';
   // Ưu tiên thời điểm đơn hàng hoàn tất (updatedAt), nếu chưa có mới dùng createdAt
   const orderCompletedTime = order?.updatedAt || order?.createdAt;
   const isWithin7Days = (() => {
