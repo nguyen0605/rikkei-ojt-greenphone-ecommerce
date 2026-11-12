@@ -53,13 +53,70 @@ function saveStoredAddresses(userId: string, addresses: AddressItem[]): void {
   }
 }
 
-function normAddress(str: string): string {
+/**
+ * Chuẩn hóa chuỗi (loại bỏ khoảng trắng thừa, đưa về chữ thường không phân biệt hoa thường)
+ * để kiểm tra trùng lặp và so khớp địa chỉ
+ */
+export function normalizeString(str?: string | null): string {
+  if (!str) return '';
   return str
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/đ/g, 'd')
+    .replace(/\s+/g, ' ')
     .trim();
+}
+
+/**
+ * Kiểm tra xem địa chỉ nhập vào có bị trùng lặp với danh sách địa chỉ hiện có hay không
+ * So khớp toàn bộ cụm địa chỉ (province, district, ward, streetAddress) và số điện thoại nhận hàng (receiverPhone).
+ * Có hỗ trợ excludeId để loại trừ chính bản ghi đang chỉnh sửa.
+ */
+export function checkDuplicateAddress(
+  candidate: Pick<AddressRequest, 'receiverPhone' | 'province' | 'district' | 'ward' | 'streetAddress'>,
+  existingList: AddressItem[],
+  excludeId?: string | number | null
+): boolean {
+  const normPhone = (candidate.receiverPhone || '').replace(/\D/g, '').trim();
+  const normProv = normalizeString(candidate.province);
+  const normDist = normalizeString(candidate.district);
+  const normWard = normalizeString(candidate.ward);
+  const normStreet = normalizeString(candidate.streetAddress);
+
+  return existingList.some((item) => {
+    if (excludeId !== undefined && excludeId !== null && String(item.id) === String(excludeId)) {
+      return false; // Loại trừ bản ghi đang chỉnh sửa
+    }
+
+    const itemPhone = (item.receiverPhone || '').replace(/\D/g, '').trim();
+    if (itemPhone !== normPhone) {
+      return false;
+    }
+
+    const itemProv = normalizeString(item.province);
+    const itemDist = normalizeString(item.district);
+    const itemWard = normalizeString(item.ward);
+    const itemStreet = normalizeString(item.streetAddress);
+
+    // Trùng khớp cả 4 thành phần địa chỉ và số điện thoại
+    const isDirectMatch =
+      itemProv === normProv &&
+      itemDist === normDist &&
+      itemWard === normWard &&
+      itemStreet === normStreet;
+
+    if (isDirectMatch) return true;
+
+    // Ngoài ra, kiểm tra trùng theo định dạng địa chỉ đầy đủ (formatFullAddress)
+    const candFull = normalizeString(formatFullAddress(candidate));
+    const itemFull = normalizeString(formatFullAddress(item));
+    return candFull === itemFull;
+  });
+}
+
+function normAddress(str: string): string {
+  return normalizeString(str);
 }
 
 export function formatFullAddress(
@@ -282,8 +339,7 @@ export const userService = {
     const addresses = getStoredAddresses(userId);
 
     // Kiểm tra trùng lặp với địa chỉ đã có của cùng người nhận
-    const newFingerprint = getAddressFingerprint(data);
-    const isDuplicate = addresses.some((a) => getAddressFingerprint(a) === newFingerprint);
+    const isDuplicate = checkDuplicateAddress(data, addresses);
     if (isDuplicate) {
       throw new Error('Địa chỉ này đã tồn tại trong sổ địa chỉ của bạn.');
     }
@@ -355,11 +411,8 @@ export const userService = {
       throw new Error('Địa chỉ không tồn tại hoặc đã bị xóa.');
     }
 
-    // Kiểm tra nếu địa chỉ sau khi sửa bị trùng với một địa chỉ khác trong sổ
-    const updateFingerprint = getAddressFingerprint(data);
-    const isDuplicateOther = addresses.some(
-      (a) => String(a.id) !== String(id) && getAddressFingerprint(a) === updateFingerprint
-    );
+    // Kiểm tra nếu địa chỉ sau khi sửa bị trùng với một địa chỉ khác trong sổ (loại trừ chính nó)
+    const isDuplicateOther = checkDuplicateAddress(data, addresses, id);
     if (isDuplicateOther) {
       throw new Error('Địa chỉ này đã trùng với một địa chỉ khác trong sổ địa chỉ của bạn.');
     }
