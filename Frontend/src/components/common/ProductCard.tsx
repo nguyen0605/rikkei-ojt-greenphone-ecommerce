@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Loader2 } from 'lucide-react';
+import { ShoppingCart, Loader2, Smartphone } from 'lucide-react';
 import { App } from 'antd';
 import type { PhoneDTO, PhoneDetailDTO, PhoneVariantDTO } from '@/types/api';
 import type { Product } from '@/types';
@@ -47,8 +47,13 @@ export default function ProductCard({ product, className }: Props) {
   const { message } = App.useApp();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [isBuyingNow, setIsBuyingNow] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const isSubmitting = isAddingToCart || isBuyingNow;
   const imgUrl = getOptimizedImageUrl(product.mainImageUrl || '', { width: 400, height: 400 });
+
+  useEffect(() => {
+    setImageError(false);
+  }, [product.mainImageUrl]);
 
   const bestVoucher = calculateBestVoucherForPrice(product.lowestPrice, myPromotions);
   const discountPercent =
@@ -149,15 +154,26 @@ export default function ProductCard({ product, className }: Props) {
               iconSize={18}
             />
           </div>
-          <img
-            src={imgUrl}
-            alt={product.name}
-            width={400}
-            height={400}
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-          />
+          {!imgUrl || imageError ? (
+            <div
+              data-testid={`product-card-fallback-${product.id}`}
+              className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-emerald-50/60 via-gray-50 to-green-100/50 p-4 text-emerald-700 select-none"
+            >
+              <Smartphone className="mb-2 h-12 w-12 text-emerald-500/70" strokeWidth={1.5} />
+              <span className="text-xs font-semibold text-emerald-800 text-center line-clamp-1">{product.name}</span>
+            </div>
+          ) : (
+            <img
+              src={imgUrl}
+              alt={product.name}
+              width={400}
+              height={400}
+              loading="lazy"
+              decoding="async"
+              onError={() => setImageError(true)}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+          )}
         </div>
         <div className="p-3">
           <div className="mb-1 text-xs text-gray-500">{product.brandName}</div>
