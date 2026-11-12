@@ -166,4 +166,39 @@ describe('AddressBookPage', () => {
       expect(userService.setDefaultAddress).toHaveBeenCalledWith('addr_2');
     });
   });
+
+  it('renders custom labels and coordinate status badge', async () => {
+    const mockAddresses: AddressItem[] = [
+      {
+        id: 'addr_office',
+        receiverName: 'Lê Công Ty',
+        receiverPhone: '0933333333',
+        province: 'Hà Nội',
+        streetAddress: 'Tòa nhà FPT, Cầu Giấy',
+        label: 'OFFICE',
+        latitude: 21.03,
+        longitude: 105.78,
+        isDefault: false,
+      },
+      {
+        id: 'addr_family',
+        receiverName: 'Bố Mẹ',
+        receiverPhone: '0944444444',
+        province: 'Đà Nẵng',
+        streetAddress: '12 Nguyễn Tất Thành',
+        label: 'FAMILY',
+        isDefault: false,
+      },
+    ];
+    vi.mocked(userService.getAddresses).mockResolvedValueOnce(mockAddresses);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Văn phòng')).toBeInTheDocument();
+      expect(screen.getByText('Người thân')).toBeInTheDocument();
+      expect(screen.getByText(/Đã ghim vị trí/)).toBeInTheDocument();
+      expect(screen.getByText(/Chưa ghim vị trí/)).toBeInTheDocument();
+    });
+  });
 });

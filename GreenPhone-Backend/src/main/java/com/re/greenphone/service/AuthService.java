@@ -104,8 +104,14 @@ public class AuthService {
             throw new BadRequestException("Invalid email or password");
         }
 
-        if (!"ACTIVE".equals(user.getStatus())) {
-            throw new BadRequestException("Account is not active. Please verify your email.");
+        if ("BLOCKED".equalsIgnoreCase(user.getStatus())) {
+            throw new BadRequestException("Tài khoản đã bị khóa. Vui lòng liên hệ với quản trị viên để được hỗ trợ.");
+        }
+        if ("UNVERIFIED".equalsIgnoreCase(user.getStatus())) {
+            throw new BadRequestException("Tài khoản chưa được kích hoạt. Vui lòng xác thực email của bạn.");
+        }
+        if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
+            throw new BadRequestException("Tài khoản không hoạt động. Vui lòng liên hệ với quản trị viên để được hỗ trợ.");
         }
 
         UserPrincipal principal = UserPrincipal.create(user);
@@ -136,8 +142,11 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        if (!"ACTIVE".equals(user.getStatus())) {
-            throw new BadRequestException("Account is not active");
+        if ("BLOCKED".equalsIgnoreCase(user.getStatus())) {
+            throw new BadRequestException("Tài khoản đã bị khóa. Vui lòng liên hệ với quản trị viên để được hỗ trợ.");
+        }
+        if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
+            throw new BadRequestException("Tài khoản không hoạt động. Vui lòng liên hệ với quản trị viên để được hỗ trợ.");
         }
 
         UserPrincipal principal = UserPrincipal.create(user);
@@ -163,23 +172,27 @@ public class AuthService {
             return;
         }
 
-        long remainingTtl = jwtTokenProvider.getRemainingExpiration(token);
-        if (remainingTtl > 0) {
-            redisTemplate.opsForValue().set(
-                    BLACKLIST_TOKEN_PREFIX + token,
-                    "revoked",
-                    remainingTtl,
-                    TimeUnit.MILLISECONDS);
-            log.info("Token successfully blacklisted for remaining {} ms", remainingTtl);
-        }
-
-        Long userId = jwtTokenProvider.getUserIdFromToken(token);
-        if (userId != null) {
-            String userRefreshToken = redisTemplate.opsForValue().get(USER_REFRESH_TOKEN_PREFIX + userId);
-            if (userRefreshToken != null) {
-                redisTemplate.delete(REFRESH_TOKEN_PREFIX + userRefreshToken);
+        try {
+            long remainingTtl = jwtTokenProvider.getRemainingExpiration(token);
+            if (remainingTtl > 0) {
+                redisTemplate.opsForValue().set(
+                        BLACKLIST_TOKEN_PREFIX + token,
+                        "revoked",
+                        remainingTtl,
+                        TimeUnit.MILLISECONDS);
+                log.info("Token successfully blacklisted for remaining {} ms", remainingTtl);
             }
-            redisTemplate.delete(USER_REFRESH_TOKEN_PREFIX + userId);
+
+            Long userId = jwtTokenProvider.getUserIdFromToken(token);
+            if (userId != null) {
+                String userRefreshToken = redisTemplate.opsForValue().get(USER_REFRESH_TOKEN_PREFIX + userId);
+                if (userRefreshToken != null) {
+                    redisTemplate.delete(REFRESH_TOKEN_PREFIX + userRefreshToken);
+                }
+                redisTemplate.delete(USER_REFRESH_TOKEN_PREFIX + userId);
+            }
+        } catch (Exception e) {
+            log.warn("Redis unavailable during logout: {}", e.getMessage());
         }
     }
 
@@ -310,13 +323,17 @@ public class AuthService {
     private String createAndStoreRefreshToken(Long userId) {
         String refreshToken = UUID.randomUUID().toString();
         long ttlMs = jwtConfig.getRefreshExpiration() > 0 ? jwtConfig.getRefreshExpiration() : 604800000L;
-        String oldRefreshToken = redisTemplate.opsForValue().get(USER_REFRESH_TOKEN_PREFIX + userId);
-        if (oldRefreshToken != null) {
-            redisTemplate.delete(REFRESH_TOKEN_PREFIX + oldRefreshToken);
+        try {
+            String oldRefreshToken = redisTemplate.opsForValue().get(USER_REFRESH_TOKEN_PREFIX + userId);
+            if (oldRefreshToken != null) {
+                redisTemplate.delete(REFRESH_TOKEN_PREFIX + oldRefreshToken);
+            }
+            redisTemplate.opsForValue().set(REFRESH_TOKEN_PREFIX + refreshToken, String.valueOf(userId), ttlMs,
+                    TimeUnit.MILLISECONDS);
+            redisTemplate.opsForValue().set(USER_REFRESH_TOKEN_PREFIX + userId, refreshToken, ttlMs, TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            log.warn("Redis unavailable for storing refresh token, proceeding: {}", e.getMessage());
         }
-        redisTemplate.opsForValue().set(REFRESH_TOKEN_PREFIX + refreshToken, String.valueOf(userId), ttlMs,
-                TimeUnit.MILLISECONDS);
-        redisTemplate.opsForValue().set(USER_REFRESH_TOKEN_PREFIX + userId, refreshToken, ttlMs, TimeUnit.MILLISECONDS);
         return refreshToken;
     }
 }

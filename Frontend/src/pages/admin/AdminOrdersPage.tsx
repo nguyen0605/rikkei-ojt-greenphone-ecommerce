@@ -32,7 +32,7 @@ import {
 
 const { TextArea } = Input;
 
-const paymentStatusOpts = ['UNPAID', 'PAID', 'REFUNDED'];
+const paymentStatusOpts = ['UNPAID', 'PAID', 'REFUND_PENDING', 'REFUNDED'];
 
 const CANCEL_REASONS = [
   'Khách hàng yêu cầu hủy',
@@ -123,6 +123,13 @@ export default function AdminOrdersPage() {
   // Xác nhận hủy đơn (Gửi lý do trực tiếp lên Backend, tuyệt đối không lưu vào localStorage)
   const handleConfirmCancel = () => {
     if (!cancellingOrder) return;
+
+    const isPaid = cancellingOrder.paymentStatus === 'PAID';
+    if (isPaid && cancelReasonPreset === 'Lý do khác' && !cancelReasonCustom.trim()) {
+      message.warning('Đối với đơn hàng đã thanh toán, vui lòng nhập chi tiết lý do hủy đơn');
+      return;
+    }
+
     const finalReason =
       cancelReasonPreset === 'Lý do khác'
         ? cancelReasonCustom.trim() || 'Lý do khác'
@@ -195,8 +202,8 @@ export default function AdminOrdersPage() {
           <Select
             size="small"
             value={s}
-            style={{ width: 95 }}
-            disabled={r.orderStatus === 'CANCELLED'}
+            style={{ width: 105 }}
+            disabled={r.orderStatus === 'CANCELLED' && r.paymentStatus !== 'REFUND_PENDING'}
             onChange={(v) => paymentMut.mutate({ id: r.id, paymentStatus: v })}
             options={paymentStatusOpts.map((o) => ({ value: o, label: o }))}
           />
@@ -373,15 +380,27 @@ export default function AdminOrdersPage() {
 
           {cancelReasonPreset === 'Lý do khác' && (
             <div>
-              <div className="mb-1 text-xs text-ink-3">Nhập chi tiết lý do:</div>
+              <div className="mb-1 text-xs text-ink-3">
+                Nhập chi tiết lý do {cancellingOrder?.paymentStatus === 'PAID' && <span className="text-red-500">*</span>}:
+              </div>
               <TextArea
                 rows={3}
-                placeholder="Nhập lý do cụ thể để lưu lại nhật ký..."
+                placeholder={
+                  cancellingOrder?.paymentStatus === 'PAID'
+                    ? 'Vui lòng nhập chi tiết lý do hủy đơn (bắt buộc đối với đơn đã thanh toán)...'
+                    : 'Nhập lý do cụ thể để lưu lại nhật ký...'
+                }
                 value={cancelReasonCustom}
                 onChange={(e) => setCancelReasonCustom(e.target.value)}
                 maxLength={200}
                 showCount
+                status={cancellingOrder?.paymentStatus === 'PAID' && !cancelReasonCustom.trim() ? 'warning' : ''}
               />
+              {cancellingOrder?.paymentStatus === 'PAID' && !cancelReasonCustom.trim() && (
+                <p className="mt-1 text-[11px] text-amber-600">
+                  * Bắt buộc nhập chi tiết lý do đối với đơn hàng đã thanh toán để lưu nhật ký đối soát hoàn tiền.
+                </p>
+              )}
             </div>
           )}
         </div>

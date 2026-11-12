@@ -12,6 +12,8 @@ export interface CartItem {
   variantId?: number;
   product: Product;
   quantity: number;
+  /** Available stock limit when checking out a single Buy Now item */
+  maxStock?: number;
   selectedColor?: string;
   selectedStorage?: string;
   addedAt: string;
@@ -35,5 +37,13 @@ export interface AppliedVoucher {
 
 export interface WishlistItem {
   productId: string;
+  phoneId?: number | string;
   addedAt: string;
+  name?: string;
+  thumbnail?: string;
+  price?: number;
+  originalPrice?: number;
+  imageUrl?: string;
+  brandName?: string;
+  inStock?: boolean;
 }

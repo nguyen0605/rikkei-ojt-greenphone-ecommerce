@@ -4,11 +4,11 @@ import {
   DashboardOutlined, PhoneOutlined, TagOutlined, ShoppingCartOutlined,
   UserOutlined, StarOutlined, GiftOutlined, PictureOutlined,
   LogoutOutlined, MenuFoldOutlined, MenuUnfoldOutlined, SettingOutlined,
-  MenuOutlined, TagsOutlined, DatabaseOutlined,
+  MenuOutlined, TagsOutlined, DatabaseOutlined, TeamOutlined,
 } from '@ant-design/icons';
-import { Button } from 'antd';
+import { Button, Tag } from 'antd';
 import RequireAuth from '@/components/auth/RequireAuth';
-import { useAppDispatch } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { logout } from '@/store/slices/authSlice';
 import { ROUTES } from '@/routes/routePaths';
 
@@ -17,31 +17,50 @@ import { ROUTES } from '@/routes/routePaths';
  * Palette inherited from design.md — Inter, accent ≤ 5%, pill CTAs, fade+slide page reveal.
  */
 
-const menu = [
-  { to: '/admin', label: 'Tổng quan', icon: <DashboardOutlined />, end: true },
-  { to: '/admin/don-hang', label: 'Đơn hàng', icon: <ShoppingCartOutlined /> },
-  { to: '/admin/san-pham', label: 'Sản phẩm', icon: <PhoneOutlined /> },
-  { to: '/admin/ton-kho', label: 'Tồn kho', icon: <DatabaseOutlined /> },
-  { to: '/admin/hang', label: 'Hãng', icon: <TagOutlined /> },
-  { to: '/admin/tuy-chon', label: 'Tùy chọn', icon: <TagsOutlined /> },
-  { to: '/admin/khach-hang', label: 'Khách hàng', icon: <UserOutlined /> },
-  { to: '/admin/danh-gia', label: 'Đánh giá', icon: <StarOutlined /> },
-  { to: '/admin/khuyen-mai', label: 'Khuyến mãi', icon: <GiftOutlined /> },
-  { to: '/admin/banner', label: 'Banner', icon: <PictureOutlined /> },
-  { to: '/admin/cai-dat', label: 'Cài đặt', icon: <SettingOutlined /> },
+export interface MenuItemConfig {
+  to: string;
+  label: string;
+  icon: React.ReactNode;
+  end?: boolean;
+  allowedRoles: string[];
+}
+
+const ALL_STAFF_ROLES = ['ROLE_ADMIN', 'ROLE_SALES', 'ROLE_WAREHOUSE', 'ROLE_MARKETING'];
+
+const MAIN_GROUP: MenuItemConfig[] = [
+  { to: '/admin', label: 'Tổng quan', icon: <DashboardOutlined />, end: true, allowedRoles: ALL_STAFF_ROLES },
 ];
 
-const MAIN_GROUP = menu.slice(0, 1);
-const CATALOG_GROUP = menu.slice(1, 7);
-const WAREHOUSE_GROUP = [
-  { to: ROUTES.ADMIN_SUPPLIERS, label: 'Nhà cung cấp', icon: <DatabaseOutlined /> },
-  { to: ROUTES.ADMIN_PURCHASE_ORDERS, label: 'Đơn Nhập Hàng (PO)', icon: <DatabaseOutlined /> },
-  { to: ROUTES.ADMIN_WAREHOUSES, label: 'Chi nhánh', icon: <DatabaseOutlined /> },
+const ORDER_GROUP: MenuItemConfig[] = [
+  { to: '/admin/don-hang', label: 'Đơn hàng', icon: <ShoppingCartOutlined />, allowedRoles: ['ROLE_ADMIN', 'ROLE_SALES', 'ROLE_WAREHOUSE'] },
+  { to: '/admin/khach-hang', label: 'Khách hàng', icon: <UserOutlined />, allowedRoles: ['ROLE_ADMIN', 'ROLE_SALES'] },
 ];
-const PROMO_GROUP = menu.slice(7, 10);
-const SYSTEM_GROUP = menu.slice(10);
 
-function NavItem({ m, collapsed, onNavigate }: { m: (typeof menu)[number]; collapsed: boolean; onNavigate: (path: string) => void }) {
+const CATALOG_GROUP: MenuItemConfig[] = [
+  { to: '/admin/san-pham', label: 'Sản phẩm', icon: <PhoneOutlined />, allowedRoles: ['ROLE_ADMIN', 'ROLE_MARKETING'] },
+  { to: '/admin/hang', label: 'Hãng', icon: <TagOutlined />, allowedRoles: ['ROLE_ADMIN', 'ROLE_MARKETING'] },
+  { to: '/admin/tuy-chon', label: 'Tùy chọn', icon: <TagsOutlined />, allowedRoles: ['ROLE_ADMIN', 'ROLE_MARKETING'] },
+  { to: '/admin/danh-gia', label: 'Đánh giá', icon: <StarOutlined />, allowedRoles: ['ROLE_ADMIN', 'ROLE_MARKETING', 'ROLE_SALES'] },
+];
+
+const WAREHOUSE_GROUP: MenuItemConfig[] = [
+  { to: ROUTES.ADMIN_SUPPLIERS, label: 'Nhà cung cấp', icon: <DatabaseOutlined />, allowedRoles: ['ROLE_ADMIN'] },
+  { to: ROUTES.ADMIN_PURCHASE_ORDERS, label: 'Đơn Nhập Hàng (PO)', icon: <DatabaseOutlined />, allowedRoles: ['ROLE_ADMIN'] },
+  { to: '/admin/ton-kho', label: 'Tồn kho', icon: <DatabaseOutlined />, allowedRoles: ['ROLE_ADMIN', 'ROLE_WAREHOUSE'] },
+  { to: ROUTES.ADMIN_WAREHOUSES, label: 'Chi nhánh', icon: <DatabaseOutlined />, allowedRoles: ['ROLE_ADMIN', 'ROLE_WAREHOUSE'] },
+];
+
+const PROMO_GROUP: MenuItemConfig[] = [
+  { to: '/admin/khuyen-mai', label: 'Khuyến mãi', icon: <GiftOutlined />, allowedRoles: ['ROLE_ADMIN', 'ROLE_MARKETING'] },
+  { to: '/admin/banner', label: 'Banner', icon: <PictureOutlined />, allowedRoles: ['ROLE_ADMIN', 'ROLE_MARKETING'] },
+];
+
+const SYSTEM_GROUP: MenuItemConfig[] = [
+  { to: ROUTES.ADMIN_STAFF, label: 'Nhân sự', icon: <TeamOutlined />, allowedRoles: ['ROLE_ADMIN'] },
+  { to: '/admin/cai-dat', label: 'Cài đặt', icon: <SettingOutlined />, allowedRoles: ['ROLE_ADMIN'] },
+];
+
+function NavItem({ m, collapsed, onNavigate }: { m: MenuItemConfig; collapsed: boolean; onNavigate: (path: string) => void }) {
   return (
     <NavLink
       key={m.to}
@@ -71,7 +90,7 @@ function NavItem({ m, collapsed, onNavigate }: { m: (typeof menu)[number]; colla
   );
 }
 
-function NavGroup({ title, items, collapsed, onNavigate }: { title: string; items: typeof menu; collapsed: boolean; onNavigate: (path: string) => void }) {
+function NavGroup({ title, items, collapsed, onNavigate }: { title: string; items: MenuItemConfig[]; collapsed: boolean; onNavigate: (path: string) => void }) {
   if (items.length === 0) return null;
   return (
     <div className="mb-1">
@@ -93,6 +112,23 @@ export default function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const { user } = useAppSelector((state) => state.auth);
+
+  const userRole = user?.role
+    ? user.role.startsWith('ROLE_')
+      ? user.role
+      : `ROLE_${user.role}`
+    : 'ROLE_CUSTOMER';
+
+  const filterItems = (items: MenuItemConfig[]) =>
+    items.filter((item) => item.allowedRoles.includes(userRole));
+
+  const mainItems = filterItems(MAIN_GROUP);
+  const orderItems = filterItems(ORDER_GROUP);
+  const catalogItems = filterItems(CATALOG_GROUP);
+  const warehouseItems = filterItems(WAREHOUSE_GROUP);
+  const promoItems = filterItems(PROMO_GROUP);
+  const systemItems = filterItems(SYSTEM_GROUP);
 
   const handleLogout = () => {
     dispatch(logout());
@@ -138,7 +174,12 @@ export default function AdminLayout() {
             {!collapsed && (
               <div className="min-w-0">
                 <div className="truncate text-sm font-bold leading-tight text-ink">GreenPhone</div>
-                <div className="text-[11px] leading-tight text-ink-2">Admin Console</div>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-[11px] leading-tight text-ink-2">Console</span>
+                  <Tag color="green" className="!rounded-full !px-1.5 !py-0 !text-[10px] !border-0 font-medium">
+                    {user?.role?.replace('ROLE_', '') || 'STAFF'}
+                  </Tag>
+                </div>
               </div>
             )}
           </div>
@@ -157,11 +198,12 @@ export default function AdminLayout() {
 
           {/* Nav */}
           <nav className="flex-1 overflow-y-auto px-3 pb-4">
-            <NavGroup title="Chung" items={MAIN_GROUP} collapsed={collapsed} onNavigate={go} />
-            <NavGroup title="Danh mục" items={CATALOG_GROUP} collapsed={collapsed} onNavigate={go} />
-            <NavGroup title="Kho hàng" items={WAREHOUSE_GROUP} collapsed={collapsed} onNavigate={go} />
-            <NavGroup title="Khuyến mãi" items={PROMO_GROUP} collapsed={collapsed} onNavigate={go} />
-            <NavGroup title="Hệ thống" items={SYSTEM_GROUP} collapsed={collapsed} onNavigate={go} />
+            <NavGroup title="Chung" items={mainItems} collapsed={collapsed} onNavigate={go} />
+            <NavGroup title="Đơn hàng" items={orderItems} collapsed={collapsed} onNavigate={go} />
+            <NavGroup title="Danh mục" items={catalogItems} collapsed={collapsed} onNavigate={go} />
+            <NavGroup title="Kho hàng" items={warehouseItems} collapsed={collapsed} onNavigate={go} />
+            <NavGroup title="Khuyến mãi" items={promoItems} collapsed={collapsed} onNavigate={go} />
+            <NavGroup title="Hệ thống" items={systemItems} collapsed={collapsed} onNavigate={go} />
           </nav>
 
           {/* Footer */}

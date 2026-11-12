@@ -2,6 +2,8 @@
  * Checkout types
  */
 
+import type { CartItem } from './cart';
+
 export type CheckoutStep = 1 | 2 | 3;
 export type DeliveryMethod = 'standard' | 'express';
 export type PaymentMethod =
@@ -32,6 +34,8 @@ export interface CheckoutState {
   voucherDiscount: number;
   /** The UserPromotion row id, sent to the backend when placing the order */
   userPromotionId?: number;
+  /** Isolated single item when checking out via "Mua ngay" (does not alter or clear cart) */
+  buyNowItem?: CartItem;
   orderId?: string;
   completedAt?: string;
 }

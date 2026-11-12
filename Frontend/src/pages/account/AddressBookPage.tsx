@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Tag, Popconfirm, App, Skeleton, Empty } from 'antd';
+import { Button, Card, Tag, Popconfirm, App, Skeleton, Empty, Tooltip } from 'antd';
 import {
   PlusOutlined,
   EditOutlined,
@@ -10,10 +10,19 @@ import {
   PhoneOutlined,
   UserOutlined,
   FileTextOutlined,
+  EnvironmentOutlined,
 } from '@ant-design/icons';
 import { userService, formatFullAddress } from '@/services';
-import AddressModal from '@/components/account/AddressModal';
-import type { AddressItem, AddressRequest } from '@/types/api';
+import type { AddressItem, AddressRequest, AddressLabel } from '@/types/api';
+
+const AddressModal = lazy(() => import('@/components/account/AddressModal'));
+
+const LABEL_MAP: Record<AddressLabel, { text: string; color: string }> = {
+  HOME: { text: 'Nhà riêng', color: 'blue' },
+  OFFICE: { text: 'Văn phòng', color: 'purple' },
+  FAMILY: { text: 'Người thân', color: 'orange' },
+  OTHER: { text: 'Khác', color: 'default' },
+};
 
 export default function AddressBookPage() {
   const { message } = App.useApp();
@@ -112,7 +121,7 @@ export default function AddressBookPage() {
         <div>
           <h2 className="text-xl font-bold text-gray-900">Sổ địa chỉ nhận hàng</h2>
           <p className="mt-1 text-sm text-gray-500">
-            Quản lý danh sách địa chỉ giao hàng khi đặt mua điện thoại tại GreenPhone
+            Quản lý danh sách địa chỉ giao hàng và xác nhận vị trí bản đồ khi nhận điện thoại tại GreenPhone
           </p>
         </div>
         <Button
@@ -161,6 +170,13 @@ export default function AddressBookPage() {
           {addresses.map((addr) => {
             const fullAddressText = formatFullAddress(addr);
             const isSingleDefault = addr.isDefault && addresses.length === 1;
+            const labelKey = (addr.label as AddressLabel) || 'HOME';
+            const labelInfo = LABEL_MAP[labelKey] || LABEL_MAP.HOME;
+            const hasCoords =
+              typeof addr.latitude === 'number' &&
+              typeof addr.longitude === 'number' &&
+              Number.isFinite(addr.latitude) &&
+              Number.isFinite(addr.longitude);
 
             return (
               <div
@@ -172,18 +188,28 @@ export default function AddressBookPage() {
                 }`}
               >
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-                  <div className="space-y-2 min-w-0 flex-1">
-                    {/* Receiver info & default badge */}
+                  <div className="space-y-2.5 min-w-0 flex-1">
+                    {/* Receiver info & badges */}
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="flex items-center gap-1.5 font-bold text-gray-900 text-base">
                         <UserOutlined className="text-gray-400 text-sm" />
                         {addr.receiverName}
                       </span>
                       <span className="text-gray-300">|</span>
-                      <span className="flex items-center gap-1.5 text-sm text-gray-600">
+                      <span className="flex items-center gap-1.5 text-sm text-gray-600 font-medium">
                         <PhoneOutlined className="text-gray-400 text-sm" />
                         {addr.receiverPhone}
                       </span>
+
+                      {/* Nhãn địa chỉ */}
+                      <Tag
+                        color={labelInfo.color}
+                        className="!rounded-md !px-2 !py-0.5 !text-xs !font-medium"
+                      >
+                        {labelInfo.text}
+                      </Tag>
+
+                      {/* Trạng thái mặc định */}
                       {addr.isDefault && (
                         <Tag
                           color="success"
@@ -192,19 +218,39 @@ export default function AddressBookPage() {
                           <CheckCircleFilled className="text-green-600" /> Mặc định
                         </Tag>
                       )}
+
+                      {/* Trạng thái tọa độ trên bản đồ */}
+                      {hasCoords ? (
+                        <Tag
+                          color="cyan"
+                          className="!inline-flex !items-center !gap-1 !rounded-md !px-2 !py-0.5 !text-xs !border-cyan-200 text-cyan-800"
+                        >
+                          <EnvironmentOutlined /> Đã ghim vị trí ({addr.latitude?.toFixed(2)}, {addr.longitude?.toFixed(2)})
+                        </Tag>
+                      ) : (
+                        <Tooltip title="Bấm để xác định và ghim vị trí chính xác trên bản đồ">
+                          <Tag
+                            color="orange"
+                            onClick={() => handleOpenEdit(addr)}
+                            className="!cursor-pointer !inline-flex !items-center !gap-1 !rounded-md !px-2 !py-0.5 !text-xs hover:opacity-80 transition-opacity"
+                          >
+                            <EnvironmentOutlined /> Chưa ghim vị trí (Bấm để ghim)
+                          </Tag>
+                        </Tooltip>
+                      )}
                     </div>
 
                     {/* Address content */}
                     <div className="flex items-start gap-2 text-sm text-gray-700">
                       <HomeOutlined className="mt-1 text-gray-400 shrink-0" />
-                      <span className="break-words">{fullAddressText}</span>
+                      <span className="break-words font-medium">{fullAddressText}</span>
                     </div>
 
                     {/* Note if available */}
                     {addr.note && (
                       <div className="flex items-start gap-2 text-xs text-gray-500 italic">
                         <FileTextOutlined className="mt-0.5 text-gray-400 shrink-0" />
-                        <span>Ghi chú: {addr.note}</span>
+                        <span>Ghi chú giao hàng: {addr.note}</span>
                       </div>
                     )}
                   </div>
@@ -236,15 +282,23 @@ export default function AddressBookPage() {
                       }}
                       onConfirm={() => handleDelete(addr)}
                     >
-                      <Button
-                        size="small"
-                        danger
-                        icon={<DeleteOutlined />}
-                        disabled={isSingleDefault || deleteMutation.isPending}
-                        className="!rounded-lg !text-xs"
+                      <Tooltip
+                        title={
+                          isSingleDefault
+                            ? 'Không thể xóa địa chỉ mặc định duy nhất'
+                            : undefined
+                        }
                       >
-                        Xóa
-                      </Button>
+                        <Button
+                          size="small"
+                          danger
+                          icon={<DeleteOutlined />}
+                          disabled={isSingleDefault || deleteMutation.isPending}
+                          className="!rounded-lg !text-xs"
+                        >
+                          Xóa
+                        </Button>
+                      </Tooltip>
                     </Popconfirm>
 
                     {!addr.isDefault && (
@@ -265,17 +319,21 @@ export default function AddressBookPage() {
         </div>
       )}
 
-      {/* Address Form Modal */}
-      <AddressModal
-        open={modalOpen}
-        onCancel={() => {
-          setModalOpen(false);
-          setEditingAddress(null);
-        }}
-        onSubmit={handleModalSubmit}
-        initialData={editingAddress}
-        loading={createMutation.isPending || updateMutation.isPending}
-      />
+      {/* Address Form Modal with Leaflet Map (Lazy Loaded) */}
+      {modalOpen && (
+        <Suspense fallback={null}>
+          <AddressModal
+            open={modalOpen}
+            onCancel={() => {
+              setModalOpen(false);
+              setEditingAddress(null);
+            }}
+            onSubmit={handleModalSubmit}
+            initialData={editingAddress}
+            loading={createMutation.isPending || updateMutation.isPending}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

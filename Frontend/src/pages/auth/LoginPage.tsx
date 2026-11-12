@@ -21,7 +21,13 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);  
   const [form] = Form.useForm<LoginFormValues>(); 
   useEffect(() => { if (rememberedEmail) form.setFieldsValue({ email: rememberedEmail, remember: true }); }, [rememberedEmail, form]);  
-  useEffect(() => { if (isAuthenticated && user) { const from = (location.state as any)?.from; navigate(user.role === 'ADMIN' ? '/admin' : from || ROUTES.HOME, { replace: true }); } }, [isAuthenticated, user]);
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const from = (location.state as any)?.from;
+      const isStaffOrAdmin = ['ADMIN', 'ROLE_ADMIN', 'SALES', 'ROLE_SALES', 'WAREHOUSE', 'ROLE_WAREHOUSE', 'MARKETING', 'ROLE_MARKETING'].includes(user.role);
+      navigate(isStaffOrAdmin ? '/admin' : from || ROUTES.HOME, { replace: true });
+    }
+  }, [isAuthenticated, user]);
   useEffect(() => { return () => { dispatch(clearError()); }; }, [dispatch]);  
   const handleSubmit = (values: LoginFormValues) => { dispatch(loginThunk({ email: values.email, password: values.password, remember: values.remember })); }; 
   return (  
@@ -30,7 +36,22 @@ export default function LoginPage() {
         <div className="mx-auto mb-2 inline-flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-green-600"><ShieldCheck className="h-5 w-5" strokeWidth={2.2} /></div>  
         <h2 className="text-xl font-bold text-gray-900 md:text-2xl">Đăng nhập</h2>  
       </div> 
-      {error && <Alert title={error} type="error" showIcon closable className="mb-4" onClose={() => dispatch(clearError())} />}  
+      {error && (
+        <Alert
+          message={
+            error.includes('Account is not active') || error.includes('not active')
+              ? 'Tài khoản đã bị khóa. Vui lòng liên hệ với quản trị viên để được hỗ trợ.'
+              : error.includes('Invalid email or password')
+              ? 'Email hoặc mật khẩu không chính xác.'
+              : error
+          }
+          type="error"
+          showIcon
+          closable
+          className="mb-4"
+          onClose={() => dispatch(clearError())}
+        />
+      )}  
       <Form form={form} layout="vertical" onFinish={handleSubmit} autoComplete="on" requiredMark={false}>  
         <Form.Item name="email" label="Email" rules={[{ required: true, message: 'Vui lòng nhập email' }]}>  
           <Input size="large" prefix={<User className="h-4 w-4 text-gray-400" />} placeholder="Nhập email" className="!h-11 !rounded-xl" autoComplete="username" />  

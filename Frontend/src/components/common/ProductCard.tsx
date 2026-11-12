@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Loader2 } from 'lucide-react';
 import { App } from 'antd';
 import type { PhoneDTO, PhoneDetailDTO, PhoneVariantDTO } from '@/types/api';
@@ -7,8 +7,12 @@ import type { Product } from '@/types';
 import { cn, getOptimizedImageUrl, formatVND, calculateBestVoucherForPrice } from '@/utils';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { addCartItem, addToCart } from '@/store/slices/cartSlice';
+import { startBuyNow } from '@/store/slices/checkoutSlice';
+import { ROUTES } from '@/routes/routePaths';
+import { createBuyNowCartItem } from '@/utils/buyNow';
 import { phoneService } from '@/services';
 import { useMyPromotions } from '@/hooks/useMyPromotions';
+import WishlistButton from '@/components/common/WishlistButton';
 
 interface Props { product: PhoneDTO; className?: string; }
 
@@ -37,10 +41,13 @@ function toProduct(phone: PhoneDetailDTO, variant: PhoneVariantDTO): Product {
 
 export default function ProductCard({ product, className }: Props) {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const { data: myPromotions } = useMyPromotions();
   const { message } = App.useApp();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [isBuyingNow, setIsBuyingNow] = useState(false);
+  const isSubmitting = isAddingToCart || isBuyingNow;
   const imgUrl = getOptimizedImageUrl(product.mainImageUrl || '', { width: 400, height: 400 });
 
   const bestVoucher = calculateBestVoucherForPrice(product.lowestPrice, myPromotions);
@@ -49,19 +56,36 @@ export default function ProductCard({ product, className }: Props) {
       ? Math.max(1, Math.round((bestVoucher.discountAmount / product.lowestPrice) * 100))
       : 0;
 
+  const findFirstAvailableVariant = async (): Promise<{
+    detail: PhoneDetailDTO;
+    variant: PhoneVariantDTO;
+  } | null> => {
+    const detail = await phoneService.detail(product.id);
+    if (detail.status === 'INACTIVE') {
+      message.warning('Sản phẩm này hiện đã ngừng kinh doanh');
+      return null;
+    }
+
+    const variant = detail.variants?.find((item) => item.status !== 'INACTIVE' && item.stockQuantity > 0);
+    if (!variant) {
+      message.warning('Sản phẩm này hiện đã hết hàng');
+      return null;
+    }
+
+    return { detail, variant };
+  };
+
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (isSubmitting) return;
 
     try {
-      setIsSubmitting(true);
-      const detail = await phoneService.detail(product.id);
-      const variant = detail.variants?.find((item) => item.stockQuantity > 0);
-      if (!variant) {
-        message.warning('Sản phẩm này hiện đã hết hàng');
-        return;
-      }
+      setIsAddingToCart(true);
+      const found = await findFirstAvailableVariant();
+      if (!found) return;
+
+      const { detail, variant } = found;
       if (!isAuthenticated) {
         dispatch(
           addToCart({
@@ -79,7 +103,27 @@ export default function ProductCard({ product, className }: Props) {
     } catch (error) {
       message.error(error instanceof Error ? error.message : 'Không thể thêm vào giỏ hàng');
     } finally {
-      setIsSubmitting(false);
+      setIsAddingToCart(false);
+    }
+  };
+
+  const handleBuyNow = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isSubmitting) return;
+
+    try {
+      setIsBuyingNow(true);
+      const found = await findFirstAvailableVariant();
+      if (!found) return;
+
+      const { detail, variant } = found;
+      dispatch(startBuyNow(createBuyNowCartItem(toProduct(detail, variant), variant, 1)));
+      navigate(ROUTES.CHECKOUT);
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : 'Không thể thực hiện mua ngay');
+    } finally {
+      setIsBuyingNow(false);
     }
   };
 
@@ -92,6 +136,19 @@ export default function ProductCard({ product, className }: Props) {
               Giảm {discountPercent}%
             </div>
           )}
+          <div className="absolute right-2 top-2 z-10">
+            <WishlistButton
+              productId={String(product.id)}
+              name={product.name}
+              price={bestVoucher ? bestVoucher.finalPrice : (product.lowestPrice ?? undefined)}
+              originalPrice={product.lowestPrice ?? undefined}
+              imageUrl={imgUrl}
+              brandName={product.brandName}
+              inStock={true}
+              className="min-h-[44px] min-w-[44px] sm:h-9 sm:w-9 sm:min-h-[36px] sm:min-w-[36px] border border-gray-100 bg-white/90 shadow-sm"
+              iconSize={18}
+            />
+          </div>
           <img
             src={imgUrl}
             alt={product.name}
@@ -125,28 +182,52 @@ export default function ProductCard({ product, className }: Props) {
         </div>
       </Link>
       <div className="px-3 pb-3">
-        <button
-          onClick={handleAddToCart}
-          disabled={isSubmitting}
+        <div
           className={cn(
-            'flex w-full items-center justify-center gap-1.5 rounded-lg bg-green-600 py-2 text-xs font-medium text-white transition-all',
+            'flex items-center gap-2 transition-all',
             isSubmitting
-              ? 'cursor-not-allowed opacity-90'
-              : 'opacity-0 hover:bg-green-700 group-hover:opacity-100'
+              ? 'opacity-100'
+              : 'opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-within:opacity-100'
           )}
         >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Đang thêm...
-            </>
-          ) : (
-            <>
-              <ShoppingCart className="h-3.5 w-3.5" />
-              Thêm vào giỏ
-            </>
-          )}
-        </button>
+          <button
+            type="button"
+            onClick={handleBuyNow}
+            disabled={isSubmitting}
+            data-testid={`product-card-buy-now-${product.id}`}
+            className={cn(
+              'flex h-9 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-green-600 px-3 text-xs font-semibold text-white transition-colors sm:text-sm',
+              isSubmitting ? 'cursor-not-allowed opacity-75' : 'hover:bg-green-700'
+            )}
+          >
+            {isBuyingNow ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Đang xử lý...
+              </>
+            ) : (
+              'Mua ngay'
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={handleAddToCart}
+            disabled={isSubmitting}
+            aria-label="Thêm vào giỏ"
+            title="Thêm vào giỏ"
+            data-testid={`product-card-add-to-cart-${product.id}`}
+            className={cn(
+              'flex h-9 w-10 shrink-0 items-center justify-center rounded-lg border border-green-600 bg-white text-green-700 transition-colors',
+              isSubmitting ? 'cursor-not-allowed opacity-75' : 'hover:bg-green-50'
+            )}
+          >
+            {isAddingToCart ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ShoppingCart className="h-4 w-4" />
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

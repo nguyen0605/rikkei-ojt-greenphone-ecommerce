@@ -4,8 +4,8 @@ import ShippingForm from '@/components/checkout/ShippingForm';
 import PaymentMethodSelect from '@/components/checkout/PaymentMethodSelect';
 import OrderSummary from '@/components/checkout/OrderSummary';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { selectCartSummary } from '@/store/selectors/cartSelectors';
-import { nextStep, prevStep, completeOrder, setCurrentStep, removeCheckoutVoucher } from '@/store/slices/checkoutSlice';
+import { selectCheckoutItems, selectCheckoutSummary } from '@/store/selectors/cartSelectors';
+import { nextStep, prevStep, completeOrder, setCurrentStep, removeCheckoutVoucher, clearBuyNow } from '@/store/slices/checkoutSlice';
 import { clearCart } from '@/store/slices/cartSlice';
 import { orderService, paymentService, phoneService } from '@/services';
 import { Button, App } from 'antd';
@@ -35,8 +35,9 @@ export default function CheckoutPage() {
   const voucherCode = useAppSelector((s) => s.checkout.voucherCode);
   const voucherDiscount = useAppSelector((s) => s.checkout.voucherDiscount);
   const userPromotionId = useAppSelector((s) => s.checkout.userPromotionId);
-  const cartItems = useAppSelector((s) => s.cart.items);
-  const summary = useAppSelector(selectCartSummary);
+  const buyNowItem = useAppSelector((s) => s.checkout.buyNowItem);
+  const checkoutItems = useAppSelector(selectCheckoutItems);
+  const summary = useAppSelector(selectCheckoutSummary);
 
   const validateShipping = () => {
     if (!shipping.fullName || shipping.fullName.trim().length < 2) {
@@ -62,7 +63,7 @@ export default function CheckoutPage() {
   };
 
   // Legacy cart items (before variantId) have no variant — resolve one from the phone detail
-  const resolveItemVariantId = async (item: (typeof cartItems)[number]): Promise<number> => {
+  const resolveItemVariantId = async (item: (typeof checkoutItems)[number]): Promise<number> => {
     if (item.variantId !== undefined) return item.variantId;
     const detail = await phoneService.detail(Number(item.productId));
     const variant = detail.variants?.[0];
@@ -73,14 +74,15 @@ export default function CheckoutPage() {
   };
 
   const handlePlaceOrder = async () => {
-    if (cartItems.length === 0) {
+    if (checkoutItems.length === 0) {
       message.warning('Giỏ hàng trống');
       return;
     }
+    const isBuyNow = Boolean(buyNowItem);
     setPlacing(true);
     try {
       const items = await Promise.all(
-        cartItems.map(async (item) => ({
+        checkoutItems.map(async (item) => ({
           phoneVariantId: await resolveItemVariantId(item),
           quantity: item.quantity,
         })),
@@ -92,6 +94,7 @@ export default function CheckoutPage() {
         paymentMethod: payment === 'bank-transfer' ? 'VIETQR' : 'COD',
         note: '',
         userPromotionId: userPromotionId ?? null,
+        buyNow: isBuyNow,
         items,
       };
       const order = await orderService.create(orderReq);
@@ -100,15 +103,27 @@ export default function CheckoutPage() {
         // Create the Payment row first — the Sepay webhook looks it up by orderId,
         // then move to the dedicated payment page (QR keyed by orderId in URL).
         await paymentService.create(order.id, 'VIETQR');
-        dispatch(clearCart());
+        if (isBuyNow) {
+          dispatch(clearBuyNow());
+        } else {
+          dispatch(clearCart());
+        }
         dispatch(removeCheckoutVoucher());
         navigate(ROUTES.CHECKOUT_PAYMENT(String(order.id)));
       } else {
         // COD — done
-        dispatch(clearCart());
+        if (isBuyNow) {
+          dispatch(clearBuyNow());
+        } else {
+          dispatch(clearCart());
+        }
         dispatch(removeCheckoutVoucher());
         dispatch(completeOrder({ orderId: String(order.id) }));
-        navigate(`/thanh-toan/hoan-tat?orderId=${order.id}`);
+        navigate(
+          isBuyNow
+            ? `/thanh-toan/hoan-tat?orderId=${order.id}&buyNow=1`
+            : `/thanh-toan/hoan-tat?orderId=${order.id}`,
+        );
       }
       message.success('Đặt hàng thành công!');
     } catch (err: unknown) {
@@ -171,7 +186,7 @@ export default function CheckoutPage() {
                 <div className="mb-6">
                   <h4 className="mb-3 text-sm font-semibold text-gray-700">🛒 Sản phẩm ({summary.totalItems})</h4>
                   <div className="space-y-2">
-                    {cartItems.map((item) => (
+                    {checkoutItems.map((item) => (
                       <div key={item.id} className="flex items-center gap-3 rounded-lg border border-gray-100 p-3">
                         <img src={item.product.thumbnail || '/placeholder.png'} alt={item.product.name} className="h-14 w-14 rounded-lg object-cover" />
                         <div className="flex-1 min-w-0">

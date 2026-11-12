@@ -6,6 +6,7 @@ import com.re.greenphone.service.admin.AdminUserService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -14,6 +15,7 @@ import java.util.Map;
 @RequestMapping("/api/admin/users")
 @RequiredArgsConstructor
 @Tag(name = "Admin - User", description = "Admin user management")
+@PreAuthorize("hasAnyRole('ADMIN', 'SALES')")
 public class AdminUserController {
 
     private final AdminUserService adminUserService;
@@ -29,6 +31,7 @@ public class AdminUserController {
         return ResponseEntity.ok(ApiResponse.success(adminUserService.getUserDetail(id)));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}/status")
     public ResponseEntity<ApiResponse<?>> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
         return ResponseEntity.ok(ApiResponse.success(adminUserService.updateUserStatus(id, body.get("status"))));

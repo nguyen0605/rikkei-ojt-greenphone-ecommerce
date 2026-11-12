@@ -27,6 +27,7 @@ export const ROUTES = {
   ACCOUNT_PROFILE: '/tai-khoan/thong-tin',
   ACCOUNT_ADDRESSES: '/tai-khoan/dia-chi',
   ACCOUNT_ORDERS: '/tai-khoan/don-hang',
+  ACCOUNT_NOTIFICATIONS: '/tai-khoan/thong-bao',
   ACCOUNT_REVIEWS: '/tai-khoan/danh-gia',
   ACCOUNT_WISHLIST: '/tai-khoan/yeu-thich',
   ACCOUNT_CHANGE_PASSWORD: '/tai-khoan/doi-mat-khau',
@@ -43,6 +44,7 @@ export const ROUTES = {
   ADMIN_OPTIONS: '/admin/tuy-chon',
   ADMIN_ORDERS: '/admin/don-hang',
   ADMIN_CUSTOMERS: '/admin/khach-hang',
+  ADMIN_STAFF: '/admin/nhan-su',
   ADMIN_REVIEWS: '/admin/danh-gia',
   ADMIN_PROMOTIONS: '/admin/khuyen-mai',
   ADMIN_VOUCHERS: '/admin/vouchers',
@@ -65,4 +67,7 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   '/dang-ky': 'Đăng ký',
   '/quen-mat-khau': 'Quên mật khẩu',
   '/tai-khoan': 'Tài khoản',
+  '/tai-khoan/thong-bao': 'Thông báo',
+  '/yeu-thich': 'Sản phẩm yêu thích',
+  '/tai-khoan/yeu-thich': 'Sản phẩm yêu thích',
 };

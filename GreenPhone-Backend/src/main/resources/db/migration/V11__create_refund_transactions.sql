@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS `refund_transaction` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_refund_order` (`order_id`),
     KEY `idx_refund_status` (`status`),
-    CONSTRAINT `fk_refund_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE,
-    CONSTRAINT `fk_refund_payment` FOREIGN KEY (`payment_id`) REFERENCES `payment` (`id`) ON DELETE SET NULL
+    CONSTRAINT `fk_refund_txn_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_refund_txn_payment` FOREIGN KEY (`payment_id`) REFERENCES `payment` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

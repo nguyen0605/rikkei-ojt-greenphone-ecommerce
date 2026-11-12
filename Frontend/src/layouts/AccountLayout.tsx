@@ -3,9 +3,11 @@ import {
   UserOutlined,
   ShoppingOutlined,
   LockOutlined,
+  HeartOutlined,
   ArrowLeftOutlined,
   StarOutlined,
   HomeOutlined,
+  BellOutlined,
 } from '@ant-design/icons';
 import { useAppSelector } from '@/store/hooks';
 import RequireAuth from '@/components/auth/RequireAuth';
@@ -14,8 +16,10 @@ import Footer from '@/components/layout/Footer';
 
 const links = [
   { to: '/tai-khoan/thong-tin', label: 'Hồ sơ cá nhân', icon: <UserOutlined /> },
+  { to: '/tai-khoan/thong-bao', label: 'Thông báo', icon: <BellOutlined /> },
   { to: '/tai-khoan/dia-chi', label: 'Sổ địa chỉ', icon: <HomeOutlined /> },
   { to: '/tai-khoan/don-hang', label: 'Đơn hàng của tôi', icon: <ShoppingOutlined /> },
+  { to: '/tai-khoan/yeu-thich', label: 'Sản phẩm yêu thích', icon: <HeartOutlined /> },
   { to: '/tai-khoan/danh-gia', label: 'Đánh giá sản phẩm', icon: <StarOutlined /> },
   { to: '/tai-khoan/doi-mat-khau', label: 'Đổi mật khẩu', icon: <LockOutlined /> },
 ];
@@ -37,7 +41,7 @@ export default function AccountLayout() {
               <ArrowLeftOutlined /> Trang chủ
             </NavLink>
             <h1 className="text-2xl font-bold text-gray-900">Tài khoản của tôi</h1>
-            <p className="mt-1 text-sm text-gray-500">Quản lý hồ sơ cá nhân, sổ địa chỉ và đơn hàng</p>
+            <p className="mt-1 text-sm text-gray-500">Quản lý hồ sơ cá nhân, sổ địa chỉ, đơn hàng và sản phẩm yêu thích</p>
           </div>
 
           <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">

@@ -17,7 +17,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/admin/warehouses")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN', 'WAREHOUSE')")
 @RequiredArgsConstructor
 @Tag(name = "Admin - Warehouse", description = "Warehouse directory management; deactivate instead of deleting")
 public class AdminWarehouseController {
