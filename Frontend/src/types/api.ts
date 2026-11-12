@@ -287,6 +287,7 @@ export interface OrderDTO {
   note: string;
   promotionCode: string;
   createdAt: string;
+  updatedAt?: string;
   orderDetails: OrderDetailDTO[];
 }
 

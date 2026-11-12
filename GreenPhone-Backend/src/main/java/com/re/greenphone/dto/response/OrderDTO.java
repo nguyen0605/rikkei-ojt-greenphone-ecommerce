@@ -29,5 +29,6 @@ public class OrderDTO {
     private String note;
     private String promotionCode;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
     private List<OrderDetailDTO> orderDetails;
 }

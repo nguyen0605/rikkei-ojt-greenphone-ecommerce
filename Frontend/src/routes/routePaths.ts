@@ -31,6 +31,7 @@ export const ROUTES = {
   ACCOUNT_REVIEWS: '/tai-khoan/danh-gia',
   ACCOUNT_WISHLIST: '/tai-khoan/yeu-thich',
   ACCOUNT_CHANGE_PASSWORD: '/tai-khoan/doi-mat-khau',
+  ACCOUNT_RETURN_REQUEST: '/tai-khoan/doi-tra',
   // Admin
   ADMIN: '/admin',
   ADMIN_DASHBOARD: '/admin',

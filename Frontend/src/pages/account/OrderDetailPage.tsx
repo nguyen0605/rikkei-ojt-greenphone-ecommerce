@@ -21,6 +21,7 @@ import { returnService, type ReturnResponse } from '@/services/returnService';
 import ClaimProgressModal from '@/components/warranty/ClaimProgressModal';
 import type { OrderDetailDTO } from '@/types/api';
 import { formatVND } from '@/utils';
+import { ROUTES } from '@/routes/routePaths';
 import { extractCustomerNote } from '@/utils/orderStateMachine';
 import { getStatusBadgeConfig, formatPaymentMethod } from '@/components/order/orderHelpers';
 import OrderTrackingTimeline from '@/components/order/OrderTrackingTimeline';
@@ -95,7 +96,8 @@ export const OrderDetailPage: React.FC = () => {
 
   // Tính toán thời gian 7 ngày kể từ khi hoàn tất giao hàng (COMPLETED)
   const isCompletedOrder = order?.orderStatus === 'COMPLETED';
-  const orderCompletedTime = order?.createdAt;
+  // Ưu tiên thời điểm đơn hàng hoàn tất (updatedAt), nếu chưa có mới dùng createdAt
+  const orderCompletedTime = order?.updatedAt || order?.createdAt;
   const isWithin7Days = (() => {
     if (!orderCompletedTime) return true;
     const completedDate = new Date(orderCompletedTime).getTime();
@@ -491,7 +493,7 @@ export const OrderDetailPage: React.FC = () => {
                           type="button"
                           disabled={!isWithin7Days}
                           onClick={() =>
-                            navigate('/tai-khoan/doi-tra', {
+                            navigate(ROUTES.ACCOUNT_RETURN_REQUEST, {
                               state: {
                                 orderId: order.id,
                                 phoneVariantId: item.phoneVariantId,

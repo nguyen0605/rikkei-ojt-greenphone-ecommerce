@@ -101,7 +101,7 @@ export default function AppRoutes() {
         <Route path={ROUTES.ACCOUNT_ADDRESSES} element={withSuspense(AddressBookPage)} />
         <Route path={ROUTES.ACCOUNT_ORDERS} element={withSuspense(AccountOrdersPage)} />
         <Route path="/tai-khoan/don-hang/:id" element={withSuspense(AccountOrderDetailPage)} />
-        <Route path="/tai-khoan/doi-tra" element={withSuspense(ReturnRequestPage)} />
+        <Route path={ROUTES.ACCOUNT_RETURN_REQUEST} element={withSuspense(ReturnRequestPage)} />
         <Route path={ROUTES.ACCOUNT_REVIEWS} element={withSuspense(AccountReviewsPage)} />
         <Route path={ROUTES.ACCOUNT_WISHLIST} element={withSuspense(WishlistPage)} />
         <Route path={ROUTES.ACCOUNT_CHANGE_PASSWORD} element={withSuspense(AccountPasswordPage)} />
