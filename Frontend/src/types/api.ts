@@ -254,6 +254,8 @@ export interface OrderRequest {
   note: string;
   userPromotionId: number | null;
   buyNow?: boolean;
+  latitude?: number;
+  longitude?: number;
   items: OrderItemRequest[];
 }
 
@@ -428,6 +430,8 @@ export interface ChangePasswordRequest {
   newPassword: string;
 }
 
+export type AddressLabel = 'HOME' | 'OFFICE' | 'FAMILY' | 'OTHER';
+
 export interface AddressItem {
   id: string | number;
   receiverName: string;
@@ -436,6 +440,9 @@ export interface AddressItem {
   district?: string;
   ward?: string;
   streetAddress: string;
+  label?: AddressLabel;
+  latitude?: number;
+  longitude?: number;
   note?: string;
   isDefault: boolean;
   createdAt?: string;
@@ -448,6 +455,9 @@ export interface AddressRequest {
   district?: string;
   ward?: string;
   streetAddress: string;
+  label?: AddressLabel;
+  latitude?: number;
+  longitude?: number;
   note?: string;
   isDefault?: boolean;
 }

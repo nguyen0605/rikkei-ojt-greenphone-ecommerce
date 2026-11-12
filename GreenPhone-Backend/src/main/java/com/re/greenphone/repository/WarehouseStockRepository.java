@@ -17,4 +17,16 @@ public interface WarehouseStockRepository extends JpaRepository<WarehouseStock, 
 
     @Query("SELECT ws FROM WarehouseStock ws WHERE ws.warehouse.id IN :warehouseIds AND ws.phoneVariant.id IN :variantIds")
     List<WarehouseStock> findByWarehouseIdInAndPhoneVariantIdIn(@org.springframework.data.repository.query.Param("warehouseIds") Collection<Long> warehouseIds, @org.springframework.data.repository.query.Param("variantIds") Collection<Long> variantIds);
+
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT ws FROM WarehouseStock ws WHERE ws.warehouse.id = :warehouseId AND ws.phoneVariant.id = :variantId")
+    Optional<WarehouseStock> findByWarehouseIdAndPhoneVariantIdForUpdate(
+            @org.springframework.data.repository.query.Param("warehouseId") Long warehouseId,
+            @org.springframework.data.repository.query.Param("variantId") Long variantId);
+
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT ws FROM WarehouseStock ws WHERE ws.warehouse.id IN :warehouseIds AND ws.phoneVariant.id IN :variantIds ORDER BY ws.warehouse.id ASC, ws.phoneVariant.id ASC")
+    List<WarehouseStock> findByWarehouseIdInAndPhoneVariantIdInForUpdate(
+            @org.springframework.data.repository.query.Param("warehouseIds") Collection<Long> warehouseIds,
+            @org.springframework.data.repository.query.Param("variantIds") Collection<Long> variantIds);
 }

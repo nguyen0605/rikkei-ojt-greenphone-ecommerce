@@ -439,5 +439,148 @@ class WarehouseRoutingServiceTest {
         assertEquals("WH-HN-MAIN", respNull.getCode());
         assertNull(respNull.getDistanceKm());
     }
+
+    @Test
+    @DisplayName("INV-08 Case 1: Một kho đủ toàn bộ giỏ hàng -> Giao trực tiếp không điều chuyển")
+    void interWarehouse_case1_directFulfillment() {
+        when(warehouseRepository.findByStatus("ACTIVE")).thenReturn(List.of(warehouseHn, warehouseHcm));
+
+        Long variantId = 101L;
+        List<WarehouseStock> stockRecords = List.of(
+                createStock(warehouseHcm, variantId, 5),
+                createStock(warehouseHn, variantId, 10)
+        );
+        when(warehouseStockRepository.findByWarehouseIdInAndPhoneVariantIdIn(anyCollection(), anyCollection()))
+                .thenReturn(stockRecords);
+
+        com.re.greenphone.dto.response.InterWarehouseTransferPlan plan = routingService.routeInterWarehouseFulfillment(
+                HCM_LAT, HCM_LNG, List.of(new OrderItemRequirement(variantId, 2)));
+
+        assertNotNull(plan);
+        assertTrue(plan.isFeasible());
+        assertTrue(plan.isDirectFulfillment());
+        assertEquals("WH-HCM-Q1", plan.getDestinationWarehouse().getCode());
+        assertEquals(0, plan.getTotalItemsToTransfer());
+        assertTrue(plan.getTransfers().isEmpty());
+    }
+
+    @Test
+    @DisplayName("INV-08 Case 2: Không kho nào đủ nhưng cộng dồn đủ -> Lập kế hoạch điều chuyển liên kho tối ưu")
+    void interWarehouse_case2_fragmentedAcrossWarehouses() {
+        Warehouse warehouseDn = new Warehouse();
+        warehouseDn.setId(3L);
+        warehouseDn.setCode("WH-DN-HAI-CHAU");
+        warehouseDn.setName("Kho Đà Nẵng Hải Châu");
+        warehouseDn.setLatitude(BigDecimal.valueOf(16.0544));
+        warehouseDn.setLongitude(BigDecimal.valueOf(108.2022));
+        warehouseDn.setStatus("ACTIVE");
+
+        when(warehouseRepository.findByStatus("ACTIVE")).thenReturn(List.of(warehouseHn, warehouseHcm, warehouseDn));
+
+        // Khách ở TP.HCM đặt 3 iPhone (v1), 2 Samsung (v2).
+        // TP.HCM chỉ có: 1 iPhone (v1), 0 Samsung (v2).
+        // Đà Nẵng có: 1 iPhone (v1), 2 Samsung (v2).
+        // Hà Nội có: 2 iPhone (v1), 0 Samsung (v2).
+        Long v1 = 201L;
+        Long v2 = 202L;
+
+        List<WarehouseStock> stockRecords = List.of(
+                createStock(warehouseHcm, v1, 1),
+                createStock(warehouseHcm, v2, 0),
+                createStock(warehouseDn, v1, 1),
+                createStock(warehouseDn, v2, 2),
+                createStock(warehouseHn, v1, 2),
+                createStock(warehouseHn, v2, 0)
+        );
+        when(warehouseStockRepository.findByWarehouseIdInAndPhoneVariantIdIn(anyCollection(), anyCollection()))
+                .thenReturn(stockRecords);
+
+        List<OrderItemRequirement> items = List.of(
+                new OrderItemRequirement(v1, 3),
+                new OrderItemRequirement(v2, 2)
+        );
+
+        com.re.greenphone.dto.response.InterWarehouseTransferPlan plan = routingService.routeInterWarehouseFulfillment(
+                HCM_LAT, HCM_LNG, items);
+
+        assertNotNull(plan);
+        assertTrue(plan.isFeasible(), "Kế hoạch phải khả thi khi tổng tồn kho toàn hệ thống đủ");
+        assertFalse(plan.isDirectFulfillment(), "Không được là giao trực tiếp vì không kho nào tự đủ hàng");
+        assertEquals("WH-HCM-Q1", plan.getDestinationWarehouse().getCode(), "Kho đích phải là TP.HCM gần khách nhất");
+
+        // TP.HCM đã có sẵn 1 v1
+        assertEquals(1, plan.getDestinationAvailableStock().get(v1));
+        assertEquals(0, plan.getDestinationAvailableStock().get(v2));
+
+        // Tổng số lượng cần chuyển: (3 - 1) + 2 = 4 sản phẩm
+        assertEquals(4, plan.getTotalItemsToTransfer());
+        assertFalse(plan.getTransfers().isEmpty());
+
+        int totalTransferred = plan.getTransfers().stream().mapToInt(com.re.greenphone.dto.response.TransferPlanItem::getQuantity).sum();
+        assertEquals(4, totalTransferred);
+    }
+
+    @Test
+    @DisplayName("INV-08 Case 3: Tổng tồn kho toàn hệ thống không đủ -> Trả về không khả thi")
+    void interWarehouse_case3_systemWideOutOfStock() {
+        when(warehouseRepository.findByStatus("ACTIVE")).thenReturn(List.of(warehouseHn, warehouseHcm));
+
+        Long variantId = 301L;
+        // Cả 2 kho cộng lại chỉ có 4 cái, khách đòi 10 cái
+        List<WarehouseStock> stockRecords = List.of(
+                createStock(warehouseHcm, variantId, 2),
+                createStock(warehouseHn, variantId, 2)
+        );
+        when(warehouseStockRepository.findByWarehouseIdInAndPhoneVariantIdIn(anyCollection(), anyCollection()))
+                .thenReturn(stockRecords);
+
+        com.re.greenphone.dto.response.InterWarehouseTransferPlan plan = routingService.routeInterWarehouseFulfillment(
+                HCM_LAT, HCM_LNG, List.of(new OrderItemRequirement(variantId, 10)));
+
+        assertNotNull(plan);
+        assertFalse(plan.isFeasible(), "Kế hoạch phải không khả thi khi thiếu hàng toàn hệ thống");
+    }
+
+    @Test
+    @DisplayName("INV-08 Benchmark: Lập kế hoạch điều chuyển cho giỏ 20 items dưới 50ms")
+    void interWarehouse_benchmark_20ItemsUnder50ms() {
+        Warehouse warehouseDn = new Warehouse();
+        warehouseDn.setId(3L);
+        warehouseDn.setCode("WH-DN-HAI-CHAU");
+        warehouseDn.setName("Kho Đà Nẵng");
+        warehouseDn.setLatitude(BigDecimal.valueOf(16.0544));
+        warehouseDn.setLongitude(BigDecimal.valueOf(108.2022));
+        warehouseDn.setStatus("ACTIVE");
+
+        when(warehouseRepository.findByStatus("ACTIVE")).thenReturn(List.of(warehouseHn, warehouseHcm, warehouseDn));
+
+        List<OrderItemRequirement> items = new ArrayList<>();
+        List<WarehouseStock> stocks = new ArrayList<>();
+        for (long i = 1; i <= 20; i++) {
+            items.add(new OrderItemRequirement(i, 2));
+            stocks.add(createStock(warehouseHcm, i, 1));
+            stocks.add(createStock(warehouseDn, i, 1));
+            stocks.add(createStock(warehouseHn, i, 1));
+        }
+        when(warehouseStockRepository.findByWarehouseIdInAndPhoneVariantIdIn(anyCollection(), anyCollection()))
+                .thenReturn(stocks);
+
+        // Warm up JIT
+        for (int i = 0; i < 50; i++) {
+            routingService.routeInterWarehouseFulfillment(HCM_LAT, HCM_LNG, items);
+        }
+
+        long start = System.nanoTime();
+        int iterations = 100;
+        for (int i = 0; i < iterations; i++) {
+            com.re.greenphone.dto.response.InterWarehouseTransferPlan plan = routingService.routeInterWarehouseFulfillment(HCM_LAT, HCM_LNG, items);
+            assertTrue(plan.isFeasible());
+        }
+        long durationNs = System.nanoTime() - start;
+        double avgMs = (durationNs / 1_000_000.0) / iterations;
+
+        System.out.printf("INV-08 InterWarehouse Benchmark: Avg time for 20-item cart: %.4f ms (Threshold: 50.0 ms)%n", avgMs);
+        assertTrue(avgMs < 50.0, "InterWarehouse planning must execute well under 50ms. Actual: " + avgMs + " ms");
+    }
 }
 

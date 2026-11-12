@@ -3,7 +3,9 @@ package com.re.greenphone.service.impl;
 import com.re.greenphone.common.exception.BadRequestException;
 import com.re.greenphone.common.exception.ResourceNotFoundException;
 import com.re.greenphone.dto.request.OrderItemRequirement;
+import com.re.greenphone.dto.response.InterWarehouseTransferPlan;
 import com.re.greenphone.dto.response.NearestWarehouseResponse;
+import com.re.greenphone.dto.response.TransferPlanItem;
 import com.re.greenphone.entity.PhoneVariant;
 import com.re.greenphone.entity.Warehouse;
 import com.re.greenphone.entity.WarehouseStock;
@@ -215,6 +217,276 @@ public class WarehouseRoutingServiceImpl implements WarehouseRoutingService {
         }
 
         throw new BadRequestException("Không có kho nào có đủ tồn kho cho toàn bộ sản phẩm trong đơn hàng");
+    }
+
+    @Override
+    public InterWarehouseTransferPlan routeInterWarehouseFulfillment(Double lat, Double lng, List<OrderItemRequirement> items) {
+        if (items == null || items.isEmpty()) {
+            throw new BadRequestException("Danh sách sản phẩm trong đơn hàng không được để trống");
+        }
+
+        Map<Long, Integer> consolidatedRequirements = new LinkedHashMap<>();
+        for (OrderItemRequirement item : items) {
+            if (item.getPhoneVariantId() == null) {
+                throw new BadRequestException("ID biến thể không hợp lệ");
+            }
+            int qty = item.getQuantity() != null ? item.getQuantity() : 0;
+            if (qty <= 0) {
+                throw new BadRequestException("Số lượng sản phẩm đặt mua phải lớn hơn 0");
+            }
+            consolidatedRequirements.merge(item.getPhoneVariantId(), qty, Integer::sum);
+        }
+
+        List<Warehouse> activeWarehouses = warehouseRepository.findByStatus("ACTIVE");
+        if (activeWarehouses.isEmpty()) {
+            throw new BadRequestException("Hệ thống hiện không có kho hàng nào đang hoạt động");
+        }
+
+        if (lat != null && lng != null) {
+            validateCoordinates(lat, lng);
+        }
+
+        // Sắp xếp các kho theo thứ tự gần khách hàng nhất
+        List<Warehouse> sortedWarehouses = sortWarehousesByProximity(activeWarehouses, lat, lng);
+
+        // Truy vấn batch tồn kho khả dụng của tất cả các kho active cho các biến thể được yêu cầu
+        List<Long> warehouseIds = sortedWarehouses.stream().map(Warehouse::getId).toList();
+        List<Long> variantIds = new ArrayList<>(consolidatedRequirements.keySet());
+        List<WarehouseStock> stockRecords = warehouseStockRepository.findByWarehouseIdInAndPhoneVariantIdIn(warehouseIds, variantIds);
+
+        Map<Long, Map<Long, Integer>> availableStockByWarehouse = new HashMap<>();
+        for (WarehouseStock ws : stockRecords) {
+            availableStockByWarehouse
+                    .computeIfAbsent(ws.getWarehouse().getId(), k -> new HashMap<>())
+                    .put(ws.getPhoneVariant().getId(), ws.getAvailableQuantity());
+        }
+
+        // 1. Kiểm tra TRƯỜNG HỢP 1: Có một kho đơn lẻ đáp ứng toàn bộ giỏ hàng
+        for (Warehouse warehouse : sortedWarehouses) {
+            Map<Long, Integer> variantStockMap = availableStockByWarehouse.getOrDefault(warehouse.getId(), Collections.emptyMap());
+            boolean canFulfillAll = true;
+
+            for (Map.Entry<Long, Integer> req : consolidatedRequirements.entrySet()) {
+                int availableQty = getEffectiveAvailable(warehouse, req.getKey(), variantStockMap);
+                if (availableQty < req.getValue()) {
+                    canFulfillAll = false;
+                    break;
+                }
+            }
+
+            if (canFulfillAll) {
+                Double distance = calculateDistanceToCustomer(warehouse, lat, lng);
+                Map<Long, Integer> destAvailable = new HashMap<>();
+                for (Map.Entry<Long, Integer> req : consolidatedRequirements.entrySet()) {
+                    destAvailable.put(req.getKey(), req.getValue());
+                }
+
+                return InterWarehouseTransferPlan.builder()
+                        .destinationWarehouse(warehouse)
+                        .directFulfillment(true)
+                        .feasible(true)
+                        .totalItemsToTransfer(0)
+                        .referenceDistanceKm(distance)
+                        .destinationAvailableStock(destAvailable)
+                        .transferItems(Collections.emptyList())
+                        .build();
+            }
+        }
+
+        // 2. Kiểm tra TRƯỜNG HỢP 3: Tổng tồn kho khả dụng toàn hệ thống có đủ không
+        for (Map.Entry<Long, Integer> req : consolidatedRequirements.entrySet()) {
+            Long variantId = req.getKey();
+            int requiredQty = req.getValue();
+            int totalAvailableAcrossSystem = 0;
+            for (Warehouse w : sortedWarehouses) {
+                Map<Long, Integer> variantStockMap = availableStockByWarehouse.getOrDefault(w.getId(), Collections.emptyMap());
+                totalAvailableAcrossSystem += getEffectiveAvailable(w, variantId, variantStockMap);
+            }
+            if (totalAvailableAcrossSystem < requiredQty) {
+                // Không đủ hàng toàn hệ thống
+                return InterWarehouseTransferPlan.builder()
+                        .destinationWarehouse(null)
+                        .directFulfillment(false)
+                        .feasible(false)
+                        .totalItemsToTransfer(0)
+                        .referenceDistanceKm(null)
+                        .destinationAvailableStock(Collections.emptyMap())
+                        .transferItems(Collections.emptyList())
+                        .build();
+            }
+        }
+
+        // 3. TRƯỜNG HỢP 2: Kích hoạt điều chuyển liên kho
+        // Đánh giá từng kho đích khả dĩ và chọn phương án tối ưu
+        InterWarehouseTransferPlan bestPlan = null;
+        CandidateScore bestScore = null;
+
+        for (Warehouse candidateDest : sortedWarehouses) {
+            Map<Long, Integer> destStockMap = availableStockByWarehouse.getOrDefault(candidateDest.getId(), Collections.emptyMap());
+            Map<Long, Integer> remainingNeeded = new HashMap<>();
+            Map<Long, Integer> usedFromDest = new HashMap<>();
+
+            for (Map.Entry<Long, Integer> req : consolidatedRequirements.entrySet()) {
+                Long variantId = req.getKey();
+                int requiredQty = req.getValue();
+                int availAtDest = getEffectiveAvailable(candidateDest, variantId, destStockMap);
+                int takeFromDest = Math.min(requiredQty, availAtDest);
+                usedFromDest.put(variantId, takeFromDest);
+                int needed = requiredQty - takeFromDest;
+                if (needed > 0) {
+                    remainingNeeded.put(variantId, needed);
+                }
+            }
+
+            // Sắp xếp các kho nguồn theo thứ tự gần kho đích nhất, tie-breaker bằng ID ASC
+            List<Warehouse> candidateSources = activeWarehouses.stream()
+                    .filter(w -> !w.getId().equals(candidateDest.getId()))
+                    .sorted(Comparator.comparingDouble((Warehouse w) -> {
+                        if (w.getLatitude() != null && w.getLongitude() != null
+                                && candidateDest.getLatitude() != null && candidateDest.getLongitude() != null) {
+                            return calculateDistance(candidateDest.getLatitudeAsDouble(), candidateDest.getLongitudeAsDouble(),
+                                    w.getLatitudeAsDouble(), w.getLongitudeAsDouble());
+                        }
+                        return Double.MAX_VALUE;
+                    }).thenComparing(Warehouse::getId))
+                    .toList();
+
+            List<TransferPlanItem> transferItems = new ArrayList<>();
+            Map<Long, Integer> neededCopy = new HashMap<>(remainingNeeded);
+            Set<Long> uniqueSourceWarehouseIds = new HashSet<>();
+            int totalTransferred = 0;
+
+            for (Warehouse source : candidateSources) {
+                Map<Long, Integer> srcStockMap = availableStockByWarehouse.getOrDefault(source.getId(), Collections.emptyMap());
+                double distBetween = calculateWarehouseToWarehouseDistance(candidateDest, source);
+
+                for (Map.Entry<Long, Integer> neededEntry : neededCopy.entrySet()) {
+                    Long variantId = neededEntry.getKey();
+                    int stillNeeded = neededEntry.getValue();
+                    if (stillNeeded <= 0) continue;
+
+                    int srcAvail = getEffectiveAvailable(source, variantId, srcStockMap);
+                    int take = Math.min(stillNeeded, srcAvail);
+                    if (take > 0) {
+                        transferItems.add(TransferPlanItem.builder()
+                                .sourceWarehouse(source)
+                                .destinationWarehouse(candidateDest)
+                                .phoneVariantId(variantId)
+                                .quantity(take)
+                                .distanceBetweenWarehousesKm(distBetween)
+                                .build());
+                        neededEntry.setValue(stillNeeded - take);
+                        uniqueSourceWarehouseIds.add(source.getId());
+                        totalTransferred += take;
+                    }
+                }
+            }
+
+            boolean allSatisfied = neededCopy.values().stream().allMatch(needed -> needed <= 0);
+            if (allSatisfied) {
+                Double distToCust = calculateDistanceToCustomer(candidateDest, lat, lng);
+                CandidateScore score = new CandidateScore(
+                        distToCust != null ? distToCust : Double.MAX_VALUE,
+                        uniqueSourceWarehouseIds.size(),
+                        totalTransferred,
+                        candidateDest.getId()
+                );
+
+                if (bestScore == null || score.compareTo(bestScore) < 0) {
+                    bestScore = score;
+                    bestPlan = InterWarehouseTransferPlan.builder()
+                            .destinationWarehouse(candidateDest)
+                            .directFulfillment(false)
+                            .feasible(true)
+                            .totalItemsToTransfer(totalTransferred)
+                            .referenceDistanceKm(distToCust)
+                            .destinationAvailableStock(usedFromDest)
+                            .transferItems(transferItems)
+                            .build();
+                }
+            }
+        }
+
+        if (bestPlan != null) {
+            return bestPlan;
+        }
+
+        return InterWarehouseTransferPlan.builder()
+                .feasible(false)
+                .build();
+    }
+
+    private List<Warehouse> sortWarehousesByProximity(List<Warehouse> warehouses, Double lat, Double lng) {
+        if (lat != null && lng != null) {
+            return warehouses.stream()
+                    .sorted(Comparator.comparingDouble((Warehouse w) -> {
+                        if (w.getLatitude() != null && w.getLongitude() != null) {
+                            return calculateDistance(lat, lng, w.getLatitudeAsDouble(), w.getLongitudeAsDouble());
+                        }
+                        return Double.MAX_VALUE;
+                    }).thenComparing(Warehouse::getId))
+                    .toList();
+        }
+        return warehouses.stream()
+                .sorted((w1, w2) -> {
+                    if (WarehouseStockLedgerService.MAIN_CODE.equals(w1.getCode())) return -1;
+                    if (WarehouseStockLedgerService.MAIN_CODE.equals(w2.getCode())) return 1;
+                    return w1.getId().compareTo(w2.getId());
+                })
+                .toList();
+    }
+
+    private Double calculateDistanceToCustomer(Warehouse w, Double lat, Double lng) {
+        if (lat != null && lng != null && w.getLatitude() != null && w.getLongitude() != null) {
+            return calculateDistance(lat, lng, w.getLatitudeAsDouble(), w.getLongitudeAsDouble());
+        }
+        return null;
+    }
+
+    private double calculateWarehouseToWarehouseDistance(Warehouse w1, Warehouse w2) {
+        if (w1.getLatitude() != null && w1.getLongitude() != null && w2.getLatitude() != null && w2.getLongitude() != null) {
+            return calculateDistance(w1.getLatitudeAsDouble(), w1.getLongitudeAsDouble(),
+                    w2.getLatitudeAsDouble(), w2.getLongitudeAsDouble());
+        }
+        return 0.0;
+    }
+
+    private int getEffectiveAvailable(Warehouse warehouse, Long variantId, Map<Long, Integer> stockMap) {
+        int avail = stockMap.getOrDefault(variantId, 0);
+        if (avail == 0 && WarehouseStockLedgerService.MAIN_CODE.equals(warehouse.getCode())) {
+            if (!warehouseStockRepository.existsByPhoneVariantId(variantId)) {
+                PhoneVariant pv = phoneVariantRepository.findById(variantId).orElse(null);
+                if (pv != null && pv.getStockQuantity() != null) {
+                    avail = pv.getStockQuantity();
+                }
+            }
+        }
+        return avail;
+    }
+
+    private static class CandidateScore implements Comparable<CandidateScore> {
+        final double distanceToCustomer;
+        final int sourceCount;
+        final int transferQuantity;
+        final Long destinationId;
+
+        CandidateScore(double distanceToCustomer, int sourceCount, int transferQuantity, Long destinationId) {
+            this.distanceToCustomer = distanceToCustomer;
+            this.sourceCount = sourceCount;
+            this.transferQuantity = transferQuantity;
+            this.destinationId = destinationId;
+        }
+
+        @Override
+        public int compareTo(CandidateScore other) {
+            int cmp = Double.compare(this.distanceToCustomer, other.distanceToCustomer);
+            if (cmp != 0) return cmp;
+            cmp = Integer.compare(this.sourceCount, other.sourceCount);
+            if (cmp != 0) return cmp;
+            cmp = Integer.compare(this.transferQuantity, other.transferQuantity);
+            if (cmp != 0) return cmp;
+            return Long.compare(this.destinationId, other.destinationId);
+        }
     }
 
     private void validateCoordinates(Double lat, Double lng) {

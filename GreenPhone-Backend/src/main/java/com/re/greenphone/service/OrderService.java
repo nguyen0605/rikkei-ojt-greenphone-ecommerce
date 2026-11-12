@@ -48,6 +48,7 @@ public class OrderService {
     private final SettingsService settingsService;
     private final InventoryStockHistoryService inventoryStockHistoryService;
     private final WarehouseRoutingService warehouseRoutingService;
+    private final WarehouseTransferService warehouseTransferService;
     private final jakarta.persistence.EntityManager entityManager;
     private final RedisTemplate<String, Object> redisTemplate;
 
@@ -146,27 +147,45 @@ public class OrderService {
             lockedVariants.add(variant);
         }
 
-        // 2. Route to the nearest active warehouse that has sufficient stock for ALL items
+        // 2. Route inventory: Direct fulfillment (Case 1) or Inter-warehouse transfer plan (Case 2)
         List<com.re.greenphone.dto.request.OrderItemRequirement> itemRequirements = sortedItems.stream()
                 .map(item -> new com.re.greenphone.dto.request.OrderItemRequirement(item.getPhoneVariantId(), item.getQuantity()))
                 .toList();
 
-        Warehouse routedWarehouse = warehouseRoutingService.routeWarehouseForOrder(
+        com.re.greenphone.dto.response.InterWarehouseTransferPlan transferPlan = warehouseRoutingService.routeInterWarehouseFulfillment(
                 request.getLatitude(),
                 request.getLongitude(),
                 itemRequirements
         );
+
+        if (!transferPlan.isFeasible()) {
+            throw new BadRequestException("Tổng tồn kho toàn hệ thống không đủ để đáp ứng đơn hàng");
+        }
+
+        Warehouse routedWarehouse = transferPlan.getDestinationWarehouse();
+        order.setFulfillmentWarehouse(routedWarehouse);
+        boolean isDirect = transferPlan.isDirectFulfillment();
+
+        if (!isDirect) {
+            order.setOrderStatus("WAITING_FOR_TRANSFER");
+        }
 
         // 3. Process items: decrement stock at routed warehouse and build order details
         for (int i = 0; i < sortedItems.size(); i++) {
             var itemReq = sortedItems.get(i);
             PhoneVariant variant = lockedVariants.get(i);
 
-            // Reduce stock at routed warehouse
+            // Giảm tồn kho:
+            // Case 1 (Direct): Trừ trực tiếp tại kho routedWarehouse
+            // Case 2 (Transfer): Giảm tổng aggregate PhoneVariant.stockQuantity và ghi log xuất hàng chờ gom
             if (variant.getStockQuantity() != null) {
                 int quantityBefore = variant.getStockQuantity();
                 variant.setStockQuantity(quantityBefore - itemReq.getQuantity());
-                inventoryStockHistoryService.recordAtWarehouse(variant, quantityBefore, -itemReq.getQuantity(), "EXPORT", "Đặt hàng", routedWarehouse.getId());
+                if (isDirect) {
+                    inventoryStockHistoryService.recordAtWarehouse(variant, quantityBefore, -itemReq.getQuantity(), "EXPORT", "Đặt hàng", routedWarehouse.getId());
+                } else {
+                    inventoryStockHistoryService.recordAggregateOnly(variant, quantityBefore, -itemReq.getQuantity(), "EXPORT", "Đặt hàng (chờ gom hàng liên kho)");
+                }
             }
 
             BigDecimal price = variant.getDiscountPrice() != null ? variant.getDiscountPrice() : variant.getPrice();
@@ -252,11 +271,19 @@ public class OrderService {
 
         order = orderRepository.save(order);
 
+        if (!isDirect) {
+            warehouseTransferService.createTransfersForOrder(order, transferPlan);
+        }
+
+        String initialOrderNote = isDirect
+                ? "Đơn hàng được khởi tạo thành công (" + order.getPaymentMethod() + ")"
+                : "Đơn hàng được khởi tạo thành công - Đang chờ điều chuyển hàng liên kho về " + routedWarehouse.getName() + " (" + order.getPaymentMethod() + ")";
+
         orderHistoryRepository.save(com.re.greenphone.entity.OrderHistory.builder()
                 .order(order)
                 .fromStatus(null)
                 .toStatus(order.getOrderStatus())
-                .note("Đơn hàng được khởi tạo thành công (" + order.getPaymentMethod() + ")")
+                .note(initialOrderNote)
                 .changedBy(user.getFullName() != null ? user.getFullName() : "CUSTOMER")
                 .build());
 
@@ -370,9 +397,11 @@ public class OrderService {
             throw new BadRequestException("Cannot cancel another user's order");
         }
 
-        if (!List.of("PENDING", "CONFIRMED").contains(order.getOrderStatus())) {
+        if (!List.of("PENDING", "CONFIRMED", "WAITING_FOR_TRANSFER").contains(order.getOrderStatus())) {
             throw new BadRequestException("Order cannot be cancelled at current status: " + order.getOrderStatus());
         }
+
+        boolean wasWaitingForTransfer = "WAITING_FOR_TRANSFER".equals(order.getOrderStatus());
 
         // Restore stock (pessimistic lock per variant — no double-restore with concurrent cancels)
         // Sort details by phoneVariantId to strictly prevent deadlocks.
@@ -384,18 +413,28 @@ public class OrderService {
         for (OrderDetail detail : sortedDetails) {
             PhoneVariant variant = detail.getPhoneVariant();
             if (variant.getStockQuantity() != null) {
-                PhoneVariant locked = phoneVariantRepository.findByIdWithLock(variant.getId())
-                        .orElse(variant);
-                entityManager.refresh(locked, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+                PhoneVariant locked = variant;
+                if (entityManager.contains(locked)) {
+                    entityManager.refresh(locked, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+                } else {
+                    locked = phoneVariantRepository.findByIdWithLock(locked.getId()).orElse(locked);
+                }
                 int quantityBefore = locked.getStockQuantity();
                 locked.setStockQuantity(quantityBefore + detail.getQuantity());
-                if (detail.getWarehouseId() == null) {
+                if (wasWaitingForTransfer) {
+                    inventoryStockHistoryService.recordAggregateOnly(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Hủy đơn hàng chờ điều chuyển");
+                } else if (detail.getWarehouseId() == null) {
                     inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Hủy đơn hàng");
                 } else {
                     inventoryStockHistoryService.recordAtWarehouse(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Hủy đơn hàng", detail.getWarehouseId());
                 }
                 phoneVariantRepository.save(locked);
             }
+        }
+
+        if (wasWaitingForTransfer) {
+            String cancelReason = request != null ? request.getReason() : null;
+            warehouseTransferService.cancelTransfersForOrder(order.getId(), cancelReason);
         }
 
         // Restore the promotion so the voucher can be reused (only if not expired)

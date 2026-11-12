@@ -14,7 +14,12 @@ function getCurrentUserId(): string {
     const raw = localStorage.getItem('greenphone.user');
     if (raw) {
       const u = JSON.parse(raw);
-      if (u?.id) return String(u.id);
+      if (u?.id !== undefined && u?.id !== null && String(u.id).trim() !== '') {
+        return String(u.id);
+      }
+      if (u?.email && typeof u.email === 'string' && u.email.trim() !== '') {
+        return u.email.trim();
+      }
     }
   } catch {
     // ignore parse error
@@ -27,7 +32,12 @@ function getStoredAddresses(userId: string): AddressItem[] {
     const raw = localStorage.getItem(`${ADDRESS_STORAGE_PREFIX}${userId}`);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        // Lọc các bản ghi hợp lệ để tránh dữ liệu rác làm hỏng ứng dụng
+        return parsed.filter(
+          (item) => item && typeof item === 'object' && item.id && item.streetAddress
+        );
+      }
     }
   } catch {
     // ignore
@@ -43,9 +53,165 @@ function saveStoredAddresses(userId: string, addresses: AddressItem[]): void {
   }
 }
 
-export function formatFullAddress(item: Pick<AddressItem, 'streetAddress' | 'ward' | 'district' | 'province'>): string {
-  const parts = [item.streetAddress, item.ward, item.district, item.province].filter(Boolean);
-  return parts.join(', ');
+/**
+ * Chuẩn hóa chuỗi (loại bỏ khoảng trắng thừa, đưa về chữ thường không phân biệt hoa thường)
+ * để kiểm tra trùng lặp và so khớp địa chỉ
+ */
+export function normalizeString(str?: string | null): string {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Kiểm tra xem địa chỉ nhập vào có bị trùng lặp với danh sách địa chỉ hiện có hay không
+ * So khớp toàn bộ cụm địa chỉ (province, district, ward, streetAddress) và số điện thoại nhận hàng (receiverPhone).
+ * Có hỗ trợ excludeId để loại trừ chính bản ghi đang chỉnh sửa.
+ */
+export function checkDuplicateAddress(
+  candidate: Pick<AddressRequest, 'receiverPhone' | 'province' | 'district' | 'ward' | 'streetAddress'>,
+  existingList: AddressItem[],
+  excludeId?: string | number | null
+): boolean {
+  const normPhone = (candidate.receiverPhone || '').replace(/\D/g, '').trim();
+  const normProv = normalizeString(candidate.province);
+  const normDist = normalizeString(candidate.district);
+  const normWard = normalizeString(candidate.ward);
+  const normStreet = normalizeString(candidate.streetAddress);
+
+  return existingList.some((item) => {
+    if (excludeId !== undefined && excludeId !== null && String(item.id) === String(excludeId)) {
+      return false; // Loại trừ bản ghi đang chỉnh sửa
+    }
+
+    const itemPhone = (item.receiverPhone || '').replace(/\D/g, '').trim();
+    if (itemPhone !== normPhone) {
+      return false;
+    }
+
+    const itemProv = normalizeString(item.province);
+    const itemDist = normalizeString(item.district);
+    const itemWard = normalizeString(item.ward);
+    const itemStreet = normalizeString(item.streetAddress);
+
+    // Trùng khớp cả 4 thành phần địa chỉ và số điện thoại
+    const isDirectMatch =
+      itemProv === normProv &&
+      itemDist === normDist &&
+      itemWard === normWard &&
+      itemStreet === normStreet;
+
+    if (isDirectMatch) return true;
+
+    // Ngoài ra, kiểm tra trùng theo định dạng địa chỉ đầy đủ (formatFullAddress)
+    const candFull = normalizeString(formatFullAddress(candidate));
+    const itemFull = normalizeString(formatFullAddress(item));
+    return candFull === itemFull;
+  });
+}
+
+function normAddress(str: string): string {
+  return normalizeString(str);
+}
+
+export function formatFullAddress(
+  item: Pick<AddressItem, 'streetAddress' | 'ward' | 'district' | 'province'>
+): string {
+  const street = (item.streetAddress || '').trim();
+  const ward = (item.ward || '').trim();
+  const district = (item.district || '').trim();
+  const province = (item.province || '').trim();
+
+  if (!street) {
+    return [ward, district, province].filter(Boolean).join(', ');
+  }
+
+  const normStreet = normAddress(street);
+  const parts: string[] = [street];
+
+  if (ward) {
+    const normWard = normAddress(ward);
+    const cleanWard = normWard.replace(/^(phuong|xa|thi tran|p\.|x\.)\s*/i, '').trim();
+    const isAlreadyPresent =
+      normStreet.includes(normWard) ||
+      (cleanWard && (normStreet.includes(`, ${cleanWard}`) || normStreet.includes(`p.${cleanWard}`) || normStreet.includes(`phuong ${cleanWard}`)));
+    if (!isAlreadyPresent) {
+      parts.push(ward);
+    }
+  }
+
+  if (district) {
+    const normDist = normAddress(district);
+    const cleanDistrict = normDist.replace(/^(quan|huyen|thi xa|thanh pho|tp\.|q\.|h\.)\s*/i, '').trim();
+    const isAlreadyPresent =
+      normStreet.includes(normDist) ||
+      (cleanDistrict && (normStreet.includes(`, ${cleanDistrict}`) || normStreet.includes(`quan ${cleanDistrict}`) || normStreet.includes(`tp.${cleanDistrict}`) || normStreet.includes(`q.${cleanDistrict}`)));
+    if (!isAlreadyPresent) {
+      parts.push(district);
+    }
+  }
+
+  if (province) {
+    const normProv = normAddress(province);
+    const cleanProvince = normProv.replace(/^(thanh pho|tinh|tp\.)\s*/i, '').trim();
+    const isAlreadyPresent =
+      normStreet.includes(normProv) ||
+      (cleanProvince && (normStreet.includes(`, ${cleanProvince}`) || normStreet.includes(`tp ${cleanProvince}`) || normStreet.includes(`tinh ${cleanProvince}`)));
+    if (!isAlreadyPresent) {
+      parts.push(province);
+    }
+  }
+
+  return parts.filter(Boolean).join(', ');
+}
+
+/**
+ * Tạo dấu vân tay nhận diện địa chỉ để phát hiện trùng lặp
+ * Dựa trên thông tin người nhận và chuỗi địa chỉ đã chuẩn hóa
+ */
+export function getAddressFingerprint(
+  item: Pick<AddressItem, 'receiverName' | 'receiverPhone' | 'streetAddress' | 'ward' | 'district' | 'province'>
+): string {
+  const normName = normAddress(item.receiverName || '');
+  const normPhone = (item.receiverPhone || '').replace(/\D/g, '');
+  const full = formatFullAddress(item);
+  const normAddr = normAddress(full);
+  return `${normName}:::${normPhone}:::${normAddr}`;
+}
+
+/**
+ * Loại bỏ các bản ghi địa chỉ trùng lặp và hợp nhất thông tin ghim tọa độ
+ */
+export function deduplicateAddresses(list: AddressItem[]): AddressItem[] {
+  const seen = new Map<string, AddressItem>();
+
+  for (const item of list) {
+    const fp = getAddressFingerprint(item);
+    if (!seen.has(fp)) {
+      seen.set(fp, item);
+    } else {
+      const existing = seen.get(fp)!;
+      const hasCoords = typeof item.latitude === 'number' && Number.isFinite(item.latitude);
+      const existingHasCoords = typeof existing.latitude === 'number' && Number.isFinite(existing.latitude);
+
+      const merged: AddressItem = {
+        ...existing,
+        // Ưu tiên bản ghi đã có tọa độ ghim hợp lệ
+        latitude: existingHasCoords ? existing.latitude : hasCoords ? item.latitude : undefined,
+        longitude: existingHasCoords ? existing.longitude : hasCoords ? item.longitude : undefined,
+        isDefault: existing.isDefault || item.isDefault,
+        note: existing.note || item.note,
+      };
+      seen.set(fp, merged);
+    }
+  }
+
+  return Array.from(seen.values());
 }
 
 export const userService = {
@@ -155,6 +321,13 @@ export const userService = {
       }
     }
 
+    // Tự động làm sạch các bản ghi địa chỉ trùng lặp nếu có
+    const uniqueAddresses = deduplicateAddresses(addresses);
+    if (uniqueAddresses.length !== addresses.length) {
+      addresses = uniqueAddresses;
+      saveStoredAddresses(userId, addresses);
+    }
+
     return addresses;
   },
 
@@ -164,6 +337,12 @@ export const userService = {
   createAddress: async (data: AddressRequest): Promise<AddressItem> => {
     const userId = getCurrentUserId();
     const addresses = getStoredAddresses(userId);
+
+    // Kiểm tra trùng lặp với địa chỉ đã có của cùng người nhận
+    const isDuplicate = checkDuplicateAddress(data, addresses);
+    if (isDuplicate) {
+      throw new Error('Địa chỉ này đã tồn tại trong sổ địa chỉ của bạn.');
+    }
 
     const isFirstAddress = addresses.length === 0;
     const shouldBeDefault = isFirstAddress || !!data.isDefault;
@@ -176,6 +355,15 @@ export const userService = {
       district: data.district?.trim(),
       ward: data.ward?.trim(),
       streetAddress: data.streetAddress.trim(),
+      label: data.label || 'HOME',
+      latitude:
+        typeof data.latitude === 'number' && Number.isFinite(data.latitude)
+          ? data.latitude
+          : undefined,
+      longitude:
+        typeof data.longitude === 'number' && Number.isFinite(data.longitude)
+          ? data.longitude
+          : undefined,
       note: data.note?.trim(),
       isDefault: shouldBeDefault,
       createdAt: new Date().toISOString(),
@@ -187,6 +375,14 @@ export const userService = {
         newAddress,
         ...addresses.map((a) => ({ ...a, isDefault: false })),
       ];
+    } else {
+      updatedList = [...addresses, newAddress];
+    }
+
+    // Luôn lưu dữ liệu local trước để bảo toàn thông tin khách hàng
+    saveStoredAddresses(userId, updatedList);
+
+    if (shouldBeDefault) {
       // Đồng bộ địa chỉ mặc định về backend USERS.ADDRESS
       try {
         const fullAddr = formatFullAddress(newAddress);
@@ -196,13 +392,10 @@ export const userService = {
           address: fullAddr,
         });
       } catch {
-        // ignore profile sync failure
+        // Bỏ qua lỗi đồng bộ Backend profile, không làm mất địa chỉ đã lưu
       }
-    } else {
-      updatedList = [...addresses, newAddress];
     }
 
-    saveStoredAddresses(userId, updatedList);
     return newAddress;
   },
 
@@ -218,6 +411,12 @@ export const userService = {
       throw new Error('Địa chỉ không tồn tại hoặc đã bị xóa.');
     }
 
+    // Kiểm tra nếu địa chỉ sau khi sửa bị trùng với một địa chỉ khác trong sổ (loại trừ chính nó)
+    const isDuplicateOther = checkDuplicateAddress(data, addresses, id);
+    if (isDuplicateOther) {
+      throw new Error('Địa chỉ này đã trùng với một địa chỉ khác trong sổ địa chỉ của bạn.');
+    }
+
     const currentItem = addresses[existingIndex];
     const willBeDefault = data.isDefault !== undefined ? !!data.isDefault : currentItem.isDefault;
 
@@ -229,6 +428,15 @@ export const userService = {
       district: data.district?.trim(),
       ward: data.ward?.trim(),
       streetAddress: data.streetAddress.trim(),
+      label: data.label !== undefined ? data.label : currentItem.label,
+      latitude:
+        typeof data.latitude === 'number' && Number.isFinite(data.latitude)
+          ? data.latitude
+          : currentItem.latitude,
+      longitude:
+        typeof data.longitude === 'number' && Number.isFinite(data.longitude)
+          ? data.longitude
+          : currentItem.longitude,
       note: data.note?.trim(),
       isDefault: willBeDefault,
     };
@@ -239,17 +447,6 @@ export const userService = {
         if (String(a.id) === String(id)) return updatedItem;
         return { ...a, isDefault: false };
       });
-      // Đồng bộ địa chỉ mặc định về backend USERS.ADDRESS
-      try {
-        const fullAddr = formatFullAddress(updatedItem);
-        await put<UserDTO>('/users/profile', {
-          fullName: updatedItem.receiverName,
-          phone: updatedItem.receiverPhone,
-          address: fullAddr,
-        });
-      } catch {
-        // ignore
-      }
     } else {
       // Nếu địa chỉ này đang là mặc định duy nhất mà bỏ tick mặc định -> không cho phép
       const hasOtherDefault = addresses.some(
@@ -262,7 +459,23 @@ export const userService = {
       updatedList = addresses.map((a) => (String(a.id) === String(id) ? updatedItem : a));
     }
 
+    // Luôn lưu dữ liệu local trước để bảo toàn thông tin khách hàng
     saveStoredAddresses(userId, updatedList);
+
+    if (willBeDefault) {
+      // Đồng bộ địa chỉ mặc định về backend USERS.ADDRESS
+      try {
+        const fullAddr = formatFullAddress(updatedItem);
+        await put<UserDTO>('/users/profile', {
+          fullName: updatedItem.receiverName,
+          phone: updatedItem.receiverPhone,
+          address: fullAddr,
+        });
+      } catch {
+        // Bỏ qua lỗi đồng bộ Backend profile, không làm mất địa chỉ đã sửa
+      }
+    }
+
     return updatedItem;
   },
 
@@ -291,6 +504,12 @@ export const userService = {
         ...a,
         isDefault: idx === 0,
       }));
+    }
+
+    // Luôn lưu dữ liệu local trước
+    saveStoredAddresses(userId, remaining);
+
+    if (target.isDefault && remaining.length > 0) {
       // Đồng bộ địa chỉ mặc định mới về backend
       try {
         const newDefault = remaining[0];
@@ -301,11 +520,9 @@ export const userService = {
           address: fullAddr,
         });
       } catch {
-        // ignore
+        // Bỏ qua lỗi đồng bộ Backend profile
       }
     }
-
-    saveStoredAddresses(userId, remaining);
   },
 
   /**

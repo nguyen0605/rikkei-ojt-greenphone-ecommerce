@@ -228,5 +228,188 @@ describe('CheckoutPage Buy Now isolation', () => {
     expect(store.getState().cart.items[0].variantId).toBe(2001);
     expect(store.getState().checkout.buyNowItem).toBeUndefined();
   });
+
+  it('truyền tọa độ latitude và longitude hợp lệ từ bản đồ vào orderService.create', async () => {
+    vi.mocked(orderService.create).mockResolvedValue({
+      id: 888,
+      userId: 7,
+      userName: 'Nguyen Van A',
+      receiverName: 'Nguyen Van A',
+      receiverPhone: '0987654321',
+      shippingAddress: '10 Duy Tân, Cầu Giấy, Hà Nội',
+      totalAmount: 28000000,
+      discountAmount: 0,
+      finalAmount: 28000000,
+      orderStatus: 'PENDING',
+      paymentMethod: 'COD',
+      paymentStatus: 'UNPAID',
+      note: '',
+      promotionCode: '',
+      createdAt: '2026-11-11T01:00:00Z',
+      orderDetails: [],
+    });
+
+    const store = configureStore({
+      reducer: {
+        auth: authReducer,
+        cart: cartReducer,
+        checkout: checkoutReducer,
+        settings: settingsReducer,
+      },
+      preloadedState: {
+        auth: {
+          user: { id: 7, fullName: 'Nguyen Van A', email: 'a@test.com', role: 'CUSTOMER' as const },
+          token: 'jwt',
+          isAuthenticated: true,
+          loading: false,
+          error: null,
+          errorCode: null,
+          rememberedEmail: null,
+        },
+      },
+    });
+
+    store.dispatch(startBuyNow(buyNowIphoneItem));
+    store.dispatch(
+      updateShipping({
+        fullName: 'Nguyen Van A',
+        phone: '0987654321',
+        address: '10 Duy Tân, Cầu Giấy, Hà Nội',
+        latitude: 21.0285,
+        longitude: 105.8542,
+      }),
+    );
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <Provider store={store}>
+        <QueryClientProvider client={queryClient}>
+          <App>
+            <MemoryRouter initialEntries={[ROUTES.CHECKOUT]}>
+              <Routes>
+                <Route path={ROUTES.CHECKOUT} element={<CheckoutPage />} />
+                <Route path="/thanh-toan/hoan-tat" element={<div data-testid="success-page">Done</div>} />
+              </Routes>
+            </MemoryRouter>
+          </App>
+        </QueryClientProvider>
+      </Provider>,
+    );
+
+    // Sang Bước 2 & đặt hàng
+    fireEvent.click(screen.getByRole('button', { name: /tiếp tục xác nhận đơn hàng/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /đặt hàng \(cod\)/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /đặt hàng \(cod\)/i }));
+
+    await waitFor(() => {
+      expect(orderService.create).toHaveBeenCalledTimes(1);
+    });
+
+    expect(orderService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        latitude: 21.0285,
+        longitude: 105.8542,
+        shippingAddress: '10 Duy Tân, Cầu Giấy, Hà Nội',
+      }),
+    );
+  });
+
+  it('loại bỏ tọa độ không hợp lệ (ngoài phạm vi [-90, 90], [-180, 180]) trước khi gọi API', async () => {
+    vi.mocked(orderService.create).mockResolvedValue({
+      id: 889,
+      userId: 7,
+      userName: 'Nguyen Van A',
+      receiverName: 'Nguyen Van A',
+      receiverPhone: '0987654321',
+      shippingAddress: 'Tọa độ lỗi',
+      totalAmount: 28000000,
+      discountAmount: 0,
+      finalAmount: 28000000,
+      orderStatus: 'PENDING',
+      paymentMethod: 'COD',
+      paymentStatus: 'UNPAID',
+      note: '',
+      promotionCode: '',
+      createdAt: '2026-11-11T01:00:00Z',
+      orderDetails: [],
+    });
+
+    const store = configureStore({
+      reducer: {
+        auth: authReducer,
+        cart: cartReducer,
+        checkout: checkoutReducer,
+        settings: settingsReducer,
+      },
+      preloadedState: {
+        auth: {
+          user: { id: 7, fullName: 'Nguyen Van A', email: 'a@test.com', role: 'CUSTOMER' as const },
+          token: 'jwt',
+          isAuthenticated: true,
+          loading: false,
+          error: null,
+          errorCode: null,
+          rememberedEmail: null,
+        },
+      },
+    });
+
+    store.dispatch(startBuyNow(buyNowIphoneItem));
+    store.dispatch(
+      updateShipping({
+        fullName: 'Nguyen Van A',
+        phone: '0987654321',
+        address: 'Tọa độ lỗi',
+        latitude: 199.99,
+        longitude: 299.99,
+      }),
+    );
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <Provider store={store}>
+        <QueryClientProvider client={queryClient}>
+          <App>
+            <MemoryRouter initialEntries={[ROUTES.CHECKOUT]}>
+              <Routes>
+                <Route path={ROUTES.CHECKOUT} element={<CheckoutPage />} />
+                <Route path="/thanh-toan/hoan-tat" element={<div data-testid="success-page">Done</div>} />
+              </Routes>
+            </MemoryRouter>
+          </App>
+        </QueryClientProvider>
+      </Provider>,
+    );
+
+    // Sang Bước 2 & đặt hàng
+    fireEvent.click(screen.getByRole('button', { name: /tiếp tục xác nhận đơn hàng/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /đặt hàng \(cod\)/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /đặt hàng \(cod\)/i }));
+
+    await waitFor(() => {
+      expect(orderService.create).toHaveBeenCalledTimes(1);
+    });
+
+    expect(orderService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        latitude: undefined,
+        longitude: undefined,
+      }),
+    );
+  });
 });
 

@@ -36,6 +36,7 @@ public class RefundService {
     private final RefundTransactionRepository refundTransactionRepository;
     private final RefundMapper refundMapper;
     private final EmailService emailService;
+    private final WarehouseTransferService warehouseTransferService;
     private final jakarta.persistence.EntityManager entityManager;
 
     /**
@@ -47,7 +48,7 @@ public class RefundService {
         Long currentUserId = SecurityUtils.getCurrentUserId();
         String currentUserRole = SecurityUtils.getCurrentUserRole();
 
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
 
         // 1. Chống IDOR: Khách chỉ được yêu cầu cho đơn của mình; Admin có quyền hỗ trợ
@@ -206,6 +207,8 @@ public class RefundService {
     // ==========================================
 
     private void restoreStockForOrder(Order order) {
+        boolean wasWaitingForTransfer = "WAITING_FOR_TRANSFER".equalsIgnoreCase(order.getOrderStatus());
+
         // Sắp xếp variantId tăng dần để triệt tiêu Deadlock
         List<OrderDetail> sortedDetails = order.getOrderDetails().stream()
                 .filter(d -> d.getPhoneVariant() != null)
@@ -215,18 +218,27 @@ public class RefundService {
         for (OrderDetail detail : sortedDetails) {
             PhoneVariant variant = detail.getPhoneVariant();
             if (variant.getStockQuantity() != null) {
-                PhoneVariant locked = phoneVariantRepository.findByIdWithLock(variant.getId())
-                        .orElse(variant);
-                entityManager.refresh(locked, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+                PhoneVariant locked = variant;
+                if (entityManager.contains(locked)) {
+                    entityManager.refresh(locked, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+                } else {
+                    locked = phoneVariantRepository.findByIdWithLock(locked.getId()).orElse(locked);
+                }
                 int quantityBefore = locked.getStockQuantity();
                 locked.setStockQuantity(quantityBefore + detail.getQuantity());
-                if (detail.getWarehouseId() == null) {
+                if (wasWaitingForTransfer) {
+                    inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Hoàn tiền đơn hàng chờ điều chuyển #" + order.getId());
+                } else if (detail.getWarehouseId() == null) {
                     inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Hoàn tiền đơn hàng #" + order.getId());
                 } else {
                     inventoryStockHistoryService.recordAtWarehouse(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Hoàn tiền đơn hàng #" + order.getId(), detail.getWarehouseId());
                 }
                 phoneVariantRepository.save(locked);
             }
+        }
+
+        if (wasWaitingForTransfer) {
+            warehouseTransferService.cancelTransfersForOrder(order.getId(), "Hoàn tiền đơn hàng #" + order.getId());
         }
     }
 

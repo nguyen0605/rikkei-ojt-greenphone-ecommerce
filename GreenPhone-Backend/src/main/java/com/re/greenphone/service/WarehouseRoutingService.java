@@ -39,5 +39,15 @@ public interface WarehouseRoutingService {
      * @return Selected Warehouse entity
      */
     Warehouse routeWarehouseForOrder(Double lat, Double lng, List<OrderItemRequirement> items);
+
+    /**
+     * Lập kế hoạch gom đơn và điều chuyển hàng liên kho (INV-08 Phương án B).
+     *
+     * @param lat Vĩ độ giao hàng (nullable)
+     * @param lng Kinh độ giao hàng (nullable)
+     * @param items Danh sách sản phẩm và số lượng yêu cầu
+     * @return Kế hoạch điều chuyển chi tiết (InterWarehouseTransferPlan)
+     */
+    com.re.greenphone.dto.response.InterWarehouseTransferPlan routeInterWarehouseFulfillment(Double lat, Double lng, List<OrderItemRequirement> items);
 }
 
