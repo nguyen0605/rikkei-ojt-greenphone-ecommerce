@@ -187,4 +187,3 @@ export default function WarrantyCard({ warranty }: WarrantyCardProps) {
     </article>
   );
 }
-

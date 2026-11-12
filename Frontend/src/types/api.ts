@@ -254,6 +254,8 @@ export interface OrderRequest {
   note: string;
   userPromotionId: number | null;
   buyNow?: boolean;
+  latitude?: number;
+  longitude?: number;
   items: OrderItemRequest[];
 }
 

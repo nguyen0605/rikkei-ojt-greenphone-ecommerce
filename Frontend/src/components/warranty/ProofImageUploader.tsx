@@ -146,4 +146,3 @@ export const ProofImageUploader: React.FC<ProofImageUploaderProps> = ({
 };
 
 export default ProofImageUploader;
-

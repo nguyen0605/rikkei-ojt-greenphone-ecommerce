@@ -44,6 +44,8 @@ class OrderServiceTest {
     @Mock private EmailService emailService;
     @Mock private SettingsService settingsService;
     @Mock private InventoryStockHistoryService inventoryStockHistoryService;
+    @Mock private WarehouseRoutingService warehouseRoutingService;
+    @Mock private WarehouseTransferService warehouseTransferService;
     @Mock private jakarta.persistence.EntityManager entityManager;
     @Mock private RedisTemplate<String, Object> redisTemplate;
     @Mock private ValueOperations<String, Object> valueOperations;
@@ -56,7 +58,21 @@ class OrderServiceTest {
     private static final Long USER_ID = 1L;
     private static final String USER_EMAIL = "test@test.com";
 
-    @BeforeEach void setUp() { securityUtilsMock = mockStatic(SecurityUtils.class); }
+    @BeforeEach void setUp() {
+        securityUtilsMock = mockStatic(SecurityUtils.class);
+        Warehouse mockWarehouse = new Warehouse();
+        mockWarehouse.setId(1L);
+        mockWarehouse.setCode("WH-HN-MAIN");
+        mockWarehouse.setName("Kho Tổng Hà Nội");
+        lenient().when(warehouseRoutingService.routeWarehouseForOrder(any(), any(), any())).thenReturn(mockWarehouse);
+
+        com.re.greenphone.dto.response.InterWarehouseTransferPlan mockPlan = com.re.greenphone.dto.response.InterWarehouseTransferPlan.builder()
+                .destinationWarehouse(mockWarehouse)
+                .directFulfillment(true)
+                .feasible(true)
+                .build();
+        lenient().when(warehouseRoutingService.routeInterWarehouseFulfillment(any(), any(), any())).thenReturn(mockPlan);
+    }
     @AfterEach void tearDown() { securityUtilsMock.close(); }
 
     private User createUser() {
@@ -100,7 +116,7 @@ class OrderServiceTest {
         orderService.createOrder(req);
 
         assertEquals(8, v.getStockQuantity());
-        verify(inventoryStockHistoryService).record(eq(v), eq(10), eq(-2), eq("EXPORT"), anyString());
+        verify(inventoryStockHistoryService).recordAtWarehouse(eq(v), eq(10), eq(-2), eq("EXPORT"), anyString(), eq(1L));
         verify(orderRepository).save(any());
         verify(emailService).sendOrderConfirmation(eq(USER_EMAIL), anyString());
     }
@@ -498,5 +514,64 @@ class OrderServiceTest {
 
         assertThrows(BadRequestException.class, () -> orderService.createOrder(req));
         verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("INV-08: Đơn hàng phân mảnh tự động chuyển trạng thái WAITING_FOR_TRANSFER và gọi createTransfersForOrder")
+    void createOrder_FragmentedStock_SetsWaitingForTransferAndCreatesTransfers() {
+        stubUser();
+        PhoneVariant v = createVariant(100L, new BigDecimal("1000.00"), null, 10);
+        OrderRequest req = createOrderReq(List.of(createItemReq(100L, 2)), null);
+
+        Warehouse destWh = new Warehouse();
+        destWh.setId(2L);
+        destWh.setName("Kho TP.HCM");
+
+        com.re.greenphone.dto.response.InterWarehouseTransferPlan transferPlan = com.re.greenphone.dto.response.InterWarehouseTransferPlan.builder()
+                .destinationWarehouse(destWh)
+                .directFulfillment(false)
+                .feasible(true)
+                .totalItemsToTransfer(2)
+                .build();
+
+        when(warehouseRoutingService.routeInterWarehouseFulfillment(any(), any(), any())).thenReturn(transferPlan);
+        when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(v));
+        when(orderRepository.save(any())).thenAnswer(inv -> {
+            Order o = inv.getArgument(0);
+            o.setId(999L);
+            return o;
+        });
+        when(orderMapper.toDto(any())).thenAnswer(inv -> {
+            Order o = inv.getArgument(0);
+            return OrderDTO.builder().id(o.getId()).orderStatus(o.getOrderStatus()).build();
+        });
+
+        OrderDTO result = orderService.createOrder(req);
+
+        assertNotNull(result);
+        assertEquals("WAITING_FOR_TRANSFER", result.getOrderStatus());
+        verify(warehouseTransferService).createTransfersForOrder(any(Order.class), eq(transferPlan));
+    }
+
+    @Test
+    @DisplayName("INV-08: Hủy đơn hàng đang WAITING_FOR_TRANSFER gọi cancelTransfersForOrder")
+    void cancelOrder_WaitingForTransfer_CallsCancelTransfersForOrder() {
+        stubUser();
+        Order o = new Order();
+        o.setId(888L);
+        o.setOrderStatus("WAITING_FOR_TRANSFER");
+        User u = new User();
+        u.setId(USER_ID);
+        o.setUser(u);
+        o.setOrderDetails(new java.util.ArrayList<>());
+
+        when(orderRepository.findByIdForUpdate(888L)).thenReturn(Optional.of(o));
+        when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(orderMapper.toDto(any())).thenReturn(OrderDTO.builder().id(888L).orderStatus("CANCELLED").build());
+
+        OrderDTO result = orderService.cancelOrder(888L, "Khách đổi ý");
+
+        assertEquals("CANCELLED", result.getOrderStatus());
+        verify(warehouseTransferService).cancelTransfersForOrder(eq(888L), eq("Khách đổi ý"));
     }
 }

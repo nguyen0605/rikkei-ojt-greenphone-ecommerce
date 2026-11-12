@@ -64,6 +64,9 @@ class RefundServiceTest {
     private EmailService emailService;
 
     @Mock
+    private WarehouseTransferService warehouseTransferService;
+
+    @Mock
     private jakarta.persistence.EntityManager entityManager;
 
     @InjectMocks
@@ -125,7 +128,7 @@ class RefundServiceTest {
             secMock.when(SecurityUtils::getCurrentUserId).thenReturn(10L);
             secMock.when(SecurityUtils::getCurrentUserRole).thenReturn("ROLE_CUSTOMER");
 
-            when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+            when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
             when(refundTransactionRepository.findByOrderId(1L)).thenReturn(Optional.empty());
             when(paymentRepository.findByOrderIdOrderByIdAsc(1L)).thenReturn(List.of(payment));
             when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(variant));
@@ -165,7 +168,7 @@ class RefundServiceTest {
             secMock.when(SecurityUtils::getCurrentUserId).thenReturn(10L);
             secMock.when(SecurityUtils::getCurrentUserRole).thenReturn("ROLE_CUSTOMER");
 
-            when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+            when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
             when(refundTransactionRepository.findByOrderId(1L))
                     .thenReturn(Optional.of(RefundTransaction.builder().status("REQUESTED").build()));
 
@@ -185,7 +188,7 @@ class RefundServiceTest {
             secMock.when(SecurityUtils::getCurrentUserRole).thenReturn("ROLE_CUSTOMER");
 
             order.setPaymentStatus("UNPAID");
-            when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+            when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
 
             CreateRefundRequest request = CreateRefundRequest.builder().reason("Lý do").build();
 
@@ -202,7 +205,7 @@ class RefundServiceTest {
             secMock.when(SecurityUtils::getCurrentUserId).thenReturn(999L);
             secMock.when(SecurityUtils::getCurrentUserRole).thenReturn("ROLE_CUSTOMER");
 
-            when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+            when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
 
             CreateRefundRequest request = CreateRefundRequest.builder().reason("Lý do").build();
 
@@ -220,7 +223,7 @@ class RefundServiceTest {
             secMock.when(SecurityUtils::getCurrentUserRole).thenReturn("ROLE_CUSTOMER");
 
             order.setOrderStatus("CANCELLED");
-            when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+            when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
             when(refundTransactionRepository.findByOrderId(1L)).thenReturn(Optional.empty());
             when(paymentRepository.findByOrderIdOrderByIdAsc(1L)).thenReturn(List.of(payment));
             when(refundTransactionRepository.save(any(RefundTransaction.class)))
@@ -235,6 +238,47 @@ class RefundServiceTest {
             // Kiểm tra: Tuyệt đối không gọi khóa PhoneVariant hay cộng kho
             verify(phoneVariantRepository, never()).findByIdWithLock(anyLong());
             verify(inventoryStockHistoryService, never()).record(any(), anyInt(), anyInt(), anyString(), anyString());
+        }
+    }
+
+    @Test
+    @DisplayName("FINDING-REFUND-01: Hoàn tiền đơn WAITING_FOR_TRANSFER hủy transfers và không tạo tồn kho ảo tại kho đích")
+    void requestRefund_waitingForTransfer_cancelsTransfersAndRestoresAggregateStock() {
+        try (MockedStatic<SecurityUtils> secMock = mockStatic(SecurityUtils.class)) {
+            secMock.when(SecurityUtils::getCurrentUserId).thenReturn(10L);
+            secMock.when(SecurityUtils::getCurrentUserRole).thenReturn("ROLE_CUSTOMER");
+
+            order.setOrderStatus("WAITING_FOR_TRANSFER");
+            order.getOrderDetails().get(0).setWarehouseId(2L); // Gán kho đích
+
+            when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
+            when(refundTransactionRepository.findByOrderId(1L)).thenReturn(Optional.empty());
+            when(paymentRepository.findByOrderIdOrderByIdAsc(1L)).thenReturn(List.of(payment));
+            when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(variant));
+            when(refundTransactionRepository.save(any(RefundTransaction.class)))
+                    .thenAnswer(inv -> inv.getArgument(0));
+            when(refundMapper.toDto(any(RefundTransaction.class)))
+                    .thenReturn(RefundDTO.builder().orderId(1L).status("REQUESTED").build());
+
+            CreateRefundRequest request = CreateRefundRequest.builder()
+                    .reason("Đổi ý khi đang chờ gom hàng")
+                    .bankName("MBBank")
+                    .bankAccount("0987654321")
+                    .accountHolder("NGUYEN VAN A")
+                    .build();
+
+            RefundDTO res = refundService.requestRefund(1L, request);
+
+            assertThat(res).isNotNull();
+            assertThat(order.getOrderStatus()).isEqualTo("CANCELLED");
+            assertThat(variant.getStockQuantity()).isEqualTo(12);
+
+            // BẮT BUỘC: Không được gọi recordAtWarehouse để ngăn chặn cộng tồn kho ảo tại kho đích
+            verify(inventoryStockHistoryService, never()).recordAtWarehouse(any(), anyInt(), anyInt(), anyString(), anyString(), anyLong());
+            // Chỉ ghi log hoàn tiền tổng thể
+            verify(inventoryStockHistoryService).record(eq(variant), eq(10), eq(2), eq("IMPORT"), contains("chờ điều chuyển"));
+            // BẮT BUỘC: Hủy các phiếu điều chuyển liên kho
+            verify(warehouseTransferService).cancelTransfersForOrder(eq(1L), contains("Hoàn tiền"));
         }
     }
 

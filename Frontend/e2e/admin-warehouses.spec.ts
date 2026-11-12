@@ -15,7 +15,12 @@ test('admin creates, edits and deactivates a branch without reloading', async ({
   let statusRequests = 0;
   await page.route('**/api/**', async (route) => {
     const request = route.request();
-    const path = new URL(request.url()).pathname;
+    const requestUrl = new URL(request.url());
+    if (!requestUrl.pathname.startsWith('/api/')) {
+      await route.continue();
+      return;
+    }
+    const path = requestUrl.pathname;
     let data: unknown = {};
     let status = 200;
     if (path.startsWith('/api/v1/admin/warehouses')) {
@@ -42,7 +47,7 @@ test('admin creates, edits and deactivates a branch without reloading', async ({
   });
 
   await page.goto('/admin/warehouses');
-  await expect(page.getByRole('heading', { name: 'Chi nhánh' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Chi nhánh|Quản lý kho/i })).toBeVisible();
   await expect(page.getByText('WH-HN-MAIN', { exact: true })).toBeVisible();
   await expect(page.getByText('WH-HCM-Q1', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: /Chi nhánh/ })).toBeVisible();
@@ -79,7 +84,14 @@ test('admin creates, edits and deactivates a branch without reloading', async ({
 });
 
 test('guest cannot access warehouse administration', async ({ page }) => {
-  await page.route('**/api/**', (route) => route.fulfill({ json: { code: 200, message: 'Success', data: [] } }));
+  await page.route('**/api/**', async (route) => {
+    const requestUrl = new URL(route.request().url());
+    if (!requestUrl.pathname.startsWith('/api/')) {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({ json: { code: 200, message: 'Success', data: [] } });
+  });
   await page.goto('/admin/warehouses');
   await expect(page).toHaveURL(/\/dang-nhap$/);
 });

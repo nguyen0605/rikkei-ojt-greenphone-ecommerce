@@ -19,4 +19,3 @@ export interface NotificationFilterParams {
   isRead?: boolean;
   type?: NotificationType;
 }
-

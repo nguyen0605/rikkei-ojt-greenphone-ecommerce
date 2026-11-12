@@ -20,6 +20,23 @@ export interface AddressSuggestion {
   };
 }
 
+/**
+ * Kiểm tra tính hợp lệ của tọa độ địa lý:
+ * - Latitude trong khoảng [-90, 90]
+ * - Longitude trong khoảng [-180, 180]
+ */
+export function isValidCoordinate(lat?: number | null, lng?: number | null): boolean {
+  return (
+    typeof lat === 'number' &&
+    typeof lng === 'number' &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180
+  );
+}
 interface KnownLocation {
   name: string;
   keywords: string[];

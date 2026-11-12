@@ -34,4 +34,3 @@ export const notificationService = {
     return put<void>('/v1/notifications/read-all');
   },
 };
-

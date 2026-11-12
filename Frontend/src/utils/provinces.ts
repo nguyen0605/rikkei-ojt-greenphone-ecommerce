@@ -134,5 +134,3 @@ export function parseAddressComponents(raw: string): { ward?: string; district?:
 
   return res;
 }
-
-

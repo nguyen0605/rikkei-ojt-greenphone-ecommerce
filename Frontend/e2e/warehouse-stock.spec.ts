@@ -19,7 +19,12 @@ test('branch import, export, transfer and nested variant allocation agree', asyn
       quantity: id === 1 ? main : branch, aggregateQuantity: main + branch };
   };
   await page.route('**/api/**', async (route) => {
-    const path = new URL(route.request().url()).pathname;
+    const requestUrl = new URL(route.request().url());
+    if (!requestUrl.pathname.startsWith('/api/')) {
+      await route.continue();
+      return;
+    }
+    const path = requestUrl.pathname;
     const method = route.request().method();
     let data: unknown = [];
     if (path === '/api/v1/admin/warehouses') data = warehouses;

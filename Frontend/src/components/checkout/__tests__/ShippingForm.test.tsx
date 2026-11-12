@@ -7,6 +7,7 @@ import checkoutReducer from '@/store/slices/checkoutSlice';
 import authReducer from '@/store/slices/authSlice';
 import * as geocodingService from '../checkoutGeocodingService';
 import { userService } from '@/services';
+import type { AddressItem } from '@/types/api';
 
 // Mock Leaflet
 vi.mock('leaflet', () => ({
@@ -101,7 +102,7 @@ describe('ShippingForm with OpenStreetMap', () => {
   });
 
   it('renders saved addresses from address book and auto-fills selected address', async () => {
-    const mockAddresses = [
+    const mockAddresses: AddressItem[] = [
       {
         id: 'addr_home',
         receiverName: 'Nguyễn Văn Chủ Hộ',
@@ -223,6 +224,8 @@ describe('ShippingForm with OpenStreetMap', () => {
 
     // Cập nhật Redux và form
     expect(store.getState().checkout.shipping.address).toBe('Quận Cầu Giấy, Hà Nội');
+    expect(store.getState().checkout.shipping.latitude).toBe(21.0362);
+    expect(store.getState().checkout.shipping.longitude).toBe(105.7906);
     expect(addressInput).toHaveValue('Quận Cầu Giấy, Hà Nội');
 
     // Dropdown đóng lại
@@ -380,5 +383,30 @@ describe('ShippingForm with OpenStreetMap', () => {
       expect(store.getState().checkout.shipping.fullName).toBe('Tên Người Đã Nhập');
       expect(store.getState().checkout.shipping.address).toBe('100 Nguyễn Huệ, Quận 1, TP.HCM');
     });
+  });
+
+  it('clears latitude and longitude when user manually modifies address text', async () => {
+    const { store } = renderWithStore({
+      checkout: {
+        shipping: {
+          fullName: 'Nguyễn Văn Test',
+          phone: '0912345678',
+          address: '10 Duy Tân, Cầu Giấy, Hà Nội',
+          latitude: 21.031,
+          longitude: 105.783,
+        },
+      },
+    });
+
+    const addressInput = screen.getByPlaceholderText(
+      'Nhập địa chỉ, tên đường (ví dụ: 97 Man Thiện, Cầu Giấy...)'
+    );
+
+    // Người dùng gõ tay sửa địa chỉ
+    fireEvent.change(addressInput, { target: { value: '99 Đường Mới Chưa Định Vị' } });
+
+    // Tọa độ phải bị xóa để tránh gửi tọa độ cũ không khớp địa chỉ mới
+    expect(store.getState().checkout.shipping.latitude).toBeUndefined();
+    expect(store.getState().checkout.shipping.longitude).toBeUndefined();
   });
 });
