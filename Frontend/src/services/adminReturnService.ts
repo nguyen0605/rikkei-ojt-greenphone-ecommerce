@@ -41,6 +41,9 @@ export const adminReturnService = {
 
   reject: (id: number, data: ReturnReviewRequest) =>
     put<ReturnResponseDTO>(`/admin/returns/${id}/reject`, data),
+
+  complete: (id: number, data?: ReturnReviewRequest) =>
+    put<ReturnResponseDTO>(`/admin/returns/${id}/complete`, data ?? {}),
 };
 
 /**

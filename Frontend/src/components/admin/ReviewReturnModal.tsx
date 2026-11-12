@@ -25,6 +25,7 @@ import {
   getReturnStatusMeta,
   getReturnTypeMeta,
   isActionableReturnStatus,
+  isCompletableReturnStatus,
 } from '@/utils/returnStatus';
 import RejectReasonModal from './RejectReasonModal';
 
@@ -35,24 +36,28 @@ interface ReviewReturnModalProps {
   returnItem: ReturnResponseDTO | null;
   approving?: boolean;
   rejecting?: boolean;
+  completing?: boolean;
   onClose: () => void;
   onApprove: (payload: ReturnReviewRequest) => void | Promise<void>;
   onReject: (reason: string) => void | Promise<void>;
+  onComplete?: (payload: ReturnReviewRequest) => void | Promise<void>;
 }
 
 /**
  * Modal thẩm định kỹ thuật yêu cầu đổi trả / hoàn tiền.
  * Hỗ trợ phóng to ảnh lỗi Cloudflare R2, nhập ghi chú kỹ thuật, IMEI đổi mới
- * và thực hiện duyệt / từ chối kèm Popconfirm xác nhận.
+ * và thực hiện duyệt / từ chối / hoàn tất kèm Popconfirm xác nhận.
  */
 export default function ReviewReturnModal({
   open,
   returnItem,
   approving = false,
   rejecting = false,
+  completing = false,
   onClose,
   onApprove,
   onReject,
+  onComplete,
 }: ReviewReturnModalProps) {
   const [adminNote, setAdminNote] = useState('');
   const [newImeiNumber, setNewImeiNumber] = useState('');
@@ -71,9 +76,10 @@ export default function ReviewReturnModal({
   const statusMeta = getReturnStatusMeta(returnItem.status);
   const typeMeta = getReturnTypeMeta(returnItem.type);
   const canProcess = isActionableReturnStatus(returnItem.status);
+  const canComplete = isCompletableReturnStatus(returnItem.status);
   const isExchange = returnItem.type === 'EXCHANGE';
   const isRefund = returnItem.type === 'REFUND';
-  const busy = approving || rejecting;
+  const busy = approving || rejecting || completing;
   const images = returnItem.proofImages || [];
 
   const handleApproveSubmit = () => {
@@ -81,6 +87,13 @@ export default function ReviewReturnModal({
     if (adminNote.trim()) payload.adminNote = adminNote.trim();
     if (isExchange && newImeiNumber.trim()) payload.newImeiNumber = newImeiNumber.trim();
     onApprove(payload);
+  };
+
+  const handleCompleteSubmit = () => {
+    if (!onComplete) return;
+    const payload: ReturnReviewRequest = {};
+    if (adminNote.trim()) payload.adminNote = adminNote.trim();
+    onComplete(payload);
   };
 
   return (
@@ -173,6 +186,26 @@ export default function ReviewReturnModal({
                   </Tooltip>
                 )}
               </div>
+            )}
+
+            {canComplete && onComplete && (
+              <Popconfirm
+                title="Xác nhận hoàn tất quy trình đổi trả?"
+                description="Xác nhận khách đã nhận máy mới hoặc tiền hoàn đã được chi trả thành công."
+                okText="Hoàn tất"
+                cancelText="Hủy"
+                onConfirm={handleCompleteSubmit}
+              >
+                <Button
+                  type="primary"
+                  icon={<CheckCircleOutlined />}
+                  loading={completing}
+                  className="!bg-purple-600 hover:!bg-purple-700"
+                  data-testid="complete-return-btn"
+                >
+                  Xác Nhận Hoàn Tất
+                </Button>
+              </Popconfirm>
             )}
           </div>
         }

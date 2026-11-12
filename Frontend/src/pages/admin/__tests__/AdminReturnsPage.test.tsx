@@ -13,6 +13,7 @@ vi.mock('@/services', () => ({
     detail: vi.fn(),
     approve: vi.fn(),
     reject: vi.fn(),
+    complete: vi.fn(),
   },
 }));
 
@@ -263,6 +264,43 @@ describe('AdminReturnsPage & Modals', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Đã từ chối')).toBeInTheDocument();
+    });
+  }, 15000);
+
+  it('hiển thị nút Xác Nhận Hoàn Tất khi phiếu ở trạng thái APPROVED và cập nhật thành Hoàn tất sau khi xác nhận Popconfirm', async () => {
+    const user = userEvent.setup();
+    const completedItem: ReturnResponseDTO = {
+      ...mockReturns[2],
+      status: 'COMPLETED',
+    };
+    vi.mocked(adminReturnService.complete).mockImplementation(async () => {
+      currentRows = currentRows.map((row) => (row.id === 3 ? completedItem : row));
+      return completedItem;
+    });
+
+    renderPage();
+
+    await user.click(await screen.findByTestId('review-return-3'));
+
+    const completeBtn = await screen.findByTestId('complete-return-btn');
+    await user.click(completeBtn);
+
+    expect(adminReturnService.complete).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText('Xác nhận hoàn tất quy trình đổi trả?'),
+    ).toBeInTheDocument();
+
+    const okBtns = screen.getAllByRole('button', { name: /Hoàn tất/i });
+    await user.click(okBtns[okBtns.length - 1]);
+
+    await waitFor(() => {
+      expect(adminReturnService.complete).toHaveBeenCalledWith(3, {
+        adminNote: 'Đã kiểm tra lỗi OIS phần cứng',
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Hoàn tất').length).toBeGreaterThanOrEqual(1);
     });
   }, 15000);
 });

@@ -66,3 +66,7 @@ export function isActionableReturnStatus(status?: string): boolean {
   return status === 'PENDING' || status === 'UNDER_REVIEW';
 }
 
+export function isCompletableReturnStatus(status?: string): boolean {
+  return status === 'APPROVED';
+}
+

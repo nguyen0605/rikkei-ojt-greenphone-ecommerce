@@ -237,6 +237,38 @@ public class ReturnRequestService {
     }
 
     /**
+     * Admin / Kỹ thuật viên xác nhận đã bàn giao máy mới hoặc chi trả hoàn tiền thành công (APPROVED -> COMPLETED)
+     */
+    @Transactional
+    public ReturnResponse completeReturn(Long returnId, ReturnReviewRequest request) {
+        ReturnRequest returnRequest = returnRequestRepository.findById(returnId)
+                .orElseThrow(() -> new ResourceNotFoundException("ReturnRequest", "id", returnId));
+
+        if (returnRequest.getStatus() != ReturnStatus.APPROVED) {
+            throw new BadRequestException(
+                    "Chỉ có thể hoàn tất yêu cầu đang ở trạng thái Đã duyệt (trạng thái hiện tại: "
+                            + returnRequest.getStatus() + ")");
+        }
+
+        Long adminId = SecurityUtils.getCurrentUser().getId();
+        User adminUser = userRepository.findById(adminId).orElse(null);
+
+        returnRequest.setStatus(ReturnStatus.COMPLETED);
+        if (request != null && request.getAdminNote() != null && !request.getAdminNote().isBlank()) {
+            returnRequest.setAdminNote(request.getAdminNote().trim());
+        }
+        if (adminUser != null) {
+            returnRequest.setReviewedBy(adminUser);
+        }
+        returnRequest.setReviewedAt(LocalDateTime.now());
+
+        ReturnRequest updated = returnRequestRepository.save(returnRequest);
+        log.info("Completed return request: code={}, type={}", updated.getReturnCode(), updated.getType());
+
+        return mapToResponse(updated);
+    }
+
+    /**
      * Lấy danh sách yêu cầu đổi trả của người dùng hiện tại
      */
     @Transactional(readOnly = true)

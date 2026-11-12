@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Input, Select, Space, Table, Tag, message, type TableColumnsType } from 'antd';
 import {
   AuditOutlined,
+  CheckCircleOutlined,
   EyeOutlined,
   ReloadOutlined,
   SearchOutlined,
@@ -19,6 +20,7 @@ import {
   getReturnStatusMeta,
   getReturnTypeMeta,
   isActionableReturnStatus,
+  isCompletableReturnStatus,
 } from '@/utils/returnStatus';
 import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import AdminCard from '@/components/admin/AdminCard';
@@ -107,6 +109,19 @@ export default function AdminReturnsPage() {
     },
     onError: (err: Error) => {
       message.error(err.message || 'Không thể từ chối yêu cầu đổi trả');
+    },
+  });
+
+  const completeMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: ReturnReviewRequest }) =>
+      adminReturnService.complete(id, payload),
+    onSuccess: (updated) => {
+      syncUpdatedRowInCache(updated);
+      setReviewModalOpen(false);
+      message.success(`Đã xác nhận hoàn tất yêu cầu ${updated.returnCode}`);
+    },
+    onError: (err: Error) => {
+      message.error(err.message || 'Không thể hoàn tất yêu cầu đổi trả');
     },
   });
 
@@ -204,15 +219,24 @@ export default function AdminReturnsPage() {
       fixed: 'right',
       render: (_, record) => {
         const actionable = isActionableReturnStatus(record.status);
+        const completable = isCompletableReturnStatus(record.status);
         return (
           <Button
             type={actionable ? 'primary' : 'default'}
             size="small"
-            icon={actionable ? <AuditOutlined /> : <EyeOutlined />}
+            icon={
+              actionable ? (
+                <AuditOutlined />
+              ) : completable ? (
+                <CheckCircleOutlined />
+              ) : (
+                <EyeOutlined />
+              )
+            }
             onClick={() => handleOpenReview(record)}
             data-testid={`review-return-${record.id}`}
           >
-            {actionable ? 'Thẩm định' : 'Chi tiết'}
+            {actionable ? 'Thẩm định' : completable ? 'Hoàn tất' : 'Chi tiết'}
           </Button>
         );
       },
@@ -291,8 +315,13 @@ export default function AdminReturnsPage() {
         returnItem={selectedReturn}
         approving={approveMutation.isPending}
         rejecting={rejectMutation.isPending}
+        completing={completeMutation.isPending}
         onClose={() => {
-          if (!approveMutation.isPending && !rejectMutation.isPending) {
+          if (
+            !approveMutation.isPending &&
+            !rejectMutation.isPending &&
+            !completeMutation.isPending
+          ) {
             setReviewModalOpen(false);
           }
         }}
@@ -303,6 +332,10 @@ export default function AdminReturnsPage() {
         onReject={async (reason) => {
           if (!selectedReturn) return;
           await rejectMutation.mutateAsync({ id: selectedReturn.id, adminNote: reason });
+        }}
+        onComplete={async (payload) => {
+          if (!selectedReturn) return;
+          await completeMutation.mutateAsync({ id: selectedReturn.id, payload });
         }}
       />
     </div>

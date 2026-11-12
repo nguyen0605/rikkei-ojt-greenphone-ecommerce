@@ -71,4 +71,13 @@ public class AdminReturnController {
         ReturnResponse response = returnRequestService.rejectReturn(id, request);
         return ResponseEntity.ok(ApiResponse.success(response, "Đã từ chối yêu cầu đổi trả"));
     }
+
+    @PutMapping("/{id}/complete")
+    @Operation(summary = "Xác nhận hoàn tất quy trình đổi trả (đã bàn giao máy mới hoặc chi trả hoàn tiền)")
+    public ResponseEntity<ApiResponse<ReturnResponse>> completeReturn(
+            @PathVariable Long id,
+            @Valid @RequestBody(required = false) ReturnReviewRequest request) {
+        ReturnResponse response = returnRequestService.completeReturn(id, request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Đã xác nhận hoàn tất yêu cầu đổi trả"));
+    }
 }
