@@ -5,6 +5,7 @@ export { shipmentService } from './shipmentService';
 export { adminStaffService } from './adminStaffService';
 export { notificationService } from './notificationService';
 export { adminReturnService, adminWarrantyClaimService } from './adminReturnService';
+export { warrantyService } from './warrantyService';
 import { get, post, put, del } from './api';
 import type {
   CartDTO, CartItemRequest, CartSyncRequest, OrderDTO, AdminOrderDetailDTO,

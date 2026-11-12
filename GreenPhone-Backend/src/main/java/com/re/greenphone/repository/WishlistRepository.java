@@ -14,7 +14,7 @@ import java.util.Optional;
 @Repository
 public interface WishlistRepository extends JpaRepository<Wishlist, Long> {
 
-    @EntityGraph(attributePaths = {"phone", "phone.brand", "phone.images", "phone.variants"})
+    @EntityGraph(attributePaths = {"phone", "phone.brand"})
     @Query("SELECT w FROM Wishlist w WHERE w.user.id = :userId ORDER BY w.createdAt DESC")
     List<Wishlist> findByUserId(@Param("userId") Long userId);
 

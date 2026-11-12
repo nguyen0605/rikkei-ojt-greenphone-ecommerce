@@ -15,7 +15,12 @@ import BrandLogo from '@/components/common/BrandLogo';
 import HeaderSearch from '@/components/layout/HeaderSearch';
 import BrandDropdown from '@/components/layout/BrandDropdown';
 import NotificationBell from '@/components/layout/NotificationBell';
-const navItems = [{ key: 'home', label: 'Trang chủ', href: '/' }, { key: 'products', label: 'Sản phẩm', href: '/san-pham' }, { key: 'vouchers', label: 'Khuyến mãi', href: '/khuyen-mai' }];
+const navItems = [
+  { key: 'home', label: 'Trang chủ', href: '/' },
+  { key: 'products', label: 'Sản phẩm', href: '/san-pham' },
+  { key: 'vouchers', label: 'Khuyến mãi', href: '/khuyen-mai' },
+  { key: 'warranty', label: 'Tra cứu bảo hành', href: '/tra-cuu-bao-hanh' },
+];
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { selectCartTotalItems } from '@/store/selectors/cartSelectors';
 import { logout } from '@/store/slices/authSlice';
