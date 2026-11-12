@@ -74,20 +74,36 @@ describe('WarrantyCheckPage', () => {
     ).toBeEnabled();
   });
 
-  it('tự động trim khoảng trắng và validate tối thiểu 10 ký tự trước khi gọi API', async () => {
+  it('tự động trim khoảng trắng và validate số điện thoại/IMEI < 10 chữ số', async () => {
     const user = userEvent.setup();
     renderPage();
 
-    const input = screen.getByLabelText('Mã IMEI hoặc số điện thoại');
+    const input = screen.getByLabelText('Mã IMEI, số điện thoại hoặc tên sản phẩm');
     const submitBtn = screen.getByRole('button', { name: /Tra Cứu Bảo Hành/i });
 
     await user.type(input, '   090123   ');
     await user.click(submitBtn);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      /tối thiểu 10 ký tự/i,
+      /tối thiểu 10 chữ số/i,
     );
     expect(warrantyService.check).not.toHaveBeenCalled();
+  });
+
+  it('cho phép tra cứu trực tiếp theo tên sản phẩm (>= 2 ký tự)', async () => {
+    const user = userEvent.setup();
+    vi.mocked(warrantyService.check).mockResolvedValueOnce([activeWarranty]);
+
+    renderPage();
+
+    const input = screen.getByLabelText('Mã IMEI, số điện thoại hoặc tên sản phẩm');
+    const submitBtn = screen.getByRole('button', { name: /Tra Cứu Bảo Hành/i });
+
+    await user.type(input, 'iPhone 15');
+    await user.click(submitBtn);
+
+    expect(warrantyService.check).toHaveBeenCalledWith('iPhone 15');
+    expect(await screen.findByText('iPhone 15 Pro Max')).toBeInTheDocument();
   });
 
   it('hiển thị trạng thái loading và disabled trên nút Tra Cứu khi đang gửi request', async () => {
@@ -100,7 +116,7 @@ describe('WarrantyCheckPage', () => {
 
     renderPage();
 
-    const input = screen.getByLabelText('Mã IMEI hoặc số điện thoại');
+    const input = screen.getByLabelText('Mã IMEI, số điện thoại hoặc tên sản phẩm');
     const submitBtn = screen.getByRole('button', { name: /Tra Cứu Bảo Hành/i });
 
     await user.type(input, '  0901234567  ');
@@ -125,7 +141,7 @@ describe('WarrantyCheckPage', () => {
 
     renderPage();
 
-    const input = screen.getByLabelText('Mã IMEI hoặc số điện thoại');
+    const input = screen.getByLabelText('Mã IMEI, số điện thoại hoặc tên sản phẩm');
     await user.type(input, '0901234567');
     await user.click(screen.getByRole('button', { name: /Tra Cứu Bảo Hành/i }));
 
@@ -147,7 +163,7 @@ describe('WarrantyCheckPage', () => {
     renderPage();
 
     await user.type(
-      screen.getByLabelText('Mã IMEI hoặc số điện thoại'),
+      screen.getByLabelText('Mã IMEI, số điện thoại hoặc tên sản phẩm'),
       '869999999999999',
     );
     await user.click(screen.getByRole('button', { name: /Tra Cứu Bảo Hành/i }));
@@ -159,6 +175,28 @@ describe('WarrantyCheckPage', () => {
     expect(screen.getByText('0 ngày còn lại')).toBeInTheDocument();
   });
 
+  it('hiển thị ô lọc nhanh theo tên sản phẩm khi danh sách có nhiều phiếu', async () => {
+    const user = userEvent.setup();
+    vi.mocked(warrantyService.check).mockResolvedValueOnce([activeWarranty, expiredWarranty]);
+
+    renderPage();
+
+    await user.type(
+      screen.getByLabelText('Mã IMEI, số điện thoại hoặc tên sản phẩm'),
+      '0901234567',
+    );
+    await user.click(screen.getByRole('button', { name: /Tra Cứu Bảo Hành/i }));
+
+    expect(await screen.findByText('iPhone 15 Pro Max')).toBeInTheDocument();
+    expect(screen.getByText('Samsung Galaxy S23 Ultra')).toBeInTheDocument();
+
+    const filterInput = screen.getByPlaceholderText(/Lọc theo tên sản phẩm, IMEI.../i);
+    await user.type(filterInput, 'Samsung');
+
+    expect(screen.queryByText('iPhone 15 Pro Max')).not.toBeInTheDocument();
+    expect(screen.getByText('Samsung Galaxy S23 Ultra')).toBeInTheDocument();
+  });
+
   it('hiển thị Empty state thân thiện kèm hướng dẫn kiểm tra IMEI khi không tìm thấy kết quả', async () => {
     const user = userEvent.setup();
     vi.mocked(warrantyService.check).mockResolvedValueOnce([]);
@@ -166,7 +204,7 @@ describe('WarrantyCheckPage', () => {
     renderPage();
 
     await user.type(
-      screen.getByLabelText('Mã IMEI hoặc số điện thoại'),
+      screen.getByLabelText('Mã IMEI, số điện thoại hoặc tên sản phẩm'),
       '860000000000000',
     );
     await user.click(screen.getByRole('button', { name: /Tra Cứu Bảo Hành/i }));
@@ -190,4 +228,3 @@ describe('WarrantyCheckPage', () => {
     expect(await screen.findByText('iPhone 15 Pro Max')).toBeInTheDocument();
   });
 });
-

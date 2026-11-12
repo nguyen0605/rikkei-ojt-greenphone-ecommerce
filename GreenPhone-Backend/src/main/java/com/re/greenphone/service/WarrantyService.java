@@ -111,7 +111,7 @@ public class WarrantyService {
     @Transactional(readOnly = true)
     public List<WarrantyResponse> searchWarranties(String query) {
         if (query == null || query.trim().isEmpty()) {
-            throw new BadRequestException("Vui lòng cung cấp mã IMEI hoặc số điện thoại để tra cứu bảo hành");
+            throw new BadRequestException("Vui lòng cung cấp mã IMEI, số điện thoại hoặc tên sản phẩm để tra cứu bảo hành");
         }
 
         String sanitizedQuery = query.trim();
