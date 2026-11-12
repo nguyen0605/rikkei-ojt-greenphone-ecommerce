@@ -42,6 +42,8 @@ export const ROUTES = {
   ADMIN_BRANDS: '/admin/hang',
   ADMIN_OPTIONS: '/admin/tuy-chon',
   ADMIN_ORDERS: '/admin/don-hang',
+  ADMIN_RETURNS: '/admin/doi-tra',
+  ADMIN_WARRANTY_CLAIMS: '/admin/bao-hanh',
   ADMIN_CUSTOMERS: '/admin/khach-hang',
   ADMIN_STAFF: '/admin/nhan-su',
   ADMIN_REVIEWS: '/admin/danh-gia',

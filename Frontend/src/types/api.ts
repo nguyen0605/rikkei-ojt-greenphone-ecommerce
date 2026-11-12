@@ -583,3 +583,107 @@ export interface SettingsDTO {
   settingValue: string;
   description: string | null;
 }
+
+// Admin Returns & Refunds
+export type ReturnStatus = 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'COMPLETED';
+export type ReturnType = 'EXCHANGE' | 'REFUND';
+
+export interface ReturnResponseDTO {
+  id: number;
+  returnCode: string;
+  orderId: number;
+  orderTrackingNumber: string | null;
+  phoneVariantId: number;
+  phoneName: string | null;
+  variantSku: string | null;
+  userId: number;
+  customerName: string | null;
+  customerPhone: string | null;
+  reason: string;
+  errorDescription: string;
+  proofImages: string[];
+  type: ReturnType;
+  status: ReturnStatus;
+  refundAmount: number;
+  adminNote: string | null;
+  reviewedBy: number | null;
+  reviewerName: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReturnReviewRequest {
+  adminNote?: string;
+  newImeiNumber?: string;
+}
+
+// Admin Warranty Claims
+export type ClaimStatus =
+  | 'SUBMITTED'
+  | 'IN_INSPECTION'
+  | 'REPAIRING'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'REJECTED';
+
+export type HardwareIssueType =
+  | 'SCREEN'
+  | 'BATTERY'
+  | 'MOTHERBOARD'
+  | 'CAMERA'
+  | 'SPEAKER'
+  | 'OTHER';
+
+export interface WarrantyClaimHistoryDTO {
+  id: number;
+  fromStatus: ClaimStatus | null;
+  toStatus: ClaimStatus;
+  action: string;
+  note: string | null;
+  performedByName: string | null;
+  createdAt: string;
+}
+
+export interface WarrantyClaimResponseDTO {
+  id: number;
+  claimCode: string;
+  warrantyId: number;
+  imeiNumber: string;
+  productName: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  hardwareIssueType: HardwareIssueType;
+  issueDescription: string;
+  status: ClaimStatus;
+  isUnderWarranty: boolean | null;
+  repairCost: number | null;
+  resolution: string | null;
+  rejectionReason: string | null;
+  customerNote: string | null;
+  createdByName: string | null;
+  receivedByName: string | null;
+  receivedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  warrantyEndDate: string | null;
+  warrantyStatus: string | null;
+  histories: WarrantyClaimHistoryDTO[];
+}
+
+export interface WarrantyClaimCreateRequest {
+  imeiNumber: string;
+  hardwareIssueType: HardwareIssueType;
+  issueDescription: string;
+  repairCost?: number;
+  customerNote?: string;
+  receivedByName?: string;
+}
+
+export interface UpdateClaimStatusRequest {
+  status: ClaimStatus;
+  resolution?: string;
+  note?: string;
+  performedByName?: string;
+}

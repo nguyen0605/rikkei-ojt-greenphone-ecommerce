@@ -28,11 +28,14 @@ public class AdminReturnController {
     private final ReturnRequestService returnRequestService;
 
     @GetMapping
-    @Operation(summary = "Lấy danh sách yêu cầu đổi trả (phân trang & lọc theo trạng thái)")
+    @Operation(summary = "Lấy danh sách yêu cầu đổi trả (phân trang, lọc theo trạng thái và từ khóa tìm kiếm)")
     public ResponseEntity<ApiResponse<PageResponse<ReturnResponse>>> getAdminReturnRequests(
             @RequestParam(required = false) ReturnStatus status,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String search,
             @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        Page<ReturnResponse> page = returnRequestService.getAdminReturnRequests(status, pageable);
+        String resolvedKeyword = (keyword != null && !keyword.isBlank()) ? keyword : search;
+        Page<ReturnResponse> page = returnRequestService.getAdminReturnRequests(status, resolvedKeyword, pageable);
         PageResponse<ReturnResponse> response = new PageResponse<>(
                 page.getContent(),
                 page.getNumber(),
@@ -70,11 +73,11 @@ public class AdminReturnController {
     }
 
     @PutMapping("/{id}/complete")
-    @Operation(summary = "Xác nhận hoàn tất quy trình đổi máy mới hoặc hoàn tiền")
+    @Operation(summary = "Xác nhận hoàn tất quy trình đổi trả (đã bàn giao máy mới hoặc chi trả hoàn tiền)")
     public ResponseEntity<ApiResponse<ReturnResponse>> completeReturn(
             @PathVariable Long id,
             @Valid @RequestBody(required = false) ReturnReviewRequest request) {
         ReturnResponse response = returnRequestService.completeReturn(id, request);
-        return ResponseEntity.ok(ApiResponse.success(response, "Đã hoàn tất quy trình đổi trả thành công"));
+        return ResponseEntity.ok(ApiResponse.success(response, "Đã xác nhận hoàn tất yêu cầu đổi trả"));
     }
 }

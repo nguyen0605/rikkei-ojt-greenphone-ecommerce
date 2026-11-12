@@ -26,6 +26,7 @@ public class ReturnResponse {
     private String variantSku;
     private Long userId;
     private String customerName;
+    private String customerPhone;
     private String reason;
     private String errorDescription;
     private List<String> proofImages;

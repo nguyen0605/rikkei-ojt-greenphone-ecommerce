@@ -316,4 +316,50 @@ class ReturnRequestServiceTest {
         assertThrows(ForbiddenException.class, () ->
                 returnRequestService.getReturnDetail(123L));
     }
+
+    @Test
+    @DisplayName("Admin xác nhận hoàn tất (APPROVED -> COMPLETED) thành công và giữ nguyên adminNote nếu không nhập mới")
+    void testCompleteReturn_FromApproved_SetsCompleted() {
+        ReturnRequest returnReq = ReturnRequest.builder()
+                .returnCode("RET-COMP001")
+                .order(completedOrder)
+                .phoneVariant(phoneVariant)
+                .user(currentUser)
+                .reason("Lỗi màn hình")
+                .errorDescription("Sọc dọc")
+                .type(ReturnType.EXCHANGE)
+                .status(ReturnStatus.APPROVED)
+                .adminNote("Đã duyệt xuất kho đổi mới")
+                .build();
+        returnReq.setId(77L);
+
+        when(returnRequestRepository.findById(77L)).thenReturn(Optional.of(returnReq));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(currentUser));
+        when(returnRequestRepository.save(any(ReturnRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ReturnResponse response = returnRequestService.completeReturn(77L, new ReturnReviewRequest());
+
+        assertNotNull(response);
+        assertEquals(ReturnStatus.COMPLETED, response.getStatus());
+        assertEquals("Đã duyệt xuất kho đổi mới", response.getAdminNote());
+        verify(returnRequestRepository).save(returnReq);
+    }
+
+    @Test
+    @DisplayName("Không thể hoàn tất phiếu chưa ở trạng thái APPROVED")
+    void testCompleteReturn_WhenPending_ThrowsBadRequest() {
+        ReturnRequest returnReq = ReturnRequest.builder()
+                .returnCode("RET-PEND001")
+                .order(completedOrder)
+                .phoneVariant(phoneVariant)
+                .user(currentUser)
+                .status(ReturnStatus.PENDING)
+                .build();
+        returnReq.setId(78L);
+
+        when(returnRequestRepository.findById(78L)).thenReturn(Optional.of(returnReq));
+
+        assertThrows(BadRequestException.class, () ->
+                returnRequestService.completeReturn(78L, null));
+    }
 }

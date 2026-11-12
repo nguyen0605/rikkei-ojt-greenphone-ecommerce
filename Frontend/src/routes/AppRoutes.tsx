@@ -1,12 +1,12 @@
 import { lazy, Suspense, type ComponentType, type LazyExoticComponent } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { Spin } from 'antd';
 import DefaultLayout from '@/layouts/DefaultLayout';
 import CheckoutLayout from '@/layouts/CheckoutLayout';
 import AccountLayout from '@/layouts/AccountLayout';
 import AdminLayout from '@/layouts/AdminLayout';
 import AuthLayout from '@/pages/auth/AuthLayout';
 import RequireRole from '@/components/auth/RequireRole';
+import { GlobalPageLoader, TopProgressBar } from '@/components/common';
 import { ROUTES } from './routePaths';
 
 const HomePage = lazy(() => import('@/pages/HomePage'));
@@ -41,6 +41,8 @@ const AdminWarehouseDetailPage = lazy(() => import('@/pages/admin/inventory/Admi
 const AdminBrandsPage = lazy(() => import('@/pages/admin/AdminBrandsPage'));
 const AdminOptionsPage = lazy(() => import('@/pages/admin/AdminOptionsPage'));
 const AdminOrdersPage = lazy(() => import('@/pages/admin/AdminOrdersPage'));
+const AdminReturnsPage = lazy(() => import('@/pages/admin/AdminReturnsPage'));
+const AdminWarrantyClaimsPage = lazy(() => import('@/pages/admin/AdminWarrantyClaimsPage'));
 const AdminUsersPage = lazy(() => import('@/pages/admin/AdminUsersPage'));
 const AdminReviewsPage = lazy(() => import('@/pages/admin/AdminReviewsPage'));
 const AdminPromotionsPage = lazy(() => import('@/pages/admin/marketing/AdminVoucherPage'));
@@ -48,21 +50,17 @@ const AdminBannersPage = lazy(() => import('@/pages/admin/marketing/AdminBannerP
 const AdminSettingsPage = lazy(() => import('@/pages/admin/AdminSettingsPage'));
 const AdminStaffPage = lazy(() => import('@/pages/admin/AdminStaffPage'));
 
-const PageLoader = () => (
-  <div className="flex min-h-screen items-center justify-center">
-    <Spin size="large" />
-  </div>
-);
-
 const withSuspense = (Component: LazyExoticComponent<ComponentType<any>>) => (
-  <Suspense fallback={<PageLoader />}>
+  <Suspense fallback={<GlobalPageLoader />}>
     <Component />
   </Suspense>
 );
 
 export default function AppRoutes() {
   return (
-    <Routes>
+    <>
+      <TopProgressBar />
+      <Routes>
       {/* Public Default Layout */}
       <Route element={<DefaultLayout />}>
         <Route path={ROUTES.HOME} element={withSuspense(HomePage)} />
@@ -124,6 +122,8 @@ export default function AppRoutes() {
         <Route path={ROUTES.ADMIN_BRANDS} element={<RequireRole allowedRoles={['ROLE_ADMIN', 'ROLE_MARKETING']}>{withSuspense(AdminBrandsPage)}</RequireRole>} />
         <Route path={ROUTES.ADMIN_OPTIONS} element={<RequireRole allowedRoles={['ROLE_ADMIN', 'ROLE_MARKETING']}>{withSuspense(AdminOptionsPage)}</RequireRole>} />
         <Route path={ROUTES.ADMIN_ORDERS} element={<RequireRole allowedRoles={['ROLE_ADMIN', 'ROLE_SALES', 'ROLE_WAREHOUSE']}>{withSuspense(AdminOrdersPage)}</RequireRole>} />
+        <Route path={ROUTES.ADMIN_RETURNS} element={<RequireRole allowedRoles={['ROLE_ADMIN', 'ROLE_WAREHOUSE', 'ROLE_SALES']}>{withSuspense(AdminReturnsPage)}</RequireRole>} />
+        <Route path={ROUTES.ADMIN_WARRANTY_CLAIMS} element={<RequireRole allowedRoles={['ROLE_ADMIN', 'ROLE_WAREHOUSE']}>{withSuspense(AdminWarrantyClaimsPage)}</RequireRole>} />
         <Route path={ROUTES.ADMIN_CUSTOMERS} element={<RequireRole allowedRoles={['ROLE_ADMIN', 'ROLE_SALES']}>{withSuspense(AdminUsersPage)}</RequireRole>} />
         <Route path={ROUTES.ADMIN_STAFF} element={<RequireRole allowedRoles={['ROLE_ADMIN']}>{withSuspense(AdminStaffPage)}</RequireRole>} />
         <Route path={ROUTES.ADMIN_REVIEWS} element={<RequireRole allowedRoles={['ROLE_ADMIN', 'ROLE_MARKETING', 'ROLE_SALES']}>{withSuspense(AdminReviewsPage)}</RequireRole>} />
@@ -134,5 +134,6 @@ export default function AppRoutes() {
         <Route path={ROUTES.ADMIN_SETTINGS} element={<RequireRole allowedRoles={['ROLE_ADMIN']}>{withSuspense(AdminSettingsPage)}</RequireRole>} />
       </Route>
     </Routes>
-  );
+  </>
+);
 }
