@@ -18,6 +18,7 @@ import NotificationBell from '@/components/layout/NotificationBell';
 const navItems = [
   { key: 'home', label: 'Trang chủ', href: '/' },
   { key: 'products', label: 'Sản phẩm', href: '/san-pham' },
+  { key: 'compare', label: 'So sánh', href: '/so-sanh' },
   { key: 'vouchers', label: 'Khuyến mãi', href: '/khuyen-mai' },
   { key: 'warranty', label: 'Tra cứu bảo hành', href: '/tra-cuu-bao-hanh' },
 ];
