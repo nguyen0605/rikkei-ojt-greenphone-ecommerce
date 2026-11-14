@@ -71,4 +71,19 @@ public interface PhoneRepository extends JpaRepository<Phone, Long>, JpaSpecific
         """,
         nativeQuery = true)
     Page<Phone> searchFullText(@Param("query") String query, Pageable pageable);
+
+    /**
+     * Nạp tối ưu danh sách điện thoại để so sánh cấu hình:
+     * JOIN FETCH brand và variants (kèm RAM, Storage, Color options) trong 1 truy vấn tránh N+1.
+     */
+    @Query("""
+        SELECT DISTINCT p FROM Phone p
+        JOIN FETCH p.brand
+        LEFT JOIN FETCH p.variants v
+        LEFT JOIN FETCH v.ramItem
+        LEFT JOIN FETCH v.storageItem
+        LEFT JOIN FETCH v.colorItem
+        WHERE p.id IN :ids AND p.status = 'ACTIVE'
+    """)
+    List<Phone> findPhonesForComparison(@Param("ids") List<Long> ids);
 }
