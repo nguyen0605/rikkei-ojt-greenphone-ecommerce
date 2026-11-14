@@ -135,3 +135,4 @@ export const CompareStickyHeader: React.FC<CompareStickyHeaderProps> = ({
 };
 
 export default CompareStickyHeader;
+

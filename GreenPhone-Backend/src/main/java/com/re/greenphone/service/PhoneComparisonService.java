@@ -13,3 +13,4 @@ public interface PhoneComparisonService {
      */
     PhoneComparisonResponse comparePhones(List<Long> phoneIds);
 }
+

@@ -193,3 +193,4 @@ export const CompareSearchBar: React.FC<CompareSearchBarProps> = ({
 };
 
 export default CompareSearchBar;
+
