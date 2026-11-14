@@ -12,10 +12,17 @@ import {
   ShieldCheck,
   CheckCircle2,
   AlertCircle,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react';
 import { ROUTES } from '@/routes/routePaths';
 import { phoneService } from '@/services';
-import { phoneComparisonService } from '@/services/phoneComparisonService';
+import {
+  phoneComparisonService,
+  getStoredCompareSlots,
+  saveStoredCompareSlots,
+  clearStoredCompareSlots,
+} from '@/services/phoneComparisonService';
 import type { PhoneComparisonResponseDTO, ComparedPhoneDTO, PhoneDTO, PhoneDetailDTO } from '@/types/api';
 import CompareSearchBar from '@/components/compare/CompareSearchBar';
 import CompareSpecTable from '@/components/compare/CompareSpecTable';
@@ -85,6 +92,26 @@ export const PhoneComparePage: React.FC = () => {
   const [activeSlotToSelect, setActiveSlotToSelect] = useState<0 | 1>(0);
 
   const [showStickyHeader, setShowStickyHeader] = useState(false);
+
+  // Khôi phục tự động từ localStorage khi người dùng chuyển trang quay lại /so-sanh
+  useEffect(() => {
+    if (!id1Param && !id2Param) {
+      const stored = getStoredCompareSlots();
+      if (stored.id1 || stored.id2) {
+        const next = new URLSearchParams();
+        if (stored.id1) next.set('id1', String(stored.id1));
+        if (stored.id2) next.set('id2', String(stored.id2));
+        setSearchParams(next, { replace: true });
+      }
+    }
+  }, [id1Param, id2Param, setSearchParams]);
+
+  // Lưu bền vững vào localStorage mỗi khi có sản phẩm được chọn
+  useEffect(() => {
+    if (id1 || id2) {
+      saveStoredCompareSlots({ id1, id2 });
+    }
+  }, [id1, id2]);
 
   // Monitor scroll for sticky header
   useEffect(() => {
@@ -169,6 +196,35 @@ export const PhoneComparePage: React.FC = () => {
     setSinglePhone1(singlePhone2);
     setSinglePhone2(temp1);
 
+    saveStoredCompareSlots({ id1: id2, id2: id1 });
+    setSearchParams(nextParams);
+  };
+
+  // Xóa một vị trí máy cụ thể
+  const handleRemoveSlot = (slot: 0 | 1) => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (slot === 0) {
+      nextParams.delete('id1');
+      setSinglePhone1(null);
+      saveStoredCompareSlots({ id1: null, id2 });
+    } else {
+      nextParams.delete('id2');
+      setSinglePhone2(null);
+      saveStoredCompareSlots({ id1, id2: null });
+    }
+    setComparisonData(null);
+    setSearchParams(nextParams);
+  };
+
+  // Đặt lại toàn bộ (Xóa cả 2 máy khỏi danh sách so sánh)
+  const handleResetAll = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('id1');
+    nextParams.delete('id2');
+    setSinglePhone1(null);
+    setSinglePhone2(null);
+    setComparisonData(null);
+    clearStoredCompareSlots();
     setSearchParams(nextParams);
   };
 
@@ -191,6 +247,7 @@ export const PhoneComparePage: React.FC = () => {
       }
       setSinglePhone1(converted);
       nextParams.set('id1', String(phone.id));
+      saveStoredCompareSlots({ id1: phone.id, id2 });
     } else {
       // Slot 2
       if (id1 === phone.id) {
@@ -199,6 +256,7 @@ export const PhoneComparePage: React.FC = () => {
       }
       setSinglePhone2(converted);
       nextParams.set('id2', String(phone.id));
+      saveStoredCompareSlots({ id1, id2: phone.id });
     }
     setSearchParams(nextParams);
     setSearchModalOpen(false);
@@ -260,13 +318,13 @@ export const PhoneComparePage: React.FC = () => {
                 So sánh cấu hình &amp; thông số điện thoại
               </h1>
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                Đặt 2 dòng máy lên bàn cân để chọn ra sản phẩm phù hợp nhất với nhu cầu của bạn
+                Đặt 2 dòng máy lên bàn cân để chọn ra sản phẩm phù hợp nhất với nhu cầu của bạn (dữ liệu được tự động lưu khi chuyển trang)
               </p>
             </div>
 
-            {/* Differences Filter Toggle & Swap Button */}
-            {comparisonData && comparisonData.phones.length >= 2 && (
-              <div className="flex items-center gap-4 flex-wrap">
+            {/* Controls Toolbar */}
+            <div className="flex items-center gap-3 flex-wrap">
+              {comparisonData && comparisonData.phones.length >= 2 && (
                 <label className="inline-flex items-center gap-2 cursor-pointer select-none bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3.5 py-2 rounded-xl hover:border-emerald-500 transition-colors">
                   <input
                     type="checkbox"
@@ -280,18 +338,34 @@ export const PhoneComparePage: React.FC = () => {
                     Chỉ xem điểm khác biệt ({differencesCount})
                   </span>
                 </label>
+              )}
 
-                <button
-                  type="button"
-                  onClick={handleSwap}
-                  data-testid="swap-phones-btn"
-                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-emerald-600 hover:border-emerald-500 transition-colors shadow-sm"
-                >
-                  <ArrowLeftRight className="w-4 h-4 text-emerald-600" />
-                  <span>Đổi vị trí</span>
-                </button>
-              </div>
-            )}
+              {(phone1 || phone2) && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleSwap}
+                    data-testid="swap-phones-btn"
+                    title="Đổi vị trí 2 điện thoại"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-emerald-600 hover:border-emerald-500 transition-colors shadow-sm"
+                  >
+                    <ArrowLeftRight className="w-4 h-4 text-emerald-600" />
+                    <span>Đổi vị trí</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleResetAll}
+                    data-testid="reset-all-compare-btn"
+                    title="Xóa tất cả sản phẩm khỏi so sánh"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 transition-colors shadow-sm"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Xóa tất cả</span>
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -302,15 +376,7 @@ export const PhoneComparePage: React.FC = () => {
             <div className="flex-1">{error}</div>
             <button
               type="button"
-              onClick={() => {
-                const nextParams = new URLSearchParams(searchParams);
-                nextParams.delete('id1');
-                nextParams.delete('id2');
-                setSinglePhone1(null);
-                setSinglePhone2(null);
-                setComparisonData(null);
-                setSearchParams(nextParams);
-              }}
+              onClick={handleResetAll}
               className="text-xs font-semibold underline text-red-800 dark:text-red-200"
             >
               Đặt lại
@@ -336,12 +402,25 @@ export const PhoneComparePage: React.FC = () => {
 
           {/* Slot 1 */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between relative overflow-hidden" data-testid="compare-slot-1">
-            <div className="absolute top-3 left-4 text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-              Sản phẩm 1
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                Sản phẩm 1
+              </span>
+              {phone1 && (
+                <button
+                  type="button"
+                  onClick={() => handleRemoveSlot(0)}
+                  title="Xóa máy này khỏi so sánh"
+                  data-testid="remove-slot-1-btn"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
             {phone1 ? (
-              <div className="pt-6">
+              <div className="pt-4">
                 <div className="h-52 flex items-center justify-center mb-4">
                   {phone1.mainImageUrl ? (
                     <img
@@ -432,12 +511,25 @@ export const PhoneComparePage: React.FC = () => {
 
           {/* Slot 2 */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between relative overflow-hidden" data-testid="compare-slot-2">
-            <div className="absolute top-3 left-4 text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 px-2.5 py-0.5 rounded-full border border-blue-200 dark:border-blue-800">
-              Sản phẩm 2
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 px-2.5 py-0.5 rounded-full border border-blue-200 dark:border-blue-800">
+                Sản phẩm 2
+              </span>
+              {phone2 && (
+                <button
+                  type="button"
+                  onClick={() => handleRemoveSlot(1)}
+                  title="Xóa máy này khỏi so sánh"
+                  data-testid="remove-slot-2-btn"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
             {phone2 ? (
-              <div className="pt-6">
+              <div className="pt-4">
                 <div className="h-52 flex items-center justify-center mb-4">
                   {phone2.mainImageUrl ? (
                     <img

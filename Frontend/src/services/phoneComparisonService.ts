@@ -9,6 +9,55 @@ const publicApi = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+export const COMPARE_STORAGE_KEY = 'greenphone_compare_slots';
+export const COMPARE_UPDATED_EVENT = 'greenphone_compare_updated';
+
+export interface StoredCompareSlots {
+  id1: number | null;
+  id2: number | null;
+}
+
+export function getStoredCompareSlots(): StoredCompareSlots {
+  try {
+    const raw = localStorage.getItem(COMPARE_STORAGE_KEY);
+    if (!raw) return { id1: null, id2: null };
+    const parsed = JSON.parse(raw);
+    const id1 = typeof parsed.id1 === 'number' && !isNaN(parsed.id1) ? parsed.id1 : null;
+    const id2 = typeof parsed.id2 === 'number' && !isNaN(parsed.id2) ? parsed.id2 : null;
+    return { id1, id2 };
+  } catch {
+    return { id1: null, id2: null };
+  }
+}
+
+export function saveStoredCompareSlots(slots: StoredCompareSlots): void {
+  try {
+    const validId1 = slots.id1 && !isNaN(slots.id1) ? slots.id1 : null;
+    const validId2 = slots.id2 && !isNaN(slots.id2) ? slots.id2 : null;
+    if (!validId1 && !validId2) {
+      localStorage.removeItem(COMPARE_STORAGE_KEY);
+    } else {
+      localStorage.setItem(COMPARE_STORAGE_KEY, JSON.stringify({ id1: validId1, id2: validId2 }));
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(COMPARE_UPDATED_EVENT));
+    }
+  } catch (err) {
+    console.error('Failed to save comparison to localStorage:', err);
+  }
+}
+
+export function clearStoredCompareSlots(): void {
+  try {
+    localStorage.removeItem(COMPARE_STORAGE_KEY);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(COMPARE_UPDATED_EVENT));
+    }
+  } catch (err) {
+    console.error('Failed to clear comparison from localStorage:', err);
+  }
+}
+
 export const phoneComparisonService = {
   /**
    * So sánh danh sách điện thoại theo IDs

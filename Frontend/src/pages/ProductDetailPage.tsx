@@ -3,6 +3,7 @@ import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query';
 import { Button, Radio, App } from 'antd';
 import { ShoppingCart, CheckCircle, Star, Ticket, AlertCircle, ArrowLeftRight } from 'lucide-react';
+import { getStoredCompareSlots } from '@/services/phoneComparisonService';
 import { Breadcrumb, ProductCard } from '@/components/common';
 import ProductGallery from '@/components/product-detail/ProductGallery';
 import ProductDetailSkeleton from '@/components/product-detail/ProductDetailSkeleton';
@@ -435,13 +436,23 @@ export default function ProductDetailPage() {
         <div className="mt-12">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl font-bold text-gray-900">Thông số kỹ thuật</h2>
-            <Link
-              to={`/so-sanh?id1=${phone.id}`}
-              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-200 transition-colors"
+            <button
+              type="button"
+              onClick={() => {
+                const stored = getStoredCompareSlots();
+                let url = `/so-sanh?id1=${phone.id}`;
+                if (stored.id1 && stored.id1 !== phone.id) {
+                  url = `/so-sanh?id1=${stored.id1}&id2=${phone.id}`;
+                } else if (stored.id2 && stored.id2 !== phone.id) {
+                  url = `/so-sanh?id1=${phone.id}&id2=${stored.id2}`;
+                }
+                navigate(url);
+              }}
+              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-200 transition-colors cursor-pointer"
             >
               <ArrowLeftRight className="h-4 w-4" />
               <span>So sánh với máy khác</span>
-            </Link>
+            </button>
           </div>
           <div className="overflow-hidden rounded-xl border border-gray-100">
             <table className="w-full text-sm">

@@ -4,7 +4,12 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PhoneComparePage from '../PhoneComparePage';
 import { phoneService } from '@/services';
-import { phoneComparisonService } from '@/services/phoneComparisonService';
+import {
+  phoneComparisonService,
+  getStoredCompareSlots,
+  saveStoredCompareSlots,
+  clearStoredCompareSlots,
+} from '@/services/phoneComparisonService';
 import type { PhoneComparisonResponseDTO } from '@/types/api';
 
 vi.mock('@/services', () => ({
@@ -19,6 +24,11 @@ vi.mock('@/services/phoneComparisonService', () => ({
     searchPhones: vi.fn(),
     getInitialPhones: vi.fn().mockResolvedValue([]),
   },
+  getStoredCompareSlots: vi.fn().mockReturnValue({ id1: null, id2: null }),
+  saveStoredCompareSlots: vi.fn(),
+  clearStoredCompareSlots: vi.fn(),
+  COMPARE_STORAGE_KEY: 'greenphone_compare_slots',
+  COMPARE_UPDATED_EVENT: 'greenphone_compare_updated',
 }));
 
 const mockComparisonData: PhoneComparisonResponseDTO = {
@@ -118,13 +128,14 @@ function renderPage(initialEntry = '/so-sanh') {
 describe('PhoneComparePage', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(getStoredCompareSlots).mockReturnValue({ id1: null, id2: null });
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it('renders empty slots when no IDs in URL search params', () => {
+  it('renders empty slots when no IDs in URL search params and no stored slots', () => {
     renderPage('/so-sanh');
 
     expect(screen.getByText('So sánh cấu hình & thông số điện thoại')).toBeInTheDocument();
@@ -132,6 +143,19 @@ describe('PhoneComparePage', () => {
     expect(screen.getByText('Chưa chọn điện thoại thứ hai')).toBeInTheDocument();
     expect(screen.getByText('Vui lòng chọn đủ 2 điện thoại để bắt đầu so sánh')).toBeInTheDocument();
     expect(phoneComparisonService.compare).not.toHaveBeenCalled();
+  });
+
+  it('restores stored comparison products from localStorage when entering /so-sanh without params', async () => {
+    vi.mocked(getStoredCompareSlots).mockReturnValue({ id1: 1, id2: 2 });
+    vi.mocked(phoneComparisonService.compare).mockResolvedValue(mockComparisonData);
+
+    renderPage('/so-sanh');
+
+    await waitFor(() => {
+      expect(phoneComparisonService.compare).toHaveBeenCalledWith([1, 2]);
+      const slot1 = screen.getByTestId('compare-slot-1');
+      expect(within(slot1).getByText('iPhone 15 Pro')).toBeInTheDocument();
+    });
   });
 
   it('renders product 1 immediately when only id1 is selected in URL search params', async () => {
