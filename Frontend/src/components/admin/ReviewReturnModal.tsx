@@ -271,11 +271,18 @@ export default function ReviewReturnModal({
                   <span className="font-bold text-gray-900 text-sm block">
                     {returnItem.phoneName || 'Sản phẩm'}
                   </span>
-                  {returnItem.variantSku && (
-                    <Tag color="cyan" className="!mt-1 !font-mono !text-xs !border-0 !rounded-md">
-                      SKU: {returnItem.variantSku}
-                    </Tag>
-                  )}
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                    {returnItem.variantSku && (
+                      <Tag color="cyan" className="!font-mono !text-xs !border-0 !rounded-md !m-0">
+                        SKU: {returnItem.variantSku}
+                      </Tag>
+                    )}
+                    {returnItem.imeiNumber && (
+                      <Tag color="purple" className="!font-mono !text-xs !border-0 !rounded-md !m-0">
+                        IMEI: {returnItem.imeiNumber}
+                      </Tag>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center justify-between pt-1 border-t border-gray-200/60">
                   <span className="text-gray-500">

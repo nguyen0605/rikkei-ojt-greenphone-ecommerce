@@ -219,7 +219,23 @@ export default function CheckoutPage() {
                   <div className="flex justify-between text-sm"><span className="text-gray-600">Tạm tính</span><span>{formatVND(summary.subtotal)}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-gray-600">Phí giao hàng</span><span className="text-green-600">{summary.shippingFee === 0 ? 'Miễn phí' : formatVND(summary.shippingFee)}</span></div>
                   {voucherDiscount > 0 && (
-                    <div className="flex justify-between text-sm"><span className="text-gray-600">Giảm giá ({voucherCode})</span><span className="text-green-600">-{formatVND(voucherDiscount)}</span></div>
+                    <div className="flex justify-between text-sm items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-600">Giảm giá ({voucherCode})</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            dispatch(removeCheckoutVoucher());
+                            message.info('Đã bỏ áp dụng mã khuyến mãi');
+                          }}
+                          className="rounded px-1.5 py-0.5 text-xs text-red-500 hover:bg-red-50 hover:underline transition-colors"
+                          title="Bỏ áp dụng mã khuyến mãi"
+                        >
+                          [Bỏ áp dụng]
+                        </button>
+                      </div>
+                      <span className="text-green-600 font-medium">-{formatVND(voucherDiscount)}</span>
+                    </div>
                   )}
                   <div className="flex justify-between border-t border-gray-100 pt-3 text-base font-bold">
                     <span>Tổng thanh toán</span>

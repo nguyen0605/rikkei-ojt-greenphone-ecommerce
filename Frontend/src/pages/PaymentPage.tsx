@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Spin } from 'antd';
@@ -42,9 +43,11 @@ export default function PaymentPage() {
 
   // When the countdown hits 0 the server scheduler flips the order to CANCELLED
   // within ~60s — refetch so the UI shows the cancelled state.
-  if (remainingSeconds === 0 && order?.orderStatus === 'PENDING') {
-    refetch();
-  }
+  useEffect(() => {
+    if (qrData?.expiresAt && remainingSeconds === 0 && order?.orderStatus === 'PENDING') {
+      refetch();
+    }
+  }, [qrData?.expiresAt, remainingSeconds, order?.orderStatus, refetch]);
 
   if (isLoading || !order) {
     return <div className="flex justify-center py-16"><Spin size="large" /></div>;

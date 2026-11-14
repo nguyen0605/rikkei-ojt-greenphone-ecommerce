@@ -148,6 +148,7 @@ export default function AdminReturnsTab() {
         <div>
           <div className="font-medium text-ink">{r.phoneName || `Sản phẩm (Variant #${r.phoneVariantId})`}</div>
           {r.variantSku && <div className="text-xs text-ink-3">SKU: {r.variantSku}</div>}
+          {r.imeiNumber && <div className="text-xs font-mono text-purple-600">IMEI: {r.imeiNumber}</div>}
         </div>
       ),
     },

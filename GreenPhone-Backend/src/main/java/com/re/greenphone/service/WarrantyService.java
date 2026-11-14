@@ -127,7 +127,9 @@ public class WarrantyService {
             }
         }
 
+        // Loại trừ triệt để các thiết bị đã bị đổi trả / hoàn tiền (VOIDED)
         return warranties.stream()
+                .filter(w -> w.getStatus() == null || !"VOIDED".equalsIgnoreCase(w.getStatus()))
                 .map(this::mapToWarrantyResponse)
                 .toList();
     }
@@ -142,6 +144,9 @@ public class WarrantyService {
         }
         Warranty warranty = warrantyRepository.findByImeiNumber(imei.trim())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin bảo hành cho mã IMEI: " + imei));
+        if ("VOIDED".equalsIgnoreCase(warranty.getStatus())) {
+            throw new BadRequestException("Thiết bị này đã được đổi trả hoặc hoàn tiền và không còn hiệu lực bảo hành trên hệ thống.");
+        }
         return mapToWarrantyResponse(warranty);
     }
 
@@ -206,7 +211,10 @@ public class WarrantyService {
         String currentStatus = warranty.getStatus();
         long remainingDays = 0L;
 
-        if (warranty.getEndDate() != null) {
+        if ("VOIDED".equalsIgnoreCase(warranty.getStatus()) || "CANCELLED".equalsIgnoreCase(warranty.getStatus())) {
+            remainingDays = 0L;
+            currentStatus = warranty.getStatus();
+        } else if (warranty.getEndDate() != null) {
             if (warranty.getEndDate().isAfter(now)) {
                 remainingDays = ChronoUnit.DAYS.between(LocalDate.now(), warranty.getEndDate().toLocalDate());
                 if (remainingDays < 0) {

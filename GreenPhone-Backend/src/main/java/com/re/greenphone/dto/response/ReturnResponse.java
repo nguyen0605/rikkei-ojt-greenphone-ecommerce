@@ -24,6 +24,7 @@ public class ReturnResponse {
     private Long phoneVariantId;
     private String phoneName;
     private String variantSku;
+    private String imeiNumber;
     private Long userId;
     private String customerName;
     private String customerPhone;

@@ -99,7 +99,8 @@ public class PaymentService {
                 .amount(BigDecimal.valueOf(amount))
                 .expiresAt(order.getCreatedAt() != null
                         ? order.getCreatedAt().plusMinutes(10)
-                                .format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME) + "Z"
+                                .atZone(java.time.ZoneId.systemDefault())
+                                .toInstant().toString()
                         : null)
                 .build();
     }
