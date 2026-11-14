@@ -23,6 +23,7 @@ vi.mock('@/services/phoneComparisonService', () => ({
     compare: vi.fn(),
     searchPhones: vi.fn(),
     getInitialPhones: vi.fn().mockResolvedValue([]),
+    getBrands: vi.fn().mockResolvedValue([]),
   },
   getStoredCompareSlots: vi.fn().mockReturnValue({ id1: null, id2: null }),
   saveStoredCompareSlots: vi.fn(),

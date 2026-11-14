@@ -70,13 +70,33 @@ export const phoneComparisonService = {
   },
 
   /**
-   * Tìm kiếm điện thoại cho thanh gợi ý thay đổi / chọn máy
+   * Lấy danh sách thương hiệu phục vụ bộ lọc nhanh
    */
-  async searchPhones(query: string): Promise<PhoneDTO[]> {
-    if (!query || !query.trim()) return [];
+  async getBrands(): Promise<{ id: number; name: string }[]> {
     try {
+      const res = await publicApi.get<ApiResponse<{ id: number; name: string }[]>>('/brands');
+      return res.data.data ?? [];
+    } catch (err) {
+      console.error('Failed to get brands:', err);
+      return [];
+    }
+  },
+
+  /**
+   * Tìm kiếm điện thoại cho thanh gợi ý thay đổi / chọn máy (lấy toàn bộ kết quả phù hợp, tối đa 100 máy)
+   */
+  async searchPhones(query: string, brandId?: number): Promise<PhoneDTO[]> {
+    if (!query || !query.trim()) {
+      return this.getInitialPhones(brandId);
+    }
+    const cleanQuery = query.trim();
+    try {
+      const params: Record<string, any> = { q: cleanQuery, page: 0, size: 100 };
+      if (brandId) {
+        params.brandIds = brandId;
+      }
       const res = await publicApi.get<ApiResponse<PageResponse<PhoneDTO>>>('/phones/search', {
-        params: { q: query.trim(), page: 0, size: 10 },
+        params,
       });
       if (res.data.data?.content && res.data.data.content.length > 0) {
         return res.data.data.content;
@@ -86,10 +106,20 @@ export const phoneComparisonService = {
     }
 
     try {
+      const params: Record<string, any> = { page: 0, size: 100 };
+      if (brandId) {
+        params.brandIds = brandId;
+      }
       const res = await publicApi.get<ApiResponse<PageResponse<PhoneDTO>>>('/phones', {
-        params: { query: query.trim(), page: 0, size: 10 },
+        params,
       });
-      return res.data.data?.content ?? [];
+      const lower = cleanQuery.toLowerCase();
+      return (res.data.data?.content ?? []).filter(
+        (p) =>
+          p.name.toLowerCase().includes(lower) ||
+          (p.brandName && p.brandName.toLowerCase().includes(lower)) ||
+          (p.chip && p.chip.toLowerCase().includes(lower))
+      );
     } catch (err) {
       console.error('All phone search methods failed:', err);
       return [];
@@ -97,12 +127,16 @@ export const phoneComparisonService = {
   },
 
   /**
-   * Lấy danh sách điện thoại nổi bật ban đầu khi mở modal
+   * Lấy toàn bộ danh sách điện thoại đang bán (tối đa 100 sản phẩm) khi mở modal
    */
-  async getInitialPhones(): Promise<PhoneDTO[]> {
+  async getInitialPhones(brandId?: number): Promise<PhoneDTO[]> {
     try {
+      const params: Record<string, any> = { page: 0, size: 100 };
+      if (brandId) {
+        params.brandIds = brandId;
+      }
       const res = await publicApi.get<ApiResponse<PageResponse<PhoneDTO>>>('/phones', {
-        params: { page: 0, size: 6 },
+        params,
       });
       return res.data.data?.content ?? [];
     } catch (err) {

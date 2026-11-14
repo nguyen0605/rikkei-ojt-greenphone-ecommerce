@@ -695,7 +695,7 @@ export const PhoneComparePage: React.FC = () => {
         footer={null}
         destroyOnHidden
         centered
-        width={560}
+        width={620}
       >
         <div className="py-2">
           <p className="text-xs text-slate-500 mb-3">
