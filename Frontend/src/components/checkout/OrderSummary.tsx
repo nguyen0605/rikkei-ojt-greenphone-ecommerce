@@ -264,7 +264,25 @@ export default function OrderSummary() {
           <div className="flex justify-between text-sm"><span className="text-gray-600">Tạm tính</span><span className="font-medium">{formatVND(summary.subtotal)}</span></div>
           <div className="flex justify-between text-sm"><span className="text-gray-600">Phí giao hàng</span><span className="font-medium text-green-600">{summary.shippingFee === 0 ? 'Miễn phí' : formatVND(summary.shippingFee)}</span></div>
           {voucherDiscount > 0 && (
-            <div className="flex justify-between text-sm"><span className="text-gray-600">Giảm giá (voucher)</span><span className="font-medium text-green-600">-{formatVND(voucherDiscount)}</span></div>
+            <div className="flex justify-between text-sm items-center">
+              <div className="flex items-center gap-1.5">
+                <span className="text-gray-600">Giảm giá ({voucherCode || 'voucher'})</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserDismissedVoucher(true);
+                    dispatch(removeCheckoutVoucher());
+                    if (!buyNowItem) dispatch(removeVoucher());
+                    message.info('Đã bỏ áp dụng mã khuyến mãi');
+                  }}
+                  className="rounded px-1.5 py-0.5 text-xs text-red-500 hover:bg-red-50 hover:underline transition-colors"
+                  title="Bỏ áp dụng mã khuyến mãi"
+                >
+                  [Bỏ chọn]
+                </button>
+              </div>
+              <span className="font-medium text-green-600">-{formatVND(voucherDiscount)}</span>
+            </div>
           )}
           <div className="flex justify-between border-t border-gray-100 pt-3 text-base">
             <span className="font-bold text-gray-900">Tổng thanh toán</span>

@@ -44,9 +44,11 @@ function calculateElapsedPercent(warranty: WarrantyLookupItem, isExpired: boolea
 }
 
 export default function WarrantyCard({ warranty }: WarrantyCardProps) {
-  const remainingDays = Math.max(0, warranty.remainingDays ?? 0);
+  const isVoided =
+    warranty.status?.toUpperCase() === 'VOIDED' || warranty.status?.toUpperCase() === 'CANCELLED';
+  const remainingDays = isVoided ? 0 : Math.max(0, warranty.remainingDays ?? 0);
   const isExpired =
-    warranty.status?.toUpperCase() === 'EXPIRED' || remainingDays === 0;
+    isVoided || warranty.status?.toUpperCase() === 'EXPIRED' || remainingDays === 0;
   const elapsedPercent = calculateElapsedPercent(warranty, isExpired);
   const imeiDisplay = warranty.imeiNumber || warranty.imei || 'Đang cập nhật';
   const durationMonths = warranty.warrantyDurationMonths ?? 12;
@@ -66,13 +68,17 @@ export default function WarrantyCard({ warranty }: WarrantyCardProps) {
       {/* Top status bar */}
       <div
         className={`flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3 sm:px-6 ${
-          isExpired
+          isVoided
+            ? 'border-red-200 bg-red-50/70'
+            : isExpired
             ? 'border-gray-200 bg-gray-50'
             : 'border-green-100 bg-green-50/70'
         }`}
       >
         <div className="flex items-center gap-2">
-          {isExpired ? (
+          {isVoided ? (
+            <ShieldAlert className="h-5 w-5 text-red-500" />
+          ) : isExpired ? (
             <ShieldAlert className="h-5 w-5 text-gray-500" />
           ) : (
             <ShieldCheck className="h-5 w-5 text-green-600" />
@@ -82,7 +88,14 @@ export default function WarrantyCard({ warranty }: WarrantyCardProps) {
           </span>
         </div>
 
-        {isExpired ? (
+        {isVoided ? (
+          <Tag
+            color="error"
+            className="!m-0 rounded-full px-3 py-0.5 text-xs font-semibold"
+          >
+            Đã vô hiệu hóa (Đã hoàn tiền / Đổi trả)
+          </Tag>
+        ) : isExpired ? (
           <Tag
             color="default"
             className="!m-0 rounded-full border-gray-300 bg-gray-200 px-3 py-0.5 text-xs font-semibold text-gray-700"

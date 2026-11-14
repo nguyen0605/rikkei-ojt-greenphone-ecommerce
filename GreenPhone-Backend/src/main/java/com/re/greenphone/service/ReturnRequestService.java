@@ -426,6 +426,18 @@ public class ReturnRequestService {
         String customerPhone = req.getOrder() != null && req.getOrder().getReceiverPhone() != null && !req.getOrder().getReceiverPhone().isBlank()
                 ? req.getOrder().getReceiverPhone()
                 : (req.getUser() != null ? req.getUser().getPhone() : null);
+
+        String imeiNumber = null;
+        if (req.getOrder() != null && req.getPhoneVariant() != null) {
+            List<Warranty> warranties = warrantyRepository.findByOrderId(req.getOrder().getId());
+            for (Warranty w : warranties) {
+                if (w.getPhoneVariant() != null && w.getPhoneVariant().getId().equals(req.getPhoneVariant().getId())) {
+                    imeiNumber = w.getImeiNumber();
+                    break;
+                }
+            }
+        }
+
         return ReturnResponse.builder()
                 .id(req.getId())
                 .returnCode(req.getReturnCode())
@@ -434,6 +446,7 @@ public class ReturnRequestService {
                 .phoneName(req.getPhoneVariant() != null && req.getPhoneVariant().getPhone() != null
                         ? req.getPhoneVariant().getPhone().getName() : null)
                 .variantSku(req.getPhoneVariant() != null ? req.getPhoneVariant().getSku() : null)
+                .imeiNumber(imeiNumber)
                 .userId(req.getUser() != null ? req.getUser().getId() : null)
                 .customerName(customerName)
                 .customerPhone(customerPhone)

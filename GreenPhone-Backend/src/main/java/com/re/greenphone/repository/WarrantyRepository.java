@@ -31,9 +31,10 @@ public interface WarrantyRepository extends JpaRepository<Warranty, Long> {
            "LEFT JOIN FETCH pv.ramItem " +
            "LEFT JOIN FETCH pv.storageItem " +
            "LEFT JOIN FETCH pv.colorItem " +
-           "WHERE w.imeiNumber = :query " +
+           "WHERE (w.status IS NULL OR UPPER(w.status) != 'VOIDED') " +
+           "  AND (w.imeiNumber = :query " +
            "   OR w.customerPhone = :query " +
-           "   OR LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) " +
+           "   OR LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%'))) " +
            "ORDER BY w.createdAt DESC")
     List<Warranty> searchByImeiOrPhone(@Param("query") String query);
 }
