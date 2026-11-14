@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, Loader2, Smartphone, AlertCircle } from 'lucide-react';
+import { Search, X, Loader2, Smartphone, AlertCircle, Sparkles } from 'lucide-react';
 import { phoneComparisonService } from '@/services/phoneComparisonService';
 import type { PhoneDTO } from '@/types/api';
 
@@ -20,10 +20,24 @@ export const CompareSearchBar: React.FC<CompareSearchBarProps> = ({
 }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<PhoneDTO[]>([]);
+  const [initialPhones, setInitialPhones] = useState<PhoneDTO[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load initial popular phones for instant selection
+  useEffect(() => {
+    let isMounted = true;
+    phoneComparisonService.getInitialPhones().then((phones) => {
+      if (isMounted) {
+        setInitialPhones(phones);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (autoFocus && inputRef.current) {
@@ -55,7 +69,7 @@ export const CompareSearchBar: React.FC<CompareSearchBarProps> = ({
       } finally {
         setLoading(false);
       }
-    }, 300);
+    }, 250);
 
     return () => {
       if (debounceTimerRef.current) {
@@ -69,8 +83,11 @@ export const CompareSearchBar: React.FC<CompareSearchBarProps> = ({
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
   };
 
+  const displayedList = query.trim().length > 0 ? results : initialPhones;
+  const isShowingInitial = query.trim().length === 0;
+
   return (
-    <div className="w-full relative" data-testid="compare-search-bar">
+    <div className="w-full flex flex-col" data-testid="compare-search-bar">
       <div className="relative flex items-center">
         <Search className="w-5 h-5 absolute left-3 text-slate-400 pointer-events-none" />
         <input
@@ -95,27 +112,33 @@ export const CompareSearchBar: React.FC<CompareSearchBarProps> = ({
         ) : null}
       </div>
 
-      {/* Kết quả tìm kiếm */}
-      {query.trim().length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-h-80 overflow-y-auto z-50">
-          {loading && (
-            <div className="p-4 text-center text-slate-500 text-sm flex items-center justify-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
-              <span>Đang tìm kiếm điện thoại...</span>
-            </div>
-          )}
+      {/* Danh sách kết quả hoặc gợi ý */}
+      <div className="mt-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm max-h-80 overflow-y-auto">
+        {loading && (
+          <div className="p-4 text-center text-slate-500 text-sm flex items-center justify-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
+            <span>Đang tìm kiếm điện thoại...</span>
+          </div>
+        )}
 
-          {!loading && hasSearched && results.length === 0 && (
-            <div className="p-6 text-center text-slate-500 text-sm">
-              <Smartphone className="w-8 h-8 mx-auto mb-2 text-slate-400 opacity-60" />
-              <p>Không tìm thấy điện thoại nào khớp với &ldquo;{query}&rdquo;</p>
-              <p className="text-xs text-slate-400 mt-1">Vui lòng thử từ khóa khác (ví dụ: iPhone, Galaxy, Xiaomi...)</p>
-            </div>
-          )}
+        {!loading && query.trim().length > 0 && hasSearched && results.length === 0 && (
+          <div className="p-6 text-center text-slate-500 text-sm">
+            <Smartphone className="w-8 h-8 mx-auto mb-2 text-slate-400 opacity-60" />
+            <p>Không tìm thấy điện thoại nào khớp với &ldquo;{query}&rdquo;</p>
+            <p className="text-xs text-slate-400 mt-1">Vui lòng thử từ khóa khác (ví dụ: iPhone, Galaxy, Xiaomi, OPPO...)</p>
+          </div>
+        )}
 
-          {!loading && results.length > 0 && (
+        {!loading && displayedList.length > 0 && (
+          <div>
+            {isShowingInitial && (
+              <div className="px-3.5 py-1.5 bg-slate-50 dark:bg-slate-700/50 border-b border-slate-100 dark:border-slate-700 text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Gợi ý điện thoại phổ biến</span>
+              </div>
+            )}
             <ul className="divide-y divide-slate-100 dark:divide-slate-700/60" role="listbox">
-              {results.map((phone) => {
+              {displayedList.map((phone) => {
                 const isAlreadySelected = disabledPhoneIds.includes(phone.id);
                 return (
                   <li key={phone.id}>
@@ -126,7 +149,6 @@ export const CompareSearchBar: React.FC<CompareSearchBarProps> = ({
                         if (!isAlreadySelected) {
                           onSelectPhone(phone);
                           setQuery('');
-                          setResults([]);
                         }
                       }}
                       className={`w-full px-4 py-3 text-left flex items-center justify-between gap-3 transition-colors ${
@@ -152,7 +174,7 @@ export const CompareSearchBar: React.FC<CompareSearchBarProps> = ({
                             {phone.name}
                           </p>
                           <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {phone.brandName} &bull; {phone.screen || 'Màn hình chuẩn'}
+                            {phone.brandName} {phone.screen ? `• ${phone.screen}` : ''}
                           </p>
                           <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
                             {formatPrice(phone.lowestPrice)}
@@ -175,9 +197,9 @@ export const CompareSearchBar: React.FC<CompareSearchBarProps> = ({
                 );
               })}
             </ul>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
 
       {onCancel && (
         <button
@@ -193,4 +215,3 @@ export const CompareSearchBar: React.FC<CompareSearchBarProps> = ({
 };
 
 export default CompareSearchBar;
-

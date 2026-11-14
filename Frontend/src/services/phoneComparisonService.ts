@@ -25,12 +25,42 @@ export const phoneComparisonService = {
    */
   async searchPhones(query: string): Promise<PhoneDTO[]> {
     if (!query || !query.trim()) return [];
-    const res = await publicApi.get<ApiResponse<PageResponse<PhoneDTO>>>('/phones/search', {
-      params: { q: query.trim(), page: 0, size: 10 },
-    });
-    return res.data.data?.content ?? [];
+    try {
+      const res = await publicApi.get<ApiResponse<PageResponse<PhoneDTO>>>('/phones/search', {
+        params: { q: query.trim(), page: 0, size: 10 },
+      });
+      if (res.data.data?.content && res.data.data.content.length > 0) {
+        return res.data.data.content;
+      }
+    } catch (err) {
+      console.warn('Fulltext search failed, falling back to query list:', err);
+    }
+
+    try {
+      const res = await publicApi.get<ApiResponse<PageResponse<PhoneDTO>>>('/phones', {
+        params: { query: query.trim(), page: 0, size: 10 },
+      });
+      return res.data.data?.content ?? [];
+    } catch (err) {
+      console.error('All phone search methods failed:', err);
+      return [];
+    }
+  },
+
+  /**
+   * Lấy danh sách điện thoại nổi bật ban đầu khi mở modal
+   */
+  async getInitialPhones(): Promise<PhoneDTO[]> {
+    try {
+      const res = await publicApi.get<ApiResponse<PageResponse<PhoneDTO>>>('/phones', {
+        params: { page: 0, size: 6 },
+      });
+      return res.data.data?.content ?? [];
+    } catch (err) {
+      console.error('Failed to get initial phones:', err);
+      return [];
+    }
   },
 };
 
 export default phoneComparisonService;
-
