@@ -3,13 +3,21 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PhoneComparePage from '../PhoneComparePage';
+import { phoneService } from '@/services';
 import { phoneComparisonService } from '@/services/phoneComparisonService';
 import type { PhoneComparisonResponseDTO } from '@/types/api';
+
+vi.mock('@/services', () => ({
+  phoneService: {
+    detail: vi.fn(),
+  },
+}));
 
 vi.mock('@/services/phoneComparisonService', () => ({
   phoneComparisonService: {
     compare: vi.fn(),
     searchPhones: vi.fn(),
+    getInitialPhones: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -124,6 +132,36 @@ describe('PhoneComparePage', () => {
     expect(screen.getByText('Chưa chọn điện thoại thứ hai')).toBeInTheDocument();
     expect(screen.getByText('Vui lòng chọn đủ 2 điện thoại để bắt đầu so sánh')).toBeInTheDocument();
     expect(phoneComparisonService.compare).not.toHaveBeenCalled();
+  });
+
+  it('renders product 1 immediately when only id1 is selected in URL search params', async () => {
+    vi.mocked(phoneService.detail).mockResolvedValue({
+      id: 1,
+      name: 'iPhone 15 Pro',
+      brandId: 10,
+      brandName: 'Apple',
+      screen: '6.1 inch, Super Retina XDR OLED',
+      os: 'iOS 17',
+      chip: 'Apple A17 Pro',
+      rearCamera: '48 MP',
+      frontCamera: '12 MP',
+      battery: '3274 mAh',
+      warranty: '12 tháng',
+      status: 'ACTIVE',
+      images: [{ id: 1, phoneId: 1, imageUrl: 'https://example.com/iphone15pro.jpg', isMain: true, sortOrder: 0 }],
+      variants: [{ id: 1, phoneId: 1, ramItemId: 1, storageItemId: 1, colorItemId: 1, ram: '8GB', storage: '128GB', color: 'Đen', price: 28990000, discountPrice: 25990000, stockQuantity: 10, status: 'ACTIVE' }],
+      avgRating: 4.8,
+      reviewCount: 42,
+    } as any);
+
+    renderPage('/so-sanh?id1=1');
+
+    await waitFor(() => {
+      const slot1 = screen.getByTestId('compare-slot-1');
+      expect(within(slot1).getByText('iPhone 15 Pro')).toBeInTheDocument();
+      expect(screen.getByText('Chưa chọn điện thoại thứ hai')).toBeInTheDocument();
+      expect(screen.getByText('Bạn đã chọn "iPhone 15 Pro"')).toBeInTheDocument();
+    });
   });
 
   it('fetches and displays comparison when valid id1 and id2 are in URL search params', async () => {

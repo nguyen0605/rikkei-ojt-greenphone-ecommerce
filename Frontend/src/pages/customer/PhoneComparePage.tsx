@@ -14,11 +14,56 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { ROUTES } from '@/routes/routePaths';
+import { phoneService } from '@/services';
 import { phoneComparisonService } from '@/services/phoneComparisonService';
-import type { PhoneComparisonResponseDTO, ComparedPhoneDTO, PhoneDTO } from '@/types/api';
+import type { PhoneComparisonResponseDTO, ComparedPhoneDTO, PhoneDTO, PhoneDetailDTO } from '@/types/api';
 import CompareSearchBar from '@/components/compare/CompareSearchBar';
 import CompareSpecTable from '@/components/compare/CompareSpecTable';
 import CompareStickyHeader from '@/components/compare/CompareStickyHeader';
+
+function toComparedPhone(phone: PhoneDetailDTO | PhoneDTO): ComparedPhoneDTO {
+  const detail = phone as PhoneDetailDTO;
+  const variants = detail.variants || [];
+  const minPrice = variants.length > 0
+    ? Math.min(...variants.map((v) => v.price).filter(Boolean))
+    : (phone as any).lowestPrice || null;
+  const minDiscountPrice = variants.filter((v) => v.discountPrice).length > 0
+    ? Math.min(...variants.map((v) => v.discountPrice!).filter(Boolean))
+    : null;
+  const maxPrice = variants.length > 0
+    ? Math.max(...variants.map((v) => v.price).filter(Boolean))
+    : minPrice;
+
+  const mainImageUrl =
+    detail.images?.find((img) => img.isMain)?.imageUrl ||
+    detail.images?.[0]?.imageUrl ||
+    phone.mainImageUrl ||
+    null;
+
+  return {
+    id: phone.id,
+    name: phone.name,
+    brandId: phone.brandId,
+    brandName: phone.brandName,
+    mainImageUrl,
+    minPrice,
+    maxPrice,
+    minDiscountPrice,
+    screen: phone.screen,
+    os: phone.os,
+    chip: phone.chip,
+    rearCamera: phone.rearCamera,
+    frontCamera: phone.frontCamera,
+    battery: phone.battery,
+    warranty: phone.warranty,
+    ramOptions: Array.from(new Set(variants.map((v) => v.ram).filter(Boolean))),
+    storageOptions: Array.from(new Set(variants.map((v) => v.storage).filter(Boolean))),
+    colorOptions: Array.from(new Set(variants.map((v) => v.color).filter(Boolean))),
+    avgRating: detail.avgRating || 0,
+    reviewCount: detail.reviewCount || 0,
+    totalStock: variants.reduce((sum, v) => sum + (v.stockQuantity || 0), 0),
+  };
+}
 
 export const PhoneComparePage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -30,6 +75,8 @@ export const PhoneComparePage: React.FC = () => {
   const id2 = id2Param ? Number(id2Param) : null;
 
   const [comparisonData, setComparisonData] = useState<PhoneComparisonResponseDTO | null>(null);
+  const [singlePhone1, setSinglePhone1] = useState<ComparedPhoneDTO | null>(null);
+  const [singlePhone2, setSinglePhone2] = useState<ComparedPhoneDTO | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,43 +103,55 @@ export const PhoneComparePage: React.FC = () => {
   useEffect(() => {
     if (!id1 && !id2) {
       setComparisonData(null);
+      setSinglePhone1(null);
+      setSinglePhone2(null);
       setError(null);
       return;
     }
 
-    // Nếu cả 2 ID trùng nhau -> Tự động sửa lỗi loại bỏ ID trùng
+    // Nếu cả 2 ID trùng nhau -> Tự động báo lỗi chặn trùng
     if (id1 && id2 && id1 === id2) {
       setError('Không thể so sánh cùng một sản phẩm ở cả hai vị trí.');
       setComparisonData(null);
       return;
     }
 
-    const fetchComparison = async () => {
+    const fetchData = async () => {
       setLoading(true);
       setError(null);
       try {
-        const idsToFetch: number[] = [];
-        if (id1 && !isNaN(id1)) idsToFetch.push(id1);
-        if (id2 && !isNaN(id2)) idsToFetch.push(id2);
-
-        if (idsToFetch.length >= 2) {
-          const data = await phoneComparisonService.compare(idsToFetch);
+        if (id1 && id2) {
+          // Cả 2 máy được chọn -> Lấy toàn bộ dữ liệu so sánh và đối chiếu thông số
+          const data = await phoneComparisonService.compare([id1, id2]);
           setComparisonData(data);
-        } else {
-          // Chỉ chọn 1 máy: không đủ 2 máy để so sánh trọn vẹn nhưng vẫn hiển thị thông tin máy đó
-          // Gọi compare với chính nó bị chặn, nên ta chỉ hiển thị placeholder cho máy thứ hai
+          setSinglePhone1(null);
+          setSinglePhone2(null);
+        } else if (id1 && !id2) {
+          // Chỉ chọn sản phẩm 1 -> nạp chi tiết sản phẩm 1 hiển thị ngay lập tức
           setComparisonData(null);
+          setSinglePhone2(null);
+          if (!singlePhone1 || singlePhone1.id !== id1) {
+            const detail = await phoneService.detail(id1);
+            setSinglePhone1(toComparedPhone(detail));
+          }
+        } else if (!id1 && id2) {
+          // Chỉ chọn sản phẩm 2 -> nạp chi tiết sản phẩm 2 hiển thị ngay lập tức
+          setComparisonData(null);
+          setSinglePhone1(null);
+          if (!singlePhone2 || singlePhone2.id !== id2) {
+            const detail = await phoneService.detail(id2);
+            setSinglePhone2(toComparedPhone(detail));
+          }
         }
       } catch (err: any) {
         console.error('Failed to load comparison data:', err);
         setError(err.message || 'Không thể tải dữ liệu so sánh. Vui lòng thử lại sau.');
-        setComparisonData(null);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchComparison();
+    fetchData();
   }, [id1, id2]);
 
   // Handle swapping slot 1 and slot 2
@@ -104,6 +163,11 @@ export const PhoneComparePage: React.FC = () => {
 
     if (id1) nextParams.set('id2', String(id1));
     else nextParams.delete('id2');
+
+    // Đồng bộ state single phones khi đảo vị trí
+    const temp1 = singlePhone1;
+    setSinglePhone1(singlePhone2);
+    setSinglePhone2(temp1);
 
     setSearchParams(nextParams);
   };
@@ -117,12 +181,15 @@ export const PhoneComparePage: React.FC = () => {
   // When a phone is selected in search modal
   const handleSelectPhone = (phone: PhoneDTO) => {
     const nextParams = new URLSearchParams(searchParams);
+    const converted = toComparedPhone(phone);
+
     if (activeSlotToSelect === 0) {
       // Slot 1
       if (id2 === phone.id) {
         alert('Không thể so sánh cùng một sản phẩm ở cả hai vị trí.');
         return;
       }
+      setSinglePhone1(converted);
       nextParams.set('id1', String(phone.id));
     } else {
       // Slot 2
@@ -130,14 +197,15 @@ export const PhoneComparePage: React.FC = () => {
         alert('Không thể so sánh cùng một sản phẩm ở cả hai vị trí.');
         return;
       }
+      setSinglePhone2(converted);
       nextParams.set('id2', String(phone.id));
     }
     setSearchParams(nextParams);
     setSearchModalOpen(false);
   };
 
-  const phone1: ComparedPhoneDTO | undefined = comparisonData?.phones?.[0];
-  const phone2: ComparedPhoneDTO | undefined = comparisonData?.phones?.[1];
+  const phone1: ComparedPhoneDTO | undefined = comparisonData?.phones?.[0] || singlePhone1 || undefined;
+  const phone2: ComparedPhoneDTO | undefined = comparisonData?.phones?.[1] || singlePhone2 || undefined;
 
   const differencesCount = comparisonData?.differencesKeys?.length ?? 0;
 
@@ -238,6 +306,9 @@ export const PhoneComparePage: React.FC = () => {
                 const nextParams = new URLSearchParams(searchParams);
                 nextParams.delete('id1');
                 nextParams.delete('id2');
+                setSinglePhone1(null);
+                setSinglePhone2(null);
+                setComparisonData(null);
                 setSearchParams(nextParams);
               }}
               className="text-xs font-semibold underline text-red-800 dark:text-red-200"
@@ -461,7 +532,7 @@ export const PhoneComparePage: React.FC = () => {
           <div className="bg-white dark:bg-slate-900 rounded-2xl p-12 text-center border border-slate-200 dark:border-slate-800 mb-8">
             <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin mx-auto mb-3" />
             <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-              Đang tải dữ liệu so sánh thông số kỹ thuật...
+              Đang tải dữ liệu thông số kỹ thuật...
             </p>
           </div>
         )}
@@ -489,8 +560,29 @@ export const PhoneComparePage: React.FC = () => {
           </div>
         )}
 
-        {/* Empty state when fewer than 2 phones selected */}
-        {!loading && (!comparisonData || comparisonData.phones.length < 2) && !error && (
+        {/* Prompt banner when only 1 phone is selected */}
+        {!loading && !comparisonData && (phone1 || phone2) && !error && (
+          <div className="bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-slate-800 dark:to-slate-800/80 rounded-2xl p-8 text-center border border-emerald-200/60 dark:border-slate-700 mb-8 shadow-sm">
+            <Smartphone className="w-10 h-10 text-emerald-600 dark:text-emerald-400 mx-auto mb-2.5" />
+            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+              {phone1 ? `Bạn đã chọn "${phone1.name}"` : `Bạn đã chọn "${phone2?.name}"`}
+            </h3>
+            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-md mx-auto">
+              Vui lòng chọn thêm sản phẩm ở ô còn lại để mở khóa toàn bộ bảng đối chiếu thông số kỹ thuật song song!
+            </p>
+            <button
+              type="button"
+              onClick={() => handleOpenSearchModal(phone1 ? 1 : 0)}
+              className="mt-4 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl inline-flex items-center gap-2 shadow transition-all hover:scale-105"
+            >
+              <Plus className="w-4 h-4" />
+              <span>{phone1 ? 'Chọn Sản phẩm 2 ngay' : 'Chọn Sản phẩm 1 ngay'}</span>
+            </button>
+          </div>
+        )}
+
+        {/* Empty state when 0 phones selected */}
+        {!loading && !comparisonData && !phone1 && !phone2 && !error && (
           <div className="bg-white dark:bg-slate-900 rounded-2xl p-12 text-center border border-dashed border-slate-300 dark:border-slate-700 mb-8">
             <Smartphone className="w-12 h-12 text-slate-400 mx-auto mb-3 opacity-60" />
             <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200">
