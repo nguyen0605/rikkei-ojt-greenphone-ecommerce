@@ -36,6 +36,7 @@ public class SecurityConfig {
                         "/api/auth/logout",
                         "/api/admin/auth/**",
                         "/api/phones/**",
+                        "/api/v1/phones/**",
                         "/api/brands/**",
                         "/api/banners/**",
                         "/api/reviews/phone/**",

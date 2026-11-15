@@ -690,3 +690,48 @@ export interface UpdateClaimStatusRequest {
   note?: string;
   performedByName?: string;
 }
+
+// Phone Comparison
+export interface ComparedPhoneDTO {
+  id: number;
+  name: string;
+  brandId?: number;
+  brandName?: string;
+  mainImageUrl?: string | null;
+  minPrice?: number | null;
+  maxPrice?: number | null;
+  minDiscountPrice?: number | null;
+  screen?: string | null;
+  os?: string | null;
+  chip?: string | null;
+  rearCamera?: string | null;
+  frontCamera?: string | null;
+  battery?: string | null;
+  warranty?: string | null;
+  ramOptions?: string[];
+  storageOptions?: string[];
+  colorOptions?: string[];
+  avgRating?: number;
+  reviewCount?: number;
+  totalStock?: number;
+}
+
+export interface SpecItemDTO {
+  key: string;
+  label: string;
+  values: Record<number, string>;
+  isDifferent: boolean;
+}
+
+export interface SpecGroupDTO {
+  groupKey: string;
+  groupName: string;
+  items: SpecItemDTO[];
+}
+
+export interface PhoneComparisonResponseDTO {
+  phones: ComparedPhoneDTO[];
+  specGroups: SpecGroupDTO[];
+  differencesKeys: string[];
+}
+
