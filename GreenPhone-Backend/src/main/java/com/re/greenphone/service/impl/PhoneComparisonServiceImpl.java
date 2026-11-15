@@ -10,6 +10,7 @@ import com.re.greenphone.entity.OptionItem;
 import com.re.greenphone.entity.Phone;
 import com.re.greenphone.entity.PhoneImage;
 import com.re.greenphone.entity.PhoneVariant;
+import com.re.greenphone.entity.Review;
 import com.re.greenphone.repository.PhoneRepository;
 import com.re.greenphone.service.PhoneComparisonService;
 import lombok.RequiredArgsConstructor;
@@ -141,11 +142,14 @@ public class PhoneComparisonServiceImpl implements PhoneComparisonService {
         double avgRating = 0.0;
         long reviewCount = 0;
         if (phone.getReviews() != null && !phone.getReviews().isEmpty()) {
-            avgRating = phone.getReviews().stream()
+            List<Review> visibleReviews = phone.getReviews().stream()
+                    .filter(r -> r != null && ("SHOW".equalsIgnoreCase(r.getStatus()) || "APPROVED".equalsIgnoreCase(r.getStatus())))
+                    .toList();
+            avgRating = visibleReviews.stream()
                     .mapToInt(r -> r.getRating() != null ? r.getRating() : 0)
                     .average()
                     .orElse(0.0);
-            reviewCount = phone.getReviews().size();
+            reviewCount = visibleReviews.size();
         }
 
         return ComparedPhoneDTO.builder()
@@ -178,7 +182,7 @@ public class PhoneComparisonServiceImpl implements PhoneComparisonService {
 
         // 1. Thông tin chung
         List<SpecItemDTO> generalItems = new ArrayList<>();
-        generalItems.add(createSpecItem("brand", "Hương hiệu / Hãng", phones,
+        generalItems.add(createSpecItem("brand", "Thương hiệu / Hãng", phones,
                 p -> p.getBrand() != null ? p.getBrand().getName() : null, differencesKeys));
         generalItems.add(createSpecItem("price", "Giá khởi điểm", phones,
                 this::formatLowestPrice, differencesKeys));
