@@ -6,7 +6,7 @@ import OrderSummary from '@/components/checkout/OrderSummary';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { selectCheckoutItems, selectCheckoutSummary } from '@/store/selectors/cartSelectors';
 import { nextStep, prevStep, completeOrder, setCurrentStep, removeCheckoutVoucher, clearBuyNow } from '@/store/slices/checkoutSlice';
-import { clearCart } from '@/store/slices/cartSlice';
+import { clearCart, removeVoucher } from '@/store/slices/cartSlice';
 import { orderService, paymentService, phoneService } from '@/services';
 import { Button, App } from 'antd';
 import { Shield, CheckCircle, Banknote } from 'lucide-react';
@@ -226,6 +226,9 @@ export default function CheckoutPage() {
                           type="button"
                           onClick={() => {
                             dispatch(removeCheckoutVoucher());
+                            if (!buyNowItem) {
+                              dispatch(removeVoucher());
+                            }
                             message.info('Đã bỏ áp dụng mã khuyến mãi');
                           }}
                           className="rounded px-1.5 py-0.5 text-xs text-red-500 hover:bg-red-50 hover:underline transition-colors"

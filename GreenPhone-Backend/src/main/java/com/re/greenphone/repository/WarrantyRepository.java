@@ -20,6 +20,8 @@ public interface WarrantyRepository extends JpaRepository<Warranty, Long> {
 
     List<Warranty> findByOrderId(Long orderId);
 
+    List<Warranty> findByOrderIdIn(java.util.Collection<Long> orderIds);
+
     boolean existsByImeiNumber(String imeiNumber);
 
     boolean existsByOrderId(Long orderId);
