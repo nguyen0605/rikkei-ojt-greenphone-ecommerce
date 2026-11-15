@@ -26,6 +26,7 @@ const footerLinks = {
     { label: 'Điều khoản sử dụng', to: ROUTES.DIEU_KHOAN },
   ],
   support: [
+    { label: 'So sánh điện thoại', to: ROUTES.PHONE_COMPARE },
     { label: 'Tra cứu bảo hành', to: ROUTES.WARRANTY_CHECK },
     { label: 'Hướng dẫn mua hàng', href: '#' },
     { label: 'Hướng dẫn bán góp', href: '#' },
