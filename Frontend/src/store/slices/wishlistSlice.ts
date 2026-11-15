@@ -71,7 +71,7 @@ function mapApiItemToWishlistItem(item: WishlistApiItem): WishlistItem {
 }
 
 /**
- * Lấy danh sách sản phẩm yêu thích (Khách đăng nhập gọi API server, khách vãng lai dùng Redux/localStorage)
+ * Lấy danh sách sản phẩm yêu thích từ server (chỉ dành riêng cho người dùng đã đăng nhập)
  */
 export const fetchWishlist = createAsyncThunk(
   'wishlist/fetchWishlist',
@@ -80,7 +80,7 @@ export const fetchWishlist = createAsyncThunk(
     const isAuth = Boolean(state.auth?.isAuthenticated && state.auth?.token);
 
     if (!isAuth) {
-      return state.wishlist?.items ?? [];
+      return [];
     }
 
     try {
@@ -93,10 +93,7 @@ export const fetchWishlist = createAsyncThunk(
 );
 
 /**
- * Thao tác bật/tắt yêu thích với cơ chế Optimistic UI (< 50ms):
- * - Cập nhật tức thì trên Redux state
- * - Nếu là khách vãng lai: Lưu vào localStorage qua Redux Persist
- * - Nếu đã đăng nhập: Gọi API server; nếu lỗi thì hoàn nguyên (rollback) lại trạng thái cũ
+ * Thao tác bật/tắt yêu thích với cơ chế Optimistic UI (< 50ms) dành cho người dùng đã đăng nhập
  */
 export const toggleWishlistAsync = createAsyncThunk<
   { productId: string; isLiked: boolean; item?: WishlistItem },
@@ -106,6 +103,13 @@ export const toggleWishlistAsync = createAsyncThunk<
   'wishlist/toggleWishlistAsync',
   async (payload, { getState, rejectWithValue }) => {
     const state = getState();
+    const isAuth = Boolean(state.auth?.isAuthenticated && state.auth?.token);
+
+    // Chặn tuyệt đối nếu chưa đăng nhập
+    if (!isAuth) {
+      return rejectWithValue('Vui lòng đăng nhập để lưu sản phẩm vào danh sách yêu thích');
+    }
+
     const item = normalizeItem(payload);
     const productId = item.productId;
 
@@ -113,14 +117,6 @@ export const toggleWishlistAsync = createAsyncThunk<
     const wasLiked = Boolean(state.wishlist?.previousItems?.some((i) => i.productId === productId));
     const isNowLiked = !wasLiked;
 
-    const isAuth = Boolean(state.auth?.isAuthenticated && state.auth?.token);
-
-    // 1. Khách vãng lai: Đã được lưu Optimistic vào Redux/localStorage
-    if (!isAuth) {
-      return { productId, isLiked: isNowLiked, item };
-    }
-
-    // 2. Khách hàng đã đăng nhập: Đồng bộ hai chiều với Server
     try {
       if (isNowLiked) {
         await wishlistApi.addToWishlist(productId);
@@ -130,42 +126,6 @@ export const toggleWishlistAsync = createAsyncThunk<
       return { productId, isLiked: isNowLiked, item };
     } catch (error: any) {
       return rejectWithValue(error.message || 'Không thể đồng bộ danh sách yêu thích với máy chủ');
-    }
-  }
-);
-
-/**
- * Đồng bộ danh sách yêu thích từ local lên server sau khi đăng nhập thành công
- */
-export const syncWishlistToServer = createAsyncThunk<
-  WishlistItem[],
-  void,
-  { state: { auth?: { isAuthenticated?: boolean; token?: string | null }; wishlist?: WishlistState } }
->(
-  'wishlist/syncWishlistToServer',
-  async (_, { getState }) => {
-    const state = getState();
-    const localItems = state.wishlist?.items ?? [];
-    const isAuth = Boolean(state.auth?.isAuthenticated && state.auth?.token);
-
-    if (!isAuth || localItems.length === 0) {
-      return localItems;
-    }
-
-    const phoneIds = localItems.map((i) => i.productId).filter(Boolean);
-
-    try {
-      try {
-        await wishlistApi.syncWishlist(phoneIds);
-      } catch {
-        // Fallback: Nếu backend chưa có endpoint /sync, gọi addToWishlist theo từng ID
-        await Promise.allSettled(phoneIds.map((id) => wishlistApi.addToWishlist(id)));
-      }
-      const serverItems = await wishlistApi.getWishlist();
-      return serverItems.length > 0 ? serverItems.map(mapApiItemToWishlistItem) : localItems;
-    } catch {
-      // Bảo toàn danh sách local nếu server tạm thời không phản hồi
-      return localItems;
     }
   }
 );
@@ -253,14 +213,8 @@ const wishlistSlice = createSlice({
         state.error = (action.payload as string) || action.error.message || null;
       })
 
-      // ===== syncWishlistToServer =====
-      .addCase(syncWishlistToServer.fulfilled, (state, action) => {
-        state.items = action.payload;
-      })
-
-      // ===== Tự động kích hoạt đồng bộ khi đăng nhập thành công =====
+      // ===== Tự động kích hoạt khi đăng nhập thành công =====
       .addCase(loginThunk.fulfilled, (state) => {
-        // Redux Persist lưu sẵn local items, Hydrator sẽ thực hiện syncWishlistToServer
         state.error = null;
       })
       .addCase(verifyOTPThunk.fulfilled, (state) => {

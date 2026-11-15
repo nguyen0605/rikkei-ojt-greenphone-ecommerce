@@ -9,9 +9,8 @@ import wishlistReducer, {
   setWishlistItems,
   fetchWishlist,
   toggleWishlistAsync,
-  syncWishlistToServer,
 } from '../wishlistSlice';
-import authReducer from '../authSlice';
+import authReducer, { logout, logoutThunk } from '../authSlice';
 import { wishlistApi } from '@/api/wishlistApi';
 
 vi.mock('@/api/wishlistApi', () => ({
@@ -37,7 +36,7 @@ describe('wishlistSlice', () => {
 
   // ===== Synchronous Reducer Tests =====
   describe('Synchronous Reducers', () => {
-    it('should return initial state', () => {
+    it('should return initial state with empty items array', () => {
       expect(wishlistReducer(undefined, { type: '@@INIT' })).toEqual(initialState);
     });
 
@@ -122,13 +121,13 @@ describe('wishlistSlice', () => {
         ...initialState,
         items: [{ productId: '1', name: 'User 1 Phone', addedAt: '2026-01-01' }],
       };
-      const stateAfterLogout = wishlistReducer(stateWithItems, { type: 'auth/logout' });
+      const stateAfterLogout = wishlistReducer(stateWithItems, logout());
       expect(stateAfterLogout.items).toEqual([]);
     });
   });
 
-  // ===== Async Thunks & Optimistic UI Tests =====
-  describe('Async Thunks and Optimistic UI', () => {
+  // ===== Async Thunks & Authentication Protection Tests =====
+  describe('Async Thunks and Authentication Protection', () => {
     function setupStore(preloadedAuth = { isAuthenticated: false, token: null as string | null }) {
       return configureStore({
         reducer: {
@@ -155,40 +154,29 @@ describe('wishlistSlice', () => {
       });
     }
 
-    it('optimistically adds item in guest mode without calling API', async () => {
+    it('khi khách chưa đăng nhập: toggleWishlistAsync bị reject và không gọi API server', async () => {
       const store = setupStore({ isAuthenticated: false, token: null });
 
-      const promise = store.dispatch(
+      const result = await store.dispatch(
         toggleWishlistAsync({ productId: '5', name: 'Xiaomi 14 Ultra' })
       );
 
-      // Optimistic check: immediately added in pending state (< 50ms)
-      expect(store.getState().wishlist.items).toHaveLength(1);
-      expect(store.getState().wishlist.items[0].productId).toBe('5');
-
-      const result = await promise;
-      expect(result.payload).toEqual({
-        productId: '5',
-        isLiked: true,
-        item: expect.objectContaining({ productId: '5', name: 'Xiaomi 14 Ultra' }),
-      });
+      expect(result.type).toBe('wishlist/toggleWishlistAsync/rejected');
+      expect(result.payload).toBe('Vui lòng đăng nhập để lưu sản phẩm vào danh sách yêu thích');
       expect(wishlistApi.addToWishlist).not.toHaveBeenCalled();
-      expect(store.getState().wishlist.items).toHaveLength(1);
-      expect(store.getState().wishlist.previousItems).toBeNull();
-    });
-
-    it('optimistically removes item in guest mode', async () => {
-      const store = setupStore({ isAuthenticated: false, token: null });
-      store.dispatch(addToWishlist({ productId: '5', name: 'Xiaomi 14 Ultra' }));
-      expect(store.getState().wishlist.items).toHaveLength(1);
-
-      await store.dispatch(toggleWishlistAsync('5'));
-
       expect(store.getState().wishlist.items).toHaveLength(0);
-      expect(wishlistApi.removeFromWishlist).not.toHaveBeenCalled();
     });
 
-    it('calls server API when user is authenticated and succeeds', async () => {
+    it('khi khách chưa đăng nhập: fetchWishlist trả về mảng rỗng [] và không gọi server', async () => {
+      const store = setupStore({ isAuthenticated: false, token: null });
+
+      await store.dispatch(fetchWishlist());
+
+      expect(wishlistApi.getWishlist).not.toHaveBeenCalled();
+      expect(store.getState().wishlist.items).toEqual([]);
+    });
+
+    it('khi người dùng đã đăng nhập: gọi API server để thêm yêu thích', async () => {
       vi.mocked(wishlistApi.addToWishlist).mockResolvedValueOnce(undefined);
       const store = setupStore({ isAuthenticated: true, token: 'mock-jwt-token' });
 
@@ -196,18 +184,17 @@ describe('wishlistSlice', () => {
         toggleWishlistAsync({ productId: '7', name: 'iPhone 15 Pro' })
       );
 
-      // Optimistic update verified immediately
+      // Optimistic update
       expect(store.getState().wishlist.items).toHaveLength(1);
 
       await promise;
 
       expect(wishlistApi.addToWishlist).toHaveBeenCalledWith('7');
       expect(store.getState().wishlist.items).toHaveLength(1);
-      expect(store.getState().wishlist.previousItems).toBeNull();
       expect(store.getState().wishlist.error).toBeNull();
     });
 
-    it('rolls back optimistic update when server API fails (Rollback UI)', async () => {
+    it('khi server API gặp lỗi: tự động rollback trạng thái về mảng rỗng', async () => {
       vi.mocked(wishlistApi.addToWishlist).mockRejectedValueOnce(new Error('Network error 500'));
       const store = setupStore({ isAuthenticated: true, token: 'mock-jwt-token' });
 
@@ -217,19 +204,18 @@ describe('wishlistSlice', () => {
         toggleWishlistAsync({ productId: '99', name: 'Faulty Product' })
       );
 
-      // Optimistic UI shows it added immediately
+      // Optimistic update
       expect(store.getState().wishlist.items).toHaveLength(1);
 
-      // Await rejection
       await promise;
 
-      // Rollback verified: items restored to empty list, error logged
+      // Rollback về trạng thái ban đầu
       expect(store.getState().wishlist.items).toHaveLength(0);
       expect(store.getState().wishlist.previousItems).toBeNull();
       expect(store.getState().wishlist.error).toContain('Network error 500');
     });
 
-    it('fetches server wishlist when authenticated', async () => {
+    it('khi đã đăng nhập: fetchWishlist tải danh sách từ server', async () => {
       vi.mocked(wishlistApi.getWishlist).mockResolvedValueOnce([
         { phoneId: 1, name: 'Samsung Galaxy S24', price: 20000000 },
         { phoneId: 2, name: 'iPhone 16', price: 25000000 },
@@ -244,25 +230,15 @@ describe('wishlistSlice', () => {
       expect(store.getState().wishlist.items[1].name).toBe('iPhone 16');
     });
 
-    it('synchronizes local wishlist to server upon login', async () => {
-      vi.mocked(wishlistApi.syncWishlist).mockResolvedValueOnce([
-        { phoneId: 10, name: 'Phone 10' },
-        { phoneId: 20, name: 'Phone 20' },
-      ]);
-      vi.mocked(wishlistApi.getWishlist).mockResolvedValueOnce([
-        { phoneId: 10, name: 'Phone 10' },
-        { phoneId: 20, name: 'Phone 20' },
-      ]);
+    it('khi đăng xuất (logout): danh sách yêu thích tự động được xóa sạch về mảng rỗng', () => {
+      const store = setupStore({ isAuthenticated: true, token: 'valid-token' });
+      store.dispatch(addToWishlist({ productId: '10', name: 'User Phone' }));
+      expect(store.getState().wishlist.items).toHaveLength(1);
 
-      const store = setupStore({ isAuthenticated: true, token: 'token-123' });
-      store.dispatch(addToWishlist({ productId: '10', name: 'Phone 10' }));
-      store.dispatch(addToWishlist({ productId: '20', name: 'Phone 20' }));
+      store.dispatch(logout());
 
-      await store.dispatch(syncWishlistToServer());
-
-      expect(wishlistApi.syncWishlist).toHaveBeenCalledWith(['10', '20']);
-      expect(wishlistApi.getWishlist).toHaveBeenCalledTimes(1);
-      expect(store.getState().wishlist.items).toHaveLength(2);
+      expect(store.getState().wishlist.items).toEqual([]);
+      expect(store.getState().wishlist.previousItems).toBeNull();
     });
   });
 });

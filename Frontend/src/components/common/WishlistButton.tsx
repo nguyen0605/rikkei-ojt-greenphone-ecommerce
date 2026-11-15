@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Heart } from 'lucide-react';
 import { App } from 'antd';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { toggleWishlistAsync } from '@/store/slices/wishlistSlice';
+import { ROUTES } from '@/routes/routePaths';
 import { cn } from '@/utils';
 
 export interface WishlistButtonProps {
@@ -37,16 +39,34 @@ export default function WishlistButton({
   onToggle,
 }: WishlistButtonProps) {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { message } = App.useApp();
   const [isBouncing, setIsBouncing] = useState(false);
 
+  const isAuthenticated = useAppSelector((state) => state.auth?.isAuthenticated ?? false);
+
+  // Chỉ hiển thị trạng thái yêu thích khi người dùng đã đăng nhập hợp lệ
   const isLiked = useAppSelector((state) =>
-    Boolean(state.wishlist?.items?.some((item) => String(item.productId) === String(productId)))
+    Boolean(
+      state.auth?.isAuthenticated &&
+      state.wishlist?.items?.some((item) => String(item.productId) === String(productId))
+    )
   );
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // Chặn người dùng chưa đăng nhập, hiển thị thông báo và chuyển hướng tới /dang-nhap
+    if (!isAuthenticated) {
+      message.warning('Vui lòng đăng nhập để lưu sản phẩm vào danh sách yêu thích');
+      const currentPath = location.pathname + location.search;
+      navigate(ROUTES.LOGIN, {
+        state: { from: currentPath, redirect: currentPath },
+      });
+      return;
+    }
 
     // Trigger bounce micro-interaction
     setIsBouncing(true);
