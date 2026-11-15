@@ -598,6 +598,7 @@ export interface ReturnResponseDTO {
   phoneVariantId: number;
   phoneName: string | null;
   variantSku: string | null;
+  imeiNumber?: string | null;
   userId: number;
   customerName: string | null;
   customerPhone: string | null;

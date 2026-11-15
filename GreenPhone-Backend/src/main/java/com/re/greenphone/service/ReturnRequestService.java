@@ -26,9 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -275,8 +274,10 @@ public class ReturnRequestService {
     @Transactional(readOnly = true)
     public List<ReturnResponse> getMyReturnRequests() {
         Long currentUserId = SecurityUtils.getCurrentUser().getId();
-        return returnRequestRepository.findByUserIdOrderByCreatedAtDesc(currentUserId).stream()
-                .map(this::mapToResponse)
+        List<ReturnRequest> list = returnRequestRepository.findByUserIdOrderByCreatedAtDesc(currentUserId);
+        Map<String, String> imeiLookup = buildImeiLookup(list);
+        return list.stream()
+                .map(r -> mapToResponse(r, imeiLookup))
                 .toList();
     }
 
@@ -302,7 +303,8 @@ public class ReturnRequestService {
         } else {
             page = returnRequestRepository.findAll(pageable);
         }
-        return page.map(this::mapToResponse);
+        Map<String, String> imeiLookup = buildImeiLookup(page.getContent());
+        return page.map(r -> mapToResponse(r, imeiLookup));
     }
 
     /**
@@ -418,7 +420,35 @@ public class ReturnRequestService {
         }
     }
 
+    private Map<String, String> buildImeiLookup(Collection<ReturnRequest> requests) {
+        if (requests == null || requests.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Set<Long> orderIds = requests.stream()
+                .filter(r -> r.getOrder() != null && r.getOrder().getId() != null)
+                .map(r -> r.getOrder().getId())
+                .collect(Collectors.toSet());
+
+        if (orderIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        List<Warranty> warranties = warrantyRepository.findByOrderIdIn(orderIds);
+        Map<String, String> lookup = new HashMap<>();
+        for (Warranty w : warranties) {
+            if (w.getOrder() != null && w.getPhoneVariant() != null && w.getImeiNumber() != null) {
+                String key = w.getOrder().getId() + "_" + w.getPhoneVariant().getId();
+                lookup.putIfAbsent(key, w.getImeiNumber());
+            }
+        }
+        return lookup;
+    }
+
     private ReturnResponse mapToResponse(ReturnRequest req) {
+        return mapToResponse(req, null);
+    }
+
+    private ReturnResponse mapToResponse(ReturnRequest req, Map<String, String> imeiLookup) {
         List<String> images = deserializeProofImages(req.getProofImagesJson());
         String customerName = req.getUser() != null && req.getUser().getFullName() != null && !req.getUser().getFullName().isBlank()
                 ? req.getUser().getFullName()
@@ -426,6 +456,23 @@ public class ReturnRequestService {
         String customerPhone = req.getOrder() != null && req.getOrder().getReceiverPhone() != null && !req.getOrder().getReceiverPhone().isBlank()
                 ? req.getOrder().getReceiverPhone()
                 : (req.getUser() != null ? req.getUser().getPhone() : null);
+
+        String imeiNumber = null;
+        if (req.getOrder() != null && req.getPhoneVariant() != null) {
+            String key = req.getOrder().getId() + "_" + req.getPhoneVariant().getId();
+            if (imeiLookup != null) {
+                imeiNumber = imeiLookup.get(key);
+            } else {
+                List<Warranty> warranties = warrantyRepository.findByOrderId(req.getOrder().getId());
+                for (Warranty w : warranties) {
+                    if (w.getPhoneVariant() != null && w.getPhoneVariant().getId().equals(req.getPhoneVariant().getId())) {
+                        imeiNumber = w.getImeiNumber();
+                        break;
+                    }
+                }
+            }
+        }
+
         return ReturnResponse.builder()
                 .id(req.getId())
                 .returnCode(req.getReturnCode())
@@ -434,6 +481,7 @@ public class ReturnRequestService {
                 .phoneName(req.getPhoneVariant() != null && req.getPhoneVariant().getPhone() != null
                         ? req.getPhoneVariant().getPhone().getName() : null)
                 .variantSku(req.getPhoneVariant() != null ? req.getPhoneVariant().getSku() : null)
+                .imeiNumber(imeiNumber)
                 .userId(req.getUser() != null ? req.getUser().getId() : null)
                 .customerName(customerName)
                 .customerPhone(customerPhone)

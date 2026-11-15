@@ -22,6 +22,7 @@ export interface ReturnResponse {
   phoneVariantId: number;
   phoneName?: string;
   variantSku?: string;
+  imeiNumber?: string;
   userId: number;
   customerName?: string;
   reason: string;
