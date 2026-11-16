@@ -77,5 +77,14 @@ cloudflare:
     bucket-name: ${R2_BUCKET_NAME:greenphone-media}
     public-url: ${R2_PUBLIC_URL:}
 
+gemini:
+  api:
+    key: ${GEMINI_API_KEY:}
+    model: ${GEMINI_MODEL:gemini-3.5-flash-lite}
+    url: ${GEMINI_URL:https://generativelanguage.googleapis.com/v1beta/models}
+    connect-timeout-ms: ${GEMINI_CONNECT_TIMEOUT:5000}
+    read-timeout-ms: ${GEMINI_READ_TIMEOUT:10000}
+
+
 
 
