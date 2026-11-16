@@ -34,6 +34,7 @@ const AccountOrdersPage = lazy(() => import('@/pages/account/AccountOrdersPage')
 const AccountOrderDetailPage = lazy(() => import('@/pages/account/AccountOrderDetailPage'));
 const ReturnRequestPage = lazy(() => import('@/pages/ReturnRequestPage'));
 const AccountReviewsPage = lazy(() => import('@/pages/account/AccountReviewsPage'));
+const AccountDevicesPage = lazy(() => import('@/pages/account/AccountDevicesPage'));
 const AccountPasswordPage = lazy(() => import('@/pages/account/AccountPasswordPage'));
 const AdminDashboardPage = lazy(() => import('@/pages/admin/AdminDashboardPage'));
 const AdminProductsPage = lazy(() => import('@/pages/admin/AdminProductsPage'));
@@ -107,11 +108,13 @@ export default function AppRoutes() {
         <Route path="/tai-khoan/don-hang/:id" element={withSuspense(AccountOrderDetailPage)} />
         <Route path={ROUTES.ACCOUNT_RETURN_REQUEST} element={withSuspense(ReturnRequestPage)} />
         <Route path={ROUTES.ACCOUNT_REVIEWS} element={withSuspense(AccountReviewsPage)} />
+        <Route path={ROUTES.ACCOUNT_DEVICES} element={withSuspense(AccountDevicesPage)} />
         <Route path={ROUTES.ACCOUNT_WISHLIST} element={withSuspense(WishlistPage)} />
         <Route path={ROUTES.ACCOUNT_CHANGE_PASSWORD} element={withSuspense(AccountPasswordPage)} />
         {/* Aliases for English /account routes */}
         <Route path="/account" element={<Navigate to={ROUTES.ACCOUNT_PROFILE} replace />} />
         <Route path="/account/profile" element={<Navigate to={ROUTES.ACCOUNT_PROFILE} replace />} />
+        <Route path="/account/devices" element={<Navigate to={ROUTES.ACCOUNT_DEVICES} replace />} />
         <Route path="/account/addresses" element={<Navigate to={ROUTES.ACCOUNT_ADDRESSES} replace />} />
         <Route path="/account/orders" element={<Navigate to={ROUTES.ACCOUNT_ORDERS} replace />} />
         <Route path="/account/wishlist" element={<Navigate to={ROUTES.ACCOUNT_WISHLIST} replace />} />

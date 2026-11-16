@@ -747,3 +747,14 @@ export interface FinancialReport {
   refundAmount: number; uncostedQuantity: number; startDate: string; endDate: string;
   timeSeriesData: FinancialTimeSeriesPoint[]; paymentMethodStats: PaymentMethodBreakdown[];
 }
+
+// User Device Sessions (USR-16)
+export interface DeviceSessionDTO {
+  id: number;
+  deviceName: string;
+  os: string;
+  browser: string;
+  ipAddress: string;
+  isCurrentSession: boolean;
+  lastActiveAt: string;
+}
