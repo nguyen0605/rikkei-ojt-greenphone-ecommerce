@@ -8,6 +8,7 @@ import {
   StarOutlined,
   HomeOutlined,
   BellOutlined,
+  MobileOutlined,
 } from '@ant-design/icons';
 import { useAppSelector } from '@/store/hooks';
 import RequireAuth from '@/components/auth/RequireAuth';
@@ -20,6 +21,7 @@ const links = [
   { to: '/tai-khoan/dia-chi', label: 'Sổ địa chỉ', icon: <HomeOutlined /> },
   { to: '/tai-khoan/don-hang', label: 'Đơn hàng của tôi', icon: <ShoppingOutlined /> },
   { to: '/tai-khoan/yeu-thich', label: 'Sản phẩm yêu thích', icon: <HeartOutlined /> },
+  { to: '/tai-khoan/thiet-bi', label: 'Thiết bị đăng nhập', icon: <MobileOutlined /> },
   { to: '/tai-khoan/danh-gia', label: 'Đánh giá sản phẩm', icon: <StarOutlined /> },
   { to: '/tai-khoan/doi-mat-khau', label: 'Đổi mật khẩu', icon: <LockOutlined /> },
 ];

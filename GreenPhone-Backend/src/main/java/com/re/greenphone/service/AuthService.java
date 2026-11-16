@@ -48,6 +48,8 @@ public class AuthService {
     private final UserMapper userMapper;
     private final EmailService emailService;
     private final StringRedisTemplate redisTemplate;
+    private final com.re.greenphone.repository.UserDeviceSessionRepository userDeviceSessionRepository;
+    private final DeviceSessionService deviceSessionService;
 
     private static final String OTP_PREFIX = "otp:";
     private static final String OTP_ATTEMPTS_PREFIX = "otp_attempts:";
@@ -96,6 +98,10 @@ public class AuthService {
     // ===== LOGIN =====
 
     public AuthResponse login(LoginRequest request) {
+        return login(request, null);
+    }
+
+    public AuthResponse login(LoginRequest request, jakarta.servlet.http.HttpServletRequest httpRequest) {
         // Don't reveal whether email exists → use same error message for both cases
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new BadRequestException("Email hoặc mật khẩu không đúng."));
@@ -114,9 +120,21 @@ public class AuthService {
             throw new BadRequestException("Tài khoản không hoạt động. Vui lòng liên hệ với quản trị viên để được hỗ trợ.");
         }
 
+        long ttlMs = jwtConfig.getRefreshExpiration() > 0 ? jwtConfig.getRefreshExpiration() : 604800000L;
+        String refreshToken = UUID.randomUUID().toString();
+        storeRefreshTokenInRedis(user.getId(), refreshToken, ttlMs);
+
+        // Ghi nhận phiên làm việc đa thiết bị
+        deviceSessionService.recordSession(user, refreshToken, ttlMs, httpRequest);
+
+        // Tìm session vừa tạo để đưa sessionId vào token
+        String tokenHash = deviceSessionService.hashToken(refreshToken);
+        Long sessionId = userDeviceSessionRepository.findByRefreshTokenHash(tokenHash)
+                .map(com.re.greenphone.entity.UserDeviceSession::getId)
+                .orElse(null);
+
         UserPrincipal principal = UserPrincipal.create(user);
-        String token = jwtTokenProvider.generateToken(principal);
-        String refreshToken = createAndStoreRefreshToken(user.getId());
+        String token = jwtTokenProvider.generateToken(principal, sessionId);
         return authMapper.toAuthResponse(user, token, refreshToken, jwtConfig.getExpiration());
     }
 
@@ -127,14 +145,35 @@ public class AuthService {
             throw new BadRequestException("Refresh token không được để trống.");
         }
 
-        String userIdStr = redisTemplate.opsForValue().get(REFRESH_TOKEN_PREFIX + refreshToken.trim());
-        if (userIdStr == null) {
+        String rawToken = refreshToken.trim();
+        String tokenHash = deviceSessionService.hashToken(rawToken);
+
+        // Kiểm tra phiên thiết bị trong Database (Device Session Security - Source of Truth)
+        var sessionOpt = userDeviceSessionRepository.findByRefreshTokenHash(tokenHash);
+        if (sessionOpt.isPresent()) {
+            var session = sessionOpt.get();
+            if (Boolean.TRUE.equals(session.getIsRevoked())) {
+                log.warn("Refresh attempt with revoked session id={}", session.getId());
+                throw new UnauthorizedException("Phiên đăng nhập đã bị thu hồi. Vui lòng đăng nhập lại.");
+            }
+            if (session.getExpiresAt() != null && session.getExpiresAt().isBefore(java.time.LocalDateTime.now())) {
+                log.warn("Refresh attempt with expired session id={}", session.getId());
+                throw new UnauthorizedException("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+            }
+        }
+
+        String userIdStr = redisTemplate.opsForValue().get(REFRESH_TOKEN_PREFIX + rawToken);
+        if (userIdStr == null && sessionOpt.isEmpty()) {
             throw new UnauthorizedException("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
         }
 
         Long userId;
         try {
-            userId = Long.parseLong(userIdStr);
+            if (userIdStr != null) {
+                userId = Long.parseLong(userIdStr);
+            } else {
+                userId = sessionOpt.get().getUser().getId();
+            }
         } catch (NumberFormatException e) {
             throw new UnauthorizedException("Token làm mới không hợp lệ.");
         }
@@ -149,9 +188,33 @@ public class AuthService {
             throw new BadRequestException("Tài khoản không hoạt động. Vui lòng liên hệ với quản trị viên để được hỗ trợ.");
         }
 
+        long ttlMs = jwtConfig.getRefreshExpiration() > 0 ? jwtConfig.getRefreshExpiration() : 604800000L;
+        String newRefreshToken = UUID.randomUUID().toString();
+        String newHash = deviceSessionService.hashToken(newRefreshToken);
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.LocalDateTime newExpiresAt = now.plusSeconds(ttlMs / 1000);
+
+        // Atomic Token Rotation: Cập nhật có điều kiện trên Database
+        Long sessionId = null;
+        if (sessionOpt.isPresent()) {
+            var session = sessionOpt.get();
+            sessionId = session.getId();
+            int updated = userDeviceSessionRepository.rotateSessionTokenAtomically(
+                    sessionId, tokenHash, newHash, now, newExpiresAt);
+            if (updated == 0) {
+                log.warn("Atomic token rotation failed for session id={}. Race condition or session revoked.", sessionId);
+                throw new UnauthorizedException("Phiên làm việc đã bị thay đổi hoặc thu hồi.");
+            }
+        }
+
+        // Cập nhật Redis song song
+        storeRefreshTokenInRedis(user.getId(), newRefreshToken, ttlMs);
+        try {
+            redisTemplate.delete(REFRESH_TOKEN_PREFIX + rawToken);
+        } catch (Exception ignored) {}
+
         UserPrincipal principal = UserPrincipal.create(user);
-        String newAccessToken = jwtTokenProvider.generateToken(principal);
-        String newRefreshToken = createAndStoreRefreshToken(user.getId());
+        String newAccessToken = jwtTokenProvider.generateToken(principal, sessionId);
 
         return authMapper.toAuthResponse(user, newAccessToken, newRefreshToken, jwtConfig.getExpiration());
     }
@@ -184,12 +247,13 @@ public class AuthService {
             }
 
             Long userId = jwtTokenProvider.getUserIdFromToken(token);
-            if (userId != null) {
-                String userRefreshToken = redisTemplate.opsForValue().get(USER_REFRESH_TOKEN_PREFIX + userId);
-                if (userRefreshToken != null) {
-                    redisTemplate.delete(REFRESH_TOKEN_PREFIX + userRefreshToken);
+            Long sessionId = jwtTokenProvider.getSessionIdFromToken(token);
+            if (userId != null && sessionId != null) {
+                try {
+                    deviceSessionService.revokeSession(userId, sessionId);
+                } catch (Exception ex) {
+                    log.debug("Session already revoked or not found: {}", ex.getMessage());
                 }
-                redisTemplate.delete(USER_REFRESH_TOKEN_PREFIX + userId);
             }
         } catch (Exception e) {
             log.warn("Redis unavailable during logout: {}", e.getMessage());
@@ -320,20 +384,19 @@ public class AuthService {
         return String.valueOf(otp);
     }
 
-    private String createAndStoreRefreshToken(Long userId) {
-        String refreshToken = UUID.randomUUID().toString();
-        long ttlMs = jwtConfig.getRefreshExpiration() > 0 ? jwtConfig.getRefreshExpiration() : 604800000L;
+    private void storeRefreshTokenInRedis(Long userId, String refreshToken, long ttlMs) {
         try {
-            String oldRefreshToken = redisTemplate.opsForValue().get(USER_REFRESH_TOKEN_PREFIX + userId);
-            if (oldRefreshToken != null) {
-                redisTemplate.delete(REFRESH_TOKEN_PREFIX + oldRefreshToken);
-            }
             redisTemplate.opsForValue().set(REFRESH_TOKEN_PREFIX + refreshToken, String.valueOf(userId), ttlMs,
                     TimeUnit.MILLISECONDS);
-            redisTemplate.opsForValue().set(USER_REFRESH_TOKEN_PREFIX + userId, refreshToken, ttlMs, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
             log.warn("Redis unavailable for storing refresh token, proceeding: {}", e.getMessage());
         }
+    }
+
+    private String createAndStoreRefreshToken(Long userId) {
+        String refreshToken = UUID.randomUUID().toString();
+        long ttlMs = jwtConfig.getRefreshExpiration() > 0 ? jwtConfig.getRefreshExpiration() : 604800000L;
+        storeRefreshTokenInRedis(userId, refreshToken, ttlMs);
         return refreshToken;
     }
 }

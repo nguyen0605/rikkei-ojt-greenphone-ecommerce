@@ -49,6 +49,8 @@ class AuthServiceTest {
     @Mock private EmailService emailService;
     @Mock private StringRedisTemplate redisTemplate;
     @Mock private ValueOperations<String, String> valueOperations;
+    @Mock private com.re.greenphone.repository.UserDeviceSessionRepository userDeviceSessionRepository;
+    @Mock private DeviceSessionService deviceSessionService;
 
     @InjectMocks
     private AuthService authService;
@@ -139,7 +141,7 @@ class AuthServiceTest {
     @Test void login_Success() {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
         when(passwordEncoder.matches("password123", "encoded_password")).thenReturn(true);
-        when(jwtTokenProvider.generateToken(any(UserPrincipal.class))).thenReturn("jwt_token_xyz");
+        when(jwtTokenProvider.generateToken(any(UserPrincipal.class), any())).thenReturn("jwt_token_xyz");
         when(jwtConfig.getExpiration()).thenReturn(86400000L);
         when(authMapper.toAuthResponse(eq(testUser), eq("jwt_token_xyz"), anyString(), eq(86400000L)))
                 .thenReturn(new AuthResponse(1L, "jwt_token_xyz", "refresh_xyz", "Test User", "test@example.com", "CUSTOMER", 86400000L));
@@ -324,7 +326,7 @@ class AuthServiceTest {
     @Test void refreshToken_Success() {
         when(valueOperations.get("refresh_token:valid-refresh-token")).thenReturn("1");
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-        when(jwtTokenProvider.generateToken(any(UserPrincipal.class))).thenReturn("new_access_token");
+        when(jwtTokenProvider.generateToken(any(UserPrincipal.class), any())).thenReturn("new_access_token");
         when(jwtConfig.getExpiration()).thenReturn(1800000L);
         when(authMapper.toAuthResponse(eq(testUser), eq("new_access_token"), anyString(), eq(1800000L)))
                 .thenReturn(new AuthResponse(1L, "new_access_token", "new_refresh_token", "Test User", "test@example.com", "CUSTOMER", 1800000L));
@@ -333,7 +335,6 @@ class AuthServiceTest {
 
         assertThat(res.getToken()).isEqualTo("new_access_token");
         verify(valueOperations).set(startsWith("refresh_token:"), eq("1"), anyLong(), any(TimeUnit.class));
-        verify(valueOperations).set(eq("user_refresh_token:1"), anyString(), anyLong(), any(TimeUnit.class));
     }
 
     @Test void refreshToken_Blank_ThrowsBadRequest() {
@@ -365,25 +366,23 @@ class AuthServiceTest {
     @Test void logout_Success_BlacklistsTokenAndRemovesRefreshToken() {
         when(jwtTokenProvider.getRemainingExpiration("sample_token")).thenReturn(120000L);
         when(jwtTokenProvider.getUserIdFromToken("sample_token")).thenReturn(1L);
-        when(valueOperations.get("user_refresh_token:1")).thenReturn("old_refresh_token");
+        when(jwtTokenProvider.getSessionIdFromToken("sample_token")).thenReturn(10L);
 
         authService.logout("Bearer sample_token");
 
         verify(valueOperations).set("blacklist:sample_token", "revoked", 120000L, TimeUnit.MILLISECONDS);
-        verify(redisTemplate).delete("refresh_token:old_refresh_token");
-        verify(redisTemplate).delete("user_refresh_token:1");
+        verify(deviceSessionService).revokeSession(1L, 10L);
     }
 
     @Test void logout_ExpiredAccessToken_StillRemovesRefreshToken() {
         when(jwtTokenProvider.getRemainingExpiration("expired_token")).thenReturn(0L);
         when(jwtTokenProvider.getUserIdFromToken("expired_token")).thenReturn(1L);
-        when(valueOperations.get("user_refresh_token:1")).thenReturn("old_refresh_token");
+        when(jwtTokenProvider.getSessionIdFromToken("expired_token")).thenReturn(10L);
 
         authService.logout("Bearer expired_token");
 
         verify(valueOperations, never()).set(startsWith("blacklist:"), anyString(), anyLong(), any(TimeUnit.class));
-        verify(redisTemplate).delete("refresh_token:old_refresh_token");
-        verify(redisTemplate).delete("user_refresh_token:1");
+        verify(deviceSessionService).revokeSession(1L, 10L);
     }
 
     @Test void logout_BlankToken_NoOp() {
