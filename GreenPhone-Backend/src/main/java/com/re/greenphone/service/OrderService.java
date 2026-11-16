@@ -416,6 +416,16 @@ public class OrderService {
         return orderMapper.toDto(order);
     }
 
+    /**
+     * Lấy dữ liệu hóa đơn điện tử công khai phục vụ tra cứu từ link email / mã QR
+     */
+    @Transactional(readOnly = true)
+    public OrderDTO getPublicInvoice(Long orderId) {
+        Order order = orderRepository.findByIdWithDetails(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+        return orderMapper.toDto(order);
+    }
+
     public OrderDTO cancelOrder(Long orderId) {
         return cancelOrder(orderId, (com.re.greenphone.dto.request.CancelOrderRequest) null);
     }

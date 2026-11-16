@@ -15,6 +15,7 @@ export const ROUTES = {
   WISHLIST: '/yeu-thich',
   WARRANTY_CHECK: '/tra-cuu-bao-hanh',
   PHONE_COMPARE: '/so-sanh',
+  PUBLIC_INVOICE: (id: number | string = ':id') => `/hoa-don/${id}`,
   // Legal
   DIEU_KHOAN: '/dieu-khoan',
   CHINH_SACH_BAO_MAT: '/chinh-sach-bao-mat',

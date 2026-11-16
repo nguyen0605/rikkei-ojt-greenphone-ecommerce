@@ -44,14 +44,30 @@ public class EmailService {
     public void sendOrderConfirmation(String toEmail, String orderId) {
         String subject = "Hóa đơn xác nhận đơn hàng #" + orderId + " - GreenPhone";
         String body = null;
+        Order order = null;
         try {
             Long id = Long.parseLong(orderId);
-            Order order = orderRepository.findByIdWithDetails(id).orElse(null);
+            // Đợi tối đa 1.5s (5 lần retry) để đảm bảo transaction tạo đơn hàng ở luồng chính đã commit hoàn toàn
+            for (int i = 0; i < 5; i++) {
+                order = orderRepository.findByIdWithDetails(id).orElse(null);
+                if (order != null) {
+                    break;
+                }
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+            }
             if (order != null) {
                 body = buildInvoiceEmail(order);
+                log.info("[Async Mail] Loaded order details for #{}: companyName={}, invoiceEmail={}",
+                        orderId, order.getCompanyName(), order.getInvoiceEmail());
+            } else {
+                log.warn("[Async Mail] Order #{} not found after retries, falling back to simple template", orderId);
             }
         } catch (Exception e) {
-            log.debug("Could not load full order details for id {}: {}", orderId, e.getMessage());
+            log.warn("[Async Mail] Could not load full order details for id {}: {}", orderId, e.getMessage());
         }
 
         if (body == null) {
@@ -59,6 +75,17 @@ public class EmailService {
         }
 
         send(toEmail, subject, body);
+
+        // Nếu đơn hàng có yêu cầu hóa đơn VAT và có email nhận riêng, gửi thêm bản sao đến email đó
+        boolean hasVatInvoice = order != null && order.getCompanyName() != null && !order.getCompanyName().isBlank();
+        if (hasVatInvoice
+                && order.getInvoiceEmail() != null
+                && !order.getInvoiceEmail().isBlank()
+                && !order.getInvoiceEmail().trim().equalsIgnoreCase(toEmail != null ? toEmail.trim() : "")) {
+            String vatSubject = "Hóa đơn GTGT điện tử cho đơn hàng #" + orderId + " - GreenPhone";
+            log.info("[Async Mail] Sending VAT invoice copy for order #{} to invoiceEmail: {}", orderId, order.getInvoiceEmail().trim());
+            send(order.getInvoiceEmail().trim(), vatSubject, body);
+        }
     }
 
     @Async("mailTaskExecutor")
@@ -188,7 +215,8 @@ public class EmailService {
 
     private String buildInvoiceEmail(Order order) {
         String frontendUrl = getEnv("FRONTEND_URL", "http://localhost:5173");
-        String orderTrackingUrl = frontendUrl + "/tai-khoan/don-hang";
+        String invoiceViewUrl = frontendUrl + "/hoa-don/" + order.getId();
+        String orderTrackingUrl = frontendUrl + "/tai-khoan/don-hang/" + order.getId();
         String orderDate = order.getCreatedAt() != null ? order.getCreatedAt().format(DATE_FORMATTER) : "Vừa xong";
 
         String paymentMethodText = "COD".equalsIgnoreCase(order.getPaymentMethod())
@@ -235,6 +263,40 @@ public class EmailService {
                     <td style="padding: 6px 0; text-align: right; color: #dc2626; font-size: 13px; font-weight: 600;">-%s</td>
                 </tr>
                 """.formatted(formatCurrency(order.getDiscountAmount()));
+        }
+
+        String vatSection = "";
+        if (order.getCompanyName() != null && !order.getCompanyName().isBlank()) {
+            vatSection = """
+                <div style="margin-top: 14px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 12px 14px;">
+                    <div style="font-weight: 700; color: #065f46; font-size: 13px; margin-bottom: 6px;">
+                        📄 THÔNG TIN XUẤT HÓA ĐƠN GIÁ TRỊ GIA TĂNG (VAT)
+                    </div>
+                    <table style="width: 100%%; font-size: 12px; line-height: 1.6; border-collapse: collapse; color: #1f2937;">
+                        <tr>
+                            <td style="color: #047857; width: 130px; font-weight: 600; padding: 2px 0;">Công ty:</td>
+                            <td style="font-weight: 600; padding: 2px 0;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="color: #047857; font-weight: 600; padding: 2px 0;">Mã số thuế:</td>
+                            <td style="font-weight: 600; padding: 2px 0;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="color: #047857; font-weight: 600; padding: 2px 0; vertical-align: top;">Địa chỉ:</td>
+                            <td style="padding: 2px 0;">%s</td>
+                        </tr>
+                        <tr>
+                            <td style="color: #047857; font-weight: 600; padding: 2px 0;">Email nhận VAT:</td>
+                            <td style="padding: 2px 0;">%s</td>
+                        </tr>
+                    </table>
+                </div>
+                """.formatted(
+                    order.getCompanyName() != null ? order.getCompanyName() : "Chưa cập nhật",
+                    order.getTaxCode() != null ? order.getTaxCode() : "Chưa cập nhật",
+                    order.getCompanyAddress() != null ? order.getCompanyAddress() : "Chưa cập nhật",
+                    order.getInvoiceEmail() != null ? order.getInvoiceEmail() : "Chưa cập nhật"
+            );
         }
 
         return """
@@ -285,6 +347,7 @@ public class EmailService {
                                     <td style="padding: 4px 0;">%s</td>
                                 </tr>
                             </table>
+                            %s
                         </div>
                     </div>
 
@@ -324,9 +387,10 @@ public class EmailService {
                             </table>
                         </div>
 
-                        <!-- CTA Button -->
+                        <!-- CTA Buttons -->
                         <div style="text-align: center; margin-top: 28px;">
-                            <a href="%s" style="display: inline-block; background: #16a34a; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 12px 28px; border-radius: 8px;">Theo dõi đơn hàng</a>
+                            <a href="%s" style="display: inline-block; background: #16a34a; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 12px 24px; border-radius: 8px; margin: 4px;">📄 Xem & In Hóa đơn điện tử</a>
+                            <a href="%s" style="display: inline-block; background: #f3f4f6; color: #374151; text-decoration: none; font-size: 14px; font-weight: 600; padding: 12px 20px; border-radius: 8px; border: 1px solid #d1d5db; margin: 4px;">Theo dõi đơn hàng</a>
                         </div>
                     </div>
 
@@ -348,10 +412,12 @@ public class EmailService {
                 order.getShippingAddress() != null ? order.getShippingAddress() : "",
                 paymentMethodText,
                 paymentStatusBadge,
+                vatSection,
                 itemRows.toString(),
                 formatCurrency(order.getTotalAmount()),
                 discountRow,
                 formatCurrency(order.getFinalAmount()),
+                invoiceViewUrl,
                 orderTrackingUrl
         );
     }
