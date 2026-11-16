@@ -24,6 +24,10 @@ public class JwtTokenProvider {
     }
 
     public String generateToken(UserPrincipal userPrincipal) {
+        return generateToken(userPrincipal, null);
+    }
+
+    public String generateToken(UserPrincipal userPrincipal, Long sessionId) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtConfig.getExpiration());
 
@@ -31,11 +35,17 @@ public class JwtTokenProvider {
                 ? userPrincipal.getAuthorities().iterator().next().getAuthority()
                 : "ROLE_CUSTOMER";
 
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(userPrincipal.getUsername())
                 .claim("userId", userPrincipal.getId())
                 .claim("fullName", userPrincipal.getFullName())
-                .claim("role", role)
+                .claim("role", role);
+
+        if (sessionId != null) {
+            builder.claim("sessionId", sessionId);
+        }
+
+        return builder
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(getSigningKey())
@@ -68,6 +78,20 @@ public class JwtTokenProvider {
             return ((Number) userId).longValue();
         }
         return null;
+    }
+
+    public Long getSessionIdFromToken(String token) {
+        try {
+            Claims claims = parseClaims(token);
+            Object sessionId = claims.get("sessionId");
+            if (sessionId instanceof Number) {
+                return ((Number) sessionId).longValue();
+            }
+            return null;
+        } catch (Exception e) {
+            log.debug("Failed to extract sessionId from token: {}", e.getMessage());
+            return null;
+        }
     }
 
     public long getRemainingExpiration(String token) {
