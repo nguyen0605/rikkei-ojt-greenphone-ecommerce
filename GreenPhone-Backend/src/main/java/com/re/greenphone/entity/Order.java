@@ -66,6 +66,18 @@ public class Order extends BaseEntity {
     @Column(name = "NOTE", length = 255)
     private String note;
 
+    @Column(name = "COMPANY_NAME", length = 255)
+    private String companyName;
+
+    @Column(name = "TAX_CODE", length = 50)
+    private String taxCode;
+
+    @Column(name = "COMPANY_ADDRESS", length = 500)
+    private String companyAddress;
+
+    @Column(name = "INVOICE_EMAIL", length = 150)
+    private String invoiceEmail;
+
     /**
      * Optimistic lock: guards cancel/timeout vs payment-webhook races.
      */

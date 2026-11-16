@@ -115,13 +115,29 @@ public class OrderService {
 
         // Calculate total
         BigDecimal total = BigDecimal.ZERO;
+        String companyName = request.getCompanyName() != null ? request.getCompanyName().trim() : null;
+        String taxCode = request.getTaxCode() != null ? request.getTaxCode().trim() : null;
+        String companyAddress = request.getCompanyAddress() != null ? request.getCompanyAddress().trim() : null;
+        String invoiceEmail = request.getInvoiceEmail() != null ? request.getInvoiceEmail().trim() : null;
+
+        String note = request.getNote();
+        if (Boolean.TRUE.equals(request.getIncludePaperInvoice())) {
+            if (note == null || !note.contains("[KÈM_HÓA_ĐƠN_GIẤY]")) {
+                note = (note != null && !note.isBlank()) ? note + " [KÈM_HÓA_ĐƠN_GIẤY]" : "[KÈM_HÓA_ĐƠN_GIẤY]";
+            }
+        }
+
         Order order = Order.builder()
                 .user(user)
                 .receiverName(request.getReceiverName())
                 .receiverPhone(request.getReceiverPhone())
                 .shippingAddress(request.getShippingAddress())
                 .paymentMethod(request.getPaymentMethod())
-                .note(request.getNote())
+                .note(note)
+                .companyName(companyName)
+                .taxCode(taxCode)
+                .companyAddress(companyAddress)
+                .invoiceEmail(invoiceEmail)
                 .orderStatus("PENDING")
                 .paymentStatus("UNPAID")
                 .discountAmount(BigDecimal.ZERO)

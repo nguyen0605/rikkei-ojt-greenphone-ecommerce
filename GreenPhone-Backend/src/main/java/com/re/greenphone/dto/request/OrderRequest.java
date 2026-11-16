@@ -28,6 +28,18 @@ public class OrderRequest {
 
     private String note;
 
+    private Boolean requestInvoice;
+
+    private Boolean includePaperInvoice;
+
+    private String companyName;
+
+    private String taxCode;
+
+    private String companyAddress;
+
+    private String invoiceEmail;
+
     private Long userPromotionId;
 
     private Boolean buyNow;

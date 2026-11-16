@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Drawer, Space, Button, Descriptions, Tag, Table, Divider, Popconfirm, message, type TableColumnsType } from 'antd';
 import { Link } from 'react-router-dom';
 import {
@@ -9,16 +10,23 @@ import {
   EnvironmentOutlined,
   FileTextOutlined,
   CreditCardOutlined,
+  PrinterOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminOrderService } from '@/services';
 import type { OrderDTO, OrderDetailDTO, AdminOrderDetailDTO } from '@/types/api';
 import { formatVND, formatDate } from '@/utils';
 import StatusTag from '@/components/admin/StatusTag';
-import { extractCancelReason, extractCustomerNote, isTerminalOrderStatus } from '@/utils/orderStateMachine';
+import {
+  extractCancelReason,
+  extractCustomerNote,
+  extractPaperInvoicePreference,
+  isTerminalOrderStatus,
+} from '@/utils/orderStateMachine';
 import { useOrderProductLookup } from '@/hooks/useOrderProductLookup';
 import OrderItemThumbnail from '@/components/order/OrderItemThumbnail';
 import ShipmentTrackingCard from '@/components/order/ShipmentTrackingCard';
+import InvoicePrintModal from '@/components/order/InvoicePrintModal';
 
 interface AdminOrderDetailDrawerProps {
   open: boolean;
@@ -39,6 +47,7 @@ export default function AdminOrderDetailDrawer({
 }: AdminOrderDetailDrawerProps) {
   const qc = useQueryClient();
   const { resolveItem } = useOrderProductLookup();
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
 
   // Query chi tiết đơn hàng
   const { data: order, isLoading } = useQuery({
@@ -130,10 +139,12 @@ export default function AdminOrderDetailDrawer({
 
   const cancelReason = extractCancelReason(order?.note);
   const customerNote = extractCustomerNote(order?.note);
+  const hasPaperInvoice = extractPaperInvoicePreference(order);
   const isTerminal = isTerminalOrderStatus(order?.orderStatus);
 
   return (
-    <Drawer
+    <>
+      <Drawer
       title={
         <div className="flex items-center justify-between pr-4">
           <div className="flex items-center gap-2">
@@ -149,16 +160,18 @@ export default function AdminOrderDetailDrawer({
           )}
         </div>
       }
-      width={680}
+      width={800}
       open={open}
       onClose={onClose}
       loading={isLoading}
       footer={
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-ink-3">
-            Mã khách hàng: #{order?.userId} ({order?.userName})
-          </span>
-          <Space>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5 text-xs text-ink-3 shrink-0 whitespace-nowrap">
+            <span>Mã khách hàng:</span>
+            <span className="font-semibold text-ink">#{order?.userId}</span>
+            {order?.userName && <span>({order.userName})</span>}
+          </div>
+          <Space wrap className="justify-end">
             {/* Chỉ cho phép hủy khi đơn chưa ở trạng thái kết thúc (DELIVERED, CANCELLED) */}
             {order && !isTerminal && onOpenCancelModal && (
               <Button
@@ -201,6 +214,16 @@ export default function AdminOrderDetailDrawer({
                   Xác nhận hoàn tiền
                 </Button>
               </Popconfirm>
+            )}
+
+            {/* Nút In phiếu xuất kho & Hóa đơn bán lẻ cho Admin/Thủ kho */}
+            {order && (
+              <Button
+                icon={<PrinterOutlined />}
+                onClick={() => setInvoiceModalOpen(true)}
+              >
+                In phiếu xuất kho & Hóa đơn
+              </Button>
             )}
 
             <Button onClick={onClose}>Đóng</Button>
@@ -348,6 +371,18 @@ export default function AdminOrderDetailDrawer({
                   <Tag color="cyan">Mã: {order.promotionCode}</Tag>
                 </Descriptions.Item>
               )}
+              <Descriptions.Item label="Yêu cầu hóa đơn">
+                {hasPaperInvoice ? (
+                  <Tag color="volcano" className="!font-semibold">
+                    <PrinterOutlined className="mr-1" />
+                    Kèm hóa đơn giấy
+                  </Tag>
+                ) : (
+                  <Tag color="green" className="!font-medium">
+                    Hóa đơn điện tử (🌱)
+                  </Tag>
+                )}
+              </Descriptions.Item>
             </Descriptions>
           </div>
 
@@ -437,6 +472,16 @@ export default function AdminOrderDetailDrawer({
         </div>
       )}
     </Drawer>
+
+    {order && (
+      <InvoicePrintModal
+        open={invoiceModalOpen}
+        onClose={() => setInvoiceModalOpen(false)}
+        order={order}
+        isAdminView={true}
+      />
+    )}
+  </>
   );
 }
 

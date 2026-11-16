@@ -132,4 +132,16 @@ describe('OrderDetailPage', () => {
       ).toBeInTheDocument();
     });
   });
+
+  it('renders "Xem hóa đơn" button and opens invoice modal on click', async () => {
+    vi.mocked(orderService.detail).mockResolvedValue(mockOrderDetail);
+    renderDetailPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('view-invoice-btn')).toBeInTheDocument();
+    });
+
+    const viewBtn = screen.getByTestId('view-invoice-btn');
+    expect(viewBtn).toHaveTextContent('Xem hóa đơn');
+  });
 });

@@ -82,11 +82,130 @@ export const extractCancelReason = (note?: string | null): string | null => {
 };
 
 /**
- * Lấy ghi chú thuần túy của khách hàng (loại bỏ tag [Lý do hủy: ...] nếu có).
+ * Thông tin hóa đơn VAT doanh nghiệp
+ */
+export interface VatInvoiceInfo {
+  hasInvoice: boolean;
+  companyName: string;
+  taxCode: string;
+  companyAddress: string;
+  invoiceEmail: string;
+}
+
+/**
+ * Trích xuất thông tin hóa đơn VAT doanh nghiệp từ OrderDTO hoặc Order.note
+ */
+export const extractVatInvoice = (order?: {
+  hasInvoice?: boolean;
+  companyName?: string;
+  taxCode?: string;
+  companyAddress?: string;
+  invoiceEmail?: string;
+  note?: string | null;
+} | null): VatInvoiceInfo => {
+  if (!order) {
+    return {
+      hasInvoice: false,
+      companyName: '',
+      taxCode: '',
+      companyAddress: '',
+      invoiceEmail: '',
+    };
+  }
+
+  // 1. Kiểm tra trực tiếp các trường DTO từ backend
+  if (order.companyName && order.companyName.trim().length > 0) {
+    return {
+      hasInvoice: true,
+      companyName: order.companyName.trim(),
+      taxCode: (order.taxCode || '').trim(),
+      companyAddress: (order.companyAddress || '').trim(),
+      invoiceEmail: (order.invoiceEmail || '').trim(),
+    };
+  }
+
+  // 2. Fallback: Parse tag trong note (ví dụ: [VAT_INVOICE: ...] hoặc [Hóa đơn VAT: ...])
+  if (order.note) {
+    const vatMatch = order.note.match(/\[(?:Hóa đơn VAT|VAT_INVOICE|VAT):\s*(.*?)\]/i);
+    if (vatMatch && vatMatch[1]) {
+      const content = vatMatch[1].trim();
+      // Try JSON format
+      if (content.startsWith('{') && content.endsWith('}')) {
+        try {
+          const parsed = JSON.parse(content);
+          return {
+            hasInvoice: true,
+            companyName: parsed.companyName || parsed.company || '',
+            taxCode: parsed.taxCode || parsed.tax || '',
+            companyAddress: parsed.companyAddress || parsed.address || '',
+            invoiceEmail: parsed.invoiceEmail || parsed.email || '',
+          };
+        } catch {
+          // ignore json parse error
+        }
+      }
+
+      // Format key-value: Công ty=..., MST=..., Địa chỉ=..., Email=...
+      const segments = content.split(/[;,|]\s*/);
+      const kv: Record<string, string> = {};
+      segments.forEach((seg) => {
+        const idx = seg.indexOf(':') !== -1 ? seg.indexOf(':') : seg.indexOf('=');
+        if (idx !== -1) {
+          const k = seg.slice(0, idx).trim().toLowerCase();
+          const v = seg.slice(idx + 1).trim();
+          kv[k] = v;
+        }
+      });
+
+      const companyName = kv['công ty'] || kv['company'] || kv['tên'] || kv['name'] || '';
+      if (companyName) {
+        return {
+          hasInvoice: true,
+          companyName,
+          taxCode: kv['mst'] || kv['taxcode'] || kv['mã số thuế'] || '',
+          companyAddress: kv['địa chỉ'] || kv['address'] || '',
+          invoiceEmail: kv['email'] || '',
+        };
+      }
+    }
+  }
+
+  return {
+    hasInvoice: Boolean(order.hasInvoice),
+    companyName: (order.companyName || '').trim(),
+    taxCode: (order.taxCode || '').trim(),
+    companyAddress: (order.companyAddress || '').trim(),
+    invoiceEmail: (order.invoiceEmail || '').trim(),
+  };
+};
+
+/**
+ * Trích xuất cờ yêu cầu lấy kèm hóa đơn giấy khi giao hàng
+ */
+export const extractPaperInvoicePreference = (order?: {
+  includePaperInvoice?: boolean;
+  note?: string | null;
+} | null): boolean => {
+  if (!order) return false;
+  if (typeof order.includePaperInvoice === 'boolean') {
+    return order.includePaperInvoice;
+  }
+  if (order.note && /\[(?:KÈM_HÓA_ĐƠN_GIẤY|PAPER_INVOICE|YÊU CẦU HÓA ĐƠN GIẤY)\]/i.test(order.note)) {
+    return true;
+  }
+  return false;
+};
+
+/**
+ * Lấy ghi chú thuần túy của khách hàng (loại bỏ tag [Lý do hủy: ...], [Hóa đơn VAT: ...] và [KÈM_HÓA_ĐƠN_GIẤY] nếu có).
  */
 export const extractCustomerNote = (note?: string | null): string | null => {
   if (!note) return null;
-  const cleaned = note.replace(/\[Lý do hủy:\s*.*?\]/gi, '').trim();
+  const cleaned = note
+    .replace(/\[Lý do hủy:\s*.*?\]/gi, '')
+    .replace(/\[(?:Hóa đơn VAT|VAT_INVOICE|VAT):\s*.*?\]/gi, '')
+    .replace(/\[(?:KÈM_HÓA_ĐƠN_GIẤY|PAPER_INVOICE|YÊU CẦU HÓA ĐƠN GIẤY)\]/gi, '')
+    .trim();
   return cleaned.length > 0 ? cleaned : null;
 };
 

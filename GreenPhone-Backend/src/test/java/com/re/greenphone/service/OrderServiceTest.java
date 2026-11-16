@@ -574,4 +574,54 @@ class OrderServiceTest {
         assertEquals("CANCELLED", result.getOrderStatus());
         verify(warehouseTransferService).cancelTransfersForOrder(eq(888L), eq("Khách đổi ý"));
     }
+
+    @Test
+    @DisplayName("VAT: Đặt hàng kèm thông tin hóa đơn VAT doanh nghiệp được lưu trữ chính xác")
+    void createOrder_WithVatInvoice_StoresAndMapsVatDetails() {
+        stubUser();
+
+        PhoneVariant v = createVariant(100L, new BigDecimal("1000.00"), null, 10);
+        when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(v));
+
+        OrderRequest req = createOrderReq(List.of(createItemReq(100L, 2)), null);
+        req.setRequestInvoice(true);
+        req.setCompanyName("CÔNG TY CỔ PHẦN CÔNG NGHỆ GREEN TECH");
+        req.setTaxCode("0101234567");
+        req.setCompanyAddress("123 Phố Duy Tân, Cầu Giấy, Hà Nội");
+        req.setInvoiceEmail("ketoan@greentech.vn");
+
+        when(orderRepository.save(any())).thenAnswer(inv -> {
+            Order o = inv.getArgument(0);
+            o.setId(101L);
+            return o;
+        });
+
+        when(orderMapper.toDto(any())).thenAnswer(inv -> {
+            Order o = inv.getArgument(0);
+            return OrderDTO.builder()
+                    .id(o.getId())
+                    .companyName(o.getCompanyName())
+                    .taxCode(o.getTaxCode())
+                    .companyAddress(o.getCompanyAddress())
+                    .invoiceEmail(o.getInvoiceEmail())
+                    .hasInvoice(o.getCompanyName() != null)
+                    .build();
+        });
+
+        OrderDTO result = orderService.createOrder(req);
+
+        assertNotNull(result);
+        assertTrue(result.getHasInvoice());
+        assertEquals("CÔNG TY CỔ PHẦN CÔNG NGHỆ GREEN TECH", result.getCompanyName());
+        assertEquals("0101234567", result.getTaxCode());
+        assertEquals("123 Phố Duy Tân, Cầu Giấy, Hà Nội", result.getCompanyAddress());
+        assertEquals("ketoan@greentech.vn", result.getInvoiceEmail());
+
+        verify(orderRepository).save(argThat(o ->
+                "CÔNG TY CỔ PHẦN CÔNG NGHỆ GREEN TECH".equals(o.getCompanyName())
+                        && "0101234567".equals(o.getTaxCode())
+                        && "123 Phố Duy Tân, Cầu Giấy, Hà Nội".equals(o.getCompanyAddress())
+                        && "ketoan@greentech.vn".equals(o.getInvoiceEmail())
+        ));
+    }
 }
