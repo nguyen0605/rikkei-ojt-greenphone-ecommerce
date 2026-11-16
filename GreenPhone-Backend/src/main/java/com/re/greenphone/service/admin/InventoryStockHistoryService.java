@@ -67,6 +67,11 @@ public class InventoryStockHistoryService {
         saveCurrentUserRecord(variant, quantityBefore, quantityChange, changeType, reason);
     }
 
+    public void recordAggregateOnly(PhoneVariant variant, int quantityBefore, int quantityChange,
+                                    String changeType, String reason) {
+        saveCurrentUserRecord(variant, quantityBefore, quantityChange, changeType, reason);
+    }
+
     private void saveCurrentUserRecord(PhoneVariant variant, int quantityBefore, int quantityChange,
                                       String changeType, String reason) {
         Long userId = null;

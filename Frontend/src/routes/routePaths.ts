@@ -14,6 +14,7 @@ export const ROUTES = {
   CHECKOUT_SUCCESS: '/thanh-toan/hoan-tat',
   WISHLIST: '/yeu-thich',
   WARRANTY_CHECK: '/tra-cuu-bao-hanh',
+  PHONE_COMPARE: '/so-sanh',
   // Legal
   DIEU_KHOAN: '/dieu-khoan',
   CHINH_SACH_BAO_MAT: '/chinh-sach-bao-mat',

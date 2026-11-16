@@ -40,7 +40,7 @@ import java.util.List;
 public class AdminOrderService {
 
     private static final List<String> VALID_ORDER_STATUSES = List.of(
-            "PENDING", "CONFIRMED", "PROCESSING", "SHIPPING", "DELIVERED", "COMPLETED", "CANCELLED"
+            "PENDING", "CONFIRMED", "PROCESSING", "SHIPPING", "DELIVERED", "COMPLETED", "CANCELLED", "WAITING_FOR_TRANSFER"
     );
 
     private final OrderRepository orderRepository;
@@ -52,6 +52,7 @@ public class AdminOrderService {
     private final OrderMapper orderMapper;
     private final EmailService emailService;
     private final InventoryStockHistoryService inventoryStockHistoryService;
+    private final com.re.greenphone.service.WarehouseTransferService warehouseTransferService;
     private final com.re.greenphone.service.WarrantyService warrantyService;
     private final jakarta.persistence.EntityManager entityManager;
 
@@ -61,6 +62,7 @@ public class AdminOrderService {
 
         return switch (current) {
             case "PENDING" -> "CONFIRMED".equals(next) || "CANCELLED".equals(next) || "COMPLETED".equals(next);
+            case "WAITING_FOR_TRANSFER" -> "PROCESSING".equals(next) || "CANCELLED".equals(next);
             case "CONFIRMED" -> "PROCESSING".equals(next) || "CANCELLED".equals(next) || "COMPLETED".equals(next);
             case "PROCESSING" -> "SHIPPING".equals(next) || "CANCELLED".equals(next) || "COMPLETED".equals(next);
             case "SHIPPING" -> "DELIVERED".equals(next) || "CANCELLED".equals(next) || "COMPLETED".equals(next);
@@ -134,6 +136,7 @@ public class AdminOrderService {
         }
 
         if ("CANCELLED".equals(status)) {
+            boolean wasWaitingForTransfer = "WAITING_FOR_TRANSFER".equals(currentStatus);
             // Restore stock (pessimistic lock per variant — no double-restore)
             for (var detail : order.getOrderDetails()) {
                 PhoneVariant variant = detail.getPhoneVariant();
@@ -143,13 +146,19 @@ public class AdminOrderService {
                     entityManager.refresh(locked, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
                     int quantityBefore = locked.getStockQuantity();
                     locked.setStockQuantity(quantityBefore + detail.getQuantity());
-                    if (detail.getWarehouseId() == null) {
+                    if (wasWaitingForTransfer) {
+                        inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Admin hủy đơn hàng chờ điều chuyển");
+                    } else if (detail.getWarehouseId() == null) {
                         inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Admin hủy đơn hàng");
                     } else {
                         inventoryStockHistoryService.recordAtWarehouse(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Admin hủy đơn hàng", detail.getWarehouseId());
                     }
                     phoneVariantRepository.save(locked);
                 }
+            }
+
+            if (wasWaitingForTransfer) {
+                warehouseTransferService.cancelTransfersForOrder(order.getId(), reason);
             }
 
             // Restore the promotion so the voucher can be reused (only if not expired)
@@ -207,6 +216,10 @@ public class AdminOrderService {
                 .note(reason != null && !reason.isBlank() ? reason.trim() : "Quản trị viên chuyển trạng thái sang " + status)
                 .changedBy("ADMIN")
                 .build());
+
+        if ("SHIPPING".equals(status)) {
+            warehouseTransferService.deductFulfillmentStockAtDestination(order);
+        }
 
         if ("DELIVERED".equals(status) || "COMPLETED".equals(status)) {
             warrantyService.activateWarrantyForOrder(order);

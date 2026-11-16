@@ -44,9 +44,10 @@ test.describe('E2E Smoke Tests — GreenPhone', () => {
     await expect(page.locator('text=Đăng ký').first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('E2E-03: Guest is redirected from the cart', async ({ page }) => {
+  test('E2E-03: Guest can view the cart without login', async ({ page }) => {
     await page.goto('/gio-hang');
-    await expect(page).toHaveURL(/dang-nhap|login/i);
+    await expect(page).toHaveURL(/\/gio-hang$/);
+    await expect(page.getByText('Giỏ hàng trống')).toBeVisible();
   });
 
   test('E2E-04: Vouchers page renders', async ({ page }) => {

@@ -51,4 +51,3 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.success(null, "Đã đánh dấu tất cả thông báo là đã đọc"));
     }
 }
-

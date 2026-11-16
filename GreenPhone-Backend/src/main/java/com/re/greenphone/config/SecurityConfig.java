@@ -36,6 +36,7 @@ public class SecurityConfig {
                         "/api/auth/logout",
                         "/api/admin/auth/**",
                         "/api/phones/**",
+                        "/api/v1/phones/**",
                         "/api/brands/**",
                         "/api/banners/**",
                         "/api/reviews/phone/**",
@@ -47,6 +48,8 @@ public class SecurityConfig {
                         "/api/v1/shipments/track/**",
                         "/api/warranties/**",
                         "/api/v1/warranties/**",
+                        "/api/v1/warehouses/**",
+                        "/api/ai/**",
                         "/swagger-ui/**",
                         "/v3/api-docs/**",
                         "/actuator/health/**"

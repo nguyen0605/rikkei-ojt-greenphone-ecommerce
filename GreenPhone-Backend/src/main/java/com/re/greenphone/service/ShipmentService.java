@@ -31,6 +31,7 @@ public class ShipmentService {
     private final ShipmentHistoryRepository shipmentHistoryRepository;
     private final OrderRepository orderRepository;
     private final WarrantyRepository warrantyRepository;
+    private final WarehouseTransferService warehouseTransferService;
 
     private static final Set<String> VALID_CARRIER_CODES = Set.of("GHN", "GHTK", "VIETTEL_POST", "VNPOST", "J&T");
     private static final Set<String> VALID_SHIPMENT_STATUSES = Set.of(
@@ -48,10 +49,13 @@ public class ShipmentService {
      */
     @Transactional
     public ShipmentDTO createShipment(CreateShipmentRequest request) {
-        Order order = orderRepository.findById(request.getOrderId())
+        Order order = orderRepository.findByIdForUpdate(request.getOrderId())
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", request.getOrderId()));
 
-        // BẮT BUỘC: Kiểm tra trạng thái đơn hàng phải là PROCESSING mới được phép tạo shipment
+        // BẮT BUỘC: Kiểm tra trạng thái đơn hàng: từ chối tạo vận đơn nếu đơn đang chờ điều chuyển liên kho
+        if ("WAITING_FOR_TRANSFER".equalsIgnoreCase(order.getOrderStatus())) {
+            throw new BadRequestException("Đơn hàng đang chờ điều chuyển liên kho, chưa thể xuất giao khách");
+        }
         if (!"PROCESSING".equalsIgnoreCase(order.getOrderStatus())) {
             throw new BadRequestException("Order must be in PROCESSING status to create shipment. Current status: " + order.getOrderStatus());
         }
@@ -102,6 +106,7 @@ public class ShipmentService {
         // Đồng bộ trạng thái đơn hàng sang SHIPPING
         order.setOrderStatus("SHIPPING");
         orderRepository.save(order);
+        warehouseTransferService.deductFulfillmentStockAtDestination(order);
 
         log.info("Shipment #{} created for order #{} with tracking number: {}",
                 savedShipment.getId(), order.getId(), trackingNumber);

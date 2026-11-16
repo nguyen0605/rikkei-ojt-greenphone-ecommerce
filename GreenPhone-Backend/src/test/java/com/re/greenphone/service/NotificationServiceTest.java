@@ -236,4 +236,3 @@ class NotificationServiceTest {
         verify(notificationRepository, never()).save(any(Notification.class));
     }
 }
-

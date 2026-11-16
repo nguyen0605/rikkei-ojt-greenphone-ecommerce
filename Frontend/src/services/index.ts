@@ -6,6 +6,7 @@ export { adminStaffService } from './adminStaffService';
 export { notificationService } from './notificationService';
 export { adminReturnService, adminWarrantyClaimService } from './adminReturnService';
 export { warrantyService } from './warrantyService';
+export { phoneComparisonService } from './phoneComparisonService';
 import { get, post, put, del } from './api';
 import type {
   CartDTO, CartItemRequest, CartSyncRequest, OrderDTO, AdminOrderDetailDTO,
@@ -13,8 +14,8 @@ import type {
   PageResponse, PhoneDTO, PhoneDetailDTO,
   PhoneVariantDTO, PhoneImageDTO, BrandDTO, BannerDTO,
   PhoneRequest, PhoneVariantRequest, BrandRequest, InventoryStockMovementRequest,
-  BannerRequest, PromotionRequest, RevenueStats,
-  OrderStats, TopSellingPhone, UserDTO, SettingsDTO,
+  BannerRequest, PromotionRequest,
+  UserDTO, SettingsDTO,
   OptionDTO, OptionRequest, OptionItemDTO, OptionItemRequest, OptionTreeDTO,
   InventoryHistoryDTO,
 } from '@/types/api';
@@ -156,26 +157,7 @@ export const adminBannerService = {
   remove: (id: number) => del<void>('/admin/banners/' + id),
 };
 
-export const adminStatisticsService = {
-  revenue: (period: string, from?: string, to?: string) => {
-    const params: Record<string, string> = { period };
-    if (from) params.from = from;
-    if (to) params.to = to;
-    return get<RevenueStats>('/admin/statistics/revenue', { params });
-  },
-  orders: (from?: string, to?: string) => {
-    const params: Record<string, string> = {};
-    if (from) params.from = from;
-    if (to) params.to = to;
-    return get<OrderStats>('/admin/statistics/orders', { params });
-  },
-  topSelling: (limit = 10, from?: string, to?: string) => {
-    const params: Record<string, string> = { limit: String(limit) };
-    if (from) params.from = from;
-    if (to) params.to = to;
-    return get<TopSellingPhone[]>('/admin/statistics/top-selling', { params });
-  },
-};
+export { adminStatisticsService } from './adminStatisticsService';
 
 // Settings
 export const settingsService = {
@@ -186,4 +168,3 @@ export const settingsService = {
 
 export { returnService } from './returnService';
 export type { ReturnResponse, ReturnType, ReturnStatus, ReturnCreateRequest } from './returnService';
-

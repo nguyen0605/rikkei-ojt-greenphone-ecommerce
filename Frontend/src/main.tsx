@@ -17,6 +17,10 @@ import { store, persistor } from './store';
 import { antdTheme } from './lib/antdTheme';
 import { queryClient } from './lib/queryClient';
 
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  (window as unknown as { __store__: typeof store }).__store__ = store;
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ReduxProvider store={store}>

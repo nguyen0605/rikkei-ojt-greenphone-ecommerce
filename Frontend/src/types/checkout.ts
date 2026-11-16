@@ -23,6 +23,8 @@ export interface ShippingInfo {
   address: string;
   note?: string;
   shipToDifferentAddress: boolean;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface CheckoutState {

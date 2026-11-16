@@ -249,4 +249,3 @@ export const ClaimProgressModal: React.FC<ClaimProgressModalProps> = ({
 };
 
 export default ClaimProgressModal;
-

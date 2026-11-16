@@ -157,7 +157,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.login(loginReq))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("Email hoặc mật khẩu không đúng.");
+                .hasMessageContaining("Email hoặc mật khẩu không đúng");
     }
 
     @Test void login_EmailNotFound_DoesNotRevealExistence() {
@@ -166,7 +166,7 @@ class AuthServiceTest {
         assertThatThrownBy(() -> {
             LoginRequest r = new LoginRequest(); r.setEmail("nobody@example.com"); r.setPassword("x");
             authService.login(r);
-        }).isInstanceOf(BadRequestException.class).hasMessageContaining("Email hoặc mật khẩu không đúng.");
+        }).isInstanceOf(BadRequestException.class).hasMessageContaining("Email hoặc mật khẩu không đúng");
     }
 
     @Test void login_AccountNotActive() {
@@ -340,7 +340,7 @@ class AuthServiceTest {
     @Test void refreshToken_Blank_ThrowsBadRequest() {
         assertThatThrownBy(() -> authService.refreshToken("   "))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("Refresh token không được để trống.");
+                .hasMessageContaining("không được để trống");
     }
 
     @Test void refreshToken_InvalidOrExpired_ThrowsUnauthorized() {

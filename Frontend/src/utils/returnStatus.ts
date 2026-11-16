@@ -69,4 +69,3 @@ export function isActionableReturnStatus(status?: string): boolean {
 export function isCompletableReturnStatus(status?: string): boolean {
   return status === 'APPROVED';
 }
-

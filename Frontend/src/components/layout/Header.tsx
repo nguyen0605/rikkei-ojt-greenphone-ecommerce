@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { Badge, Dropdown, type MenuProps } from 'antd';
 import {
@@ -15,9 +16,11 @@ import BrandLogo from '@/components/common/BrandLogo';
 import HeaderSearch from '@/components/layout/HeaderSearch';
 import BrandDropdown from '@/components/layout/BrandDropdown';
 import NotificationBell from '@/components/layout/NotificationBell';
+import { getStoredCompareSlots, COMPARE_UPDATED_EVENT } from '@/services/phoneComparisonService';
 const navItems = [
   { key: 'home', label: 'Trang chủ', href: '/' },
   { key: 'products', label: 'Sản phẩm', href: '/san-pham' },
+  { key: 'compare', label: 'So sánh', href: '/so-sanh' },
   { key: 'vouchers', label: 'Khuyến mãi', href: '/khuyen-mai' },
   { key: 'warranty', label: 'Tra cứu bảo hành', href: '/tra-cuu-bao-hanh' },
 ];
@@ -32,10 +35,37 @@ import { ROUTES } from '@/routes/routePaths';
 
 export default function Header() {
   const cartCount = useAppSelector(selectCartTotalItems);
-  const wishlistCount = useAppSelector((state) => state.wishlist?.items?.length ?? 0);
+  const wishlistCount = useAppSelector((state) =>
+    state.auth?.isAuthenticated ? (state.wishlist?.items?.length ?? 0) : 0
+  );
   const { user, isAuthenticated } = useAppSelector((s) => s.auth);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+
+  const [compareCount, setCompareCount] = useState<number>(() => {
+    const slots = getStoredCompareSlots();
+    let count = 0;
+    if (slots.id1) count++;
+    if (slots.id2) count++;
+    return count;
+  });
+
+  useEffect(() => {
+    const updateCount = () => {
+      const slots = getStoredCompareSlots();
+      let count = 0;
+      if (slots.id1) count++;
+      if (slots.id2) count++;
+      setCompareCount(count);
+    };
+
+    window.addEventListener(COMPARE_UPDATED_EVENT, updateCount);
+    window.addEventListener('storage', updateCount);
+    return () => {
+      window.removeEventListener(COMPARE_UPDATED_EVENT, updateCount);
+      window.removeEventListener('storage', updateCount);
+    };
+  }, []);
 
   const handleLogout = () => {
     dispatch(logout());
@@ -189,14 +219,19 @@ export default function Header() {
                   end={item.href === '/'}
                   className={({ isActive }) =>
                     cn(
-                      'group relative px-4 py-2 text-sm font-medium transition-colors',
+                      'group relative px-4 py-2 text-sm font-medium transition-colors flex items-center gap-1.5',
                       isActive
                         ? 'text-green-600'
                         : 'text-gray-700 hover:text-green-600',
                     )
                   }
                 >
-                  {item.label}
+                  <span>{item.label}</span>
+                  {item.key === 'compare' && compareCount > 0 && (
+                    <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 text-[10px] font-bold text-white bg-emerald-600 rounded-full animate-in zoom-in">
+                      {compareCount}
+                    </span>
+                  )}
                   <span
                     aria-hidden="true"
                     className="absolute bottom-0 left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-green-600 opacity-0 transition-opacity group-aria-[current=page]:opacity-100"

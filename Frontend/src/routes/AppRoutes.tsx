@@ -21,6 +21,7 @@ const CheckoutSuccessPage = lazy(() => import('@/pages/CheckoutSuccessPage'));
 const TermsPage = lazy(() => import('@/pages/terms/TermsPageShell'));
 const PrivacyPage = lazy(() => import('@/pages/terms/PrivacyPage'));
 const WarrantyCheckPage = lazy(() => import('@/pages/warranty/WarrantyCheckPage'));
+const PhoneComparePage = lazy(() => import('@/pages/customer/PhoneComparePage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
 const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage'));
@@ -76,6 +77,7 @@ export default function AppRoutes() {
         <Route path={ROUTES.DIEU_KHOAN} element={withSuspense(TermsPage)} />
         <Route path={ROUTES.CHINH_SACH_BAO_MAT} element={withSuspense(PrivacyPage)} />
         <Route path={ROUTES.WARRANTY_CHECK} element={withSuspense(WarrantyCheckPage)} />
+        <Route path={ROUTES.PHONE_COMPARE} element={withSuspense(PhoneComparePage)} />
         <Route path="*" element={withSuspense(NotFoundPage)} />
       </Route>
 
@@ -121,6 +123,7 @@ export default function AppRoutes() {
         <Route path={ROUTES.ADMIN} element={withSuspense(AdminDashboardPage)} />
         <Route path={ROUTES.ADMIN_PRODUCTS} element={<RequireRole allowedRoles={['ROLE_ADMIN', 'ROLE_MARKETING']}>{withSuspense(AdminProductsPage)}</RequireRole>} />
         <Route path={ROUTES.ADMIN_INVENTORY} element={<RequireRole allowedRoles={['ROLE_ADMIN', 'ROLE_WAREHOUSE']}>{withSuspense(AdminInventoryPage)}</RequireRole>} />
+        <Route path="/admin/inventory" element={<Navigate to={ROUTES.ADMIN_INVENTORY} replace />} />
         <Route path={ROUTES.ADMIN_WAREHOUSES} element={<RequireRole allowedRoles={['ROLE_ADMIN', 'ROLE_WAREHOUSE']}>{withSuspense(AdminWarehousesPage)}</RequireRole>} />
         <Route path={ROUTES.ADMIN_SUPPLIERS} element={<RequireRole allowedRoles={['ROLE_ADMIN']}>{withSuspense(AdminSuppliersPage)}</RequireRole>} />
         <Route path={ROUTES.ADMIN_PURCHASE_ORDERS} element={<RequireRole allowedRoles={['ROLE_ADMIN']}>{withSuspense(AdminPurchaseOrdersPage)}</RequireRole>} />

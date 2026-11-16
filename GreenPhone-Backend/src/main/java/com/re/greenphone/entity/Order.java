@@ -25,6 +25,10 @@ public class Order extends BaseEntity {
     @JoinColumn(name = "USER_PROMOTION_ID", unique = true)
     private UserPromotion userPromotion;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "FULFILLMENT_WAREHOUSE_ID")
+    private Warehouse fulfillmentWarehouse;
+
     @Column(name = "RECEIVER_NAME", nullable = false, length = 100)
     private String receiverName;
 

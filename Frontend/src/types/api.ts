@@ -254,6 +254,8 @@ export interface OrderRequest {
   note: string;
   userPromotionId: number | null;
   buyNow?: boolean;
+  latitude?: number;
+  longitude?: number;
   items: OrderItemRequest[];
 }
 
@@ -468,6 +470,7 @@ export interface RevenueStats {
   period: string;
   startDate: string;
   endDate: string;
+  timeSeriesData: { date: string; revenue: number }[];
 }
 
 export interface OrderStats {
@@ -476,6 +479,8 @@ export interface OrderStats {
   pendingOrders: number;
   cancelledOrders: number;
   deliveredOrders: number;
+  processingOrders: number;
+  shippingOrders: number;
   period: string;
 }
 
@@ -596,6 +601,7 @@ export interface ReturnResponseDTO {
   phoneVariantId: number;
   phoneName: string | null;
   variantSku: string | null;
+  imeiNumber?: string | null;
   userId: number;
   customerName: string | null;
   customerPhone: string | null;
@@ -686,4 +692,58 @@ export interface UpdateClaimStatusRequest {
   resolution?: string;
   note?: string;
   performedByName?: string;
+}
+
+// Phone Comparison
+export interface ComparedPhoneDTO {
+  id: number;
+  name: string;
+  brandId?: number;
+  brandName?: string;
+  mainImageUrl?: string | null;
+  minPrice?: number | null;
+  maxPrice?: number | null;
+  minDiscountPrice?: number | null;
+  screen?: string | null;
+  os?: string | null;
+  chip?: string | null;
+  rearCamera?: string | null;
+  frontCamera?: string | null;
+  battery?: string | null;
+  warranty?: string | null;
+  ramOptions?: string[];
+  storageOptions?: string[];
+  colorOptions?: string[];
+  avgRating?: number;
+  reviewCount?: number;
+  totalStock?: number;
+}
+
+export interface SpecItemDTO {
+  key: string;
+  label: string;
+  values: Record<number, string>;
+  isDifferent: boolean;
+}
+
+export interface SpecGroupDTO {
+  groupKey: string;
+  groupName: string;
+  items: SpecItemDTO[];
+}
+
+export interface PhoneComparisonResponseDTO {
+  phones: ComparedPhoneDTO[];
+  specGroups: SpecGroupDTO[];
+  differencesKeys: string[];
+}
+
+
+export interface FinancialTimeSeriesPoint { date: string; revenue: number; grossProfit?: number | null }
+export interface PaymentMethodBreakdown { paymentMethod: string; revenue: number }
+export interface FinancialReport {
+  grossRevenue: number; discountAmount: number; shippingFee: number; netRevenue: number;
+  cogs: number | null; grossProfit: number | null; profitMarginPercentage: number | null;
+  refundAmount: number; uncostedQuantity: number; startDate: string; endDate: string;
+  timeSeriesData: FinancialTimeSeriesPoint[]; paymentMethodStats: PaymentMethodBreakdown[];
 }

@@ -16,4 +16,3 @@ public class NotificationEvent {
     private String redirectUrl;
     private String metadataJson;
 }
-

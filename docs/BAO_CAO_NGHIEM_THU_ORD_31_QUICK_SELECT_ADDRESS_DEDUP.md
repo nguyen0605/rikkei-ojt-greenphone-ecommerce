@@ -1,10 +1,10 @@
 # Báo Cáo Nghiệm Thu & Đánh Giá Kỹ Thuật (PR Review & Acceptance Report)
 
-**Mã Thẻ Trello:** `[5 SP] [ORD-31] [FS] Chọn Nhanh Địa Chỉ Giao Hàng Khi Thanh Toán Và Ngăn Chặn Trùng Lặp Sổ Địa Chỉ`  
-**Nhánh Tính Năng:** `feat/ord-31-quick-select-address-dedup` ➔ **Target Branch:** `develop`  
-**Dự Án:** Hệ thống Thương mại Điện tử GreenPhone (Rikkei OJT)  
-**Thời gian hoàn thành:** 12/11/2026  
-**Người thực hiện:** Frontend Developer  
+**Mã Thẻ Trello:** `[5 SP] [ORD-31] [FS] Chọn Nhanh Địa Chỉ Giao Hàng Khi Thanh Toán Và Ngăn Chặn Trùng Lặp Sổ Địa Chỉ`
+**Nhánh Tính Năng:** `feat/ord-31-quick-select-address-dedup` ➔ **Target Branch:** `develop`
+**Dự Án:** Hệ thống Thương mại Điện tử GreenPhone (Rikkei OJT)
+**Thời gian hoàn thành:** 12/11/2026
+**Người thực hiện:** Frontend Developer
 **Trạng thái Git:** Sẵn sàng tại local (Cam kết **KHÔNG PUSH GIT** theo yêu cầu)
 
 ---
@@ -166,4 +166,3 @@ Hệ thống đã chạy toàn bộ các bộ test liên quan đến `userServic
    - Tại khối Thông tin giao hàng, kiểm tra sự xuất hiện của nút: *"Thay đổi / Chọn từ sổ địa chỉ (X địa chỉ)"*.
    - Bấm nút ➔ Modal `AddressSelectModal` bật lên hiển thị danh sách trực quan.
    - Bấm chọn một địa chỉ khác trong danh sách ➔ Form tự động điền lại toàn bộ thông tin người nhận, Redux Store cập nhật và bản đồ dịch chuyển ghim đến địa chỉ mới.
-

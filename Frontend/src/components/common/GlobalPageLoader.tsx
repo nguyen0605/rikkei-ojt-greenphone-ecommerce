@@ -117,4 +117,3 @@ export const GlobalPageLoader: React.FC<GlobalPageLoaderProps> = ({
 };
 
 export default GlobalPageLoader;
-

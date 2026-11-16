@@ -27,6 +27,7 @@ import {
   reverseGeocode,
   geocodeInitialAddress,
   searchLocalDictionary,
+  isValidCoordinate,
   type AddressSuggestion,
 } from './checkoutGeocodingService';
 
@@ -121,6 +122,8 @@ export default function ShippingForm() {
       setValue('phone', addr.receiverPhone, { shouldValidate: true });
       setValue('address', fullAddr, { shouldValidate: true });
 
+      const hasCoords = isValidCoordinate(addr.latitude, addr.longitude);
+
       dispatch(
         updateShipping({
           fullName: addr.receiverName,
@@ -129,6 +132,8 @@ export default function ShippingForm() {
           province: addr.province,
           district: addr.district || '',
           ward: addr.ward || '',
+          latitude: hasCoords ? addr.latitude : undefined,
+          longitude: hasCoords ? addr.longitude : undefined,
         })
       );
 
@@ -136,15 +141,10 @@ export default function ShippingForm() {
       setPinnedAddressSuggestion(null);
 
       // Cập nhật vị trí ghim bản đồ nếu có tọa độ lưu sẵn
-      if (
-        typeof addr.latitude === 'number' &&
-        typeof addr.longitude === 'number' &&
-        Number.isFinite(addr.latitude) &&
-        Number.isFinite(addr.longitude)
-      ) {
+      if (hasCoords) {
         setSelectedLocation({
-          lat: addr.latitude,
-          lng: addr.longitude,
+          lat: addr.latitude!,
+          lng: addr.longitude!,
           displayName: fullAddr,
         });
       } else {
@@ -160,21 +160,33 @@ export default function ShippingForm() {
         }).then((result) => {
           // Chỉ áp dụng nếu người dùng vẫn đang chọn đúng địa chỉ này
           if (selectedAddressIdRef.current === targetId) {
-            if (result) {
+            if (result && isValidCoordinate(result.lat, result.lng)) {
               setSelectedLocation({
                 lat: result.lat,
                 lng: result.lng,
                 displayName: result.displayName,
               });
+              dispatch(
+                updateShipping({
+                  latitude: result.lat,
+                  longitude: result.lng,
+                })
+              );
             } else {
               // Fallback nếu không tìm thấy qua online geocoding: dùng từ điển theo tỉnh/thành
               const fallback = searchLocalDictionary(addr.province || 'Hồ Chí Minh', 1);
-              if (fallback.length > 0) {
+              if (fallback.length > 0 && isValidCoordinate(fallback[0].lat, fallback[0].lng)) {
                 setSelectedLocation({
                   lat: fallback[0].lat,
                   lng: fallback[0].lng,
                   displayName: fallback[0].place_name,
                 });
+                dispatch(
+                  updateShipping({
+                    latitude: fallback[0].lat,
+                    longitude: fallback[0].lng,
+                  })
+                );
               }
             }
           }
@@ -318,7 +330,15 @@ export default function ShippingForm() {
   // Tách biệt việc gõ từ khóa tìm kiếm (như '97') khỏi việc kích hoạt lỗi validation
   const searchAddress = (query: string) => {
     setValue('address', query, { shouldValidate: false });
-    dispatch(updateShipping({ address: query }));
+    // Khi người dùng tự gõ/chỉnh sửa chuỗi địa chỉ, reset tọa độ cũ không còn phù hợp
+    dispatch(
+      updateShipping({
+        address: query,
+        latitude: undefined,
+        longitude: undefined,
+      })
+    );
+    setSelectedLocation(null);
     setPinnedAddressSuggestion(null);
     setFocusedSuggestionIndex(-1);
     if (selectedAddressId !== 'custom') {
@@ -359,12 +379,15 @@ export default function ShippingForm() {
   // Chọn một gợi ý từ danh sách autocomplete
   const selectAddress = (s: AddressSuggestion) => {
     setValue('address', s.place_name, { shouldValidate: true });
+    const hasCoords = isValidCoordinate(s.lat, s.lng);
     dispatch(
       updateShipping({
         address: s.place_name,
         province: s.components?.province,
         district: s.components?.district,
         ward: s.components?.ward,
+        latitude: hasCoords ? s.lat : undefined,
+        longitude: hasCoords ? s.lng : undefined,
       })
     );
     setSuggestions([]);
@@ -372,12 +395,14 @@ export default function ShippingForm() {
     setFocusedSuggestionIndex(-1);
     setPinnedAddressSuggestion(null);
     setSelectedAddressId('custom');
-    setSelectedLocation({
-      lat: s.lat,
-      lng: s.lng,
-      displayName: s.place_name,
-    });
-    setIsMapExpanded(true);
+    if (hasCoords) {
+      setSelectedLocation({
+        lat: s.lat,
+        lng: s.lng,
+        displayName: s.place_name,
+      });
+      setIsMapExpanded(true);
+    }
   };
 
   // Điều hướng bằng bàn phím (ArrowUp, ArrowDown, Enter, Escape)
@@ -404,18 +429,26 @@ export default function ShippingForm() {
   // Xử lý khi người dùng click vào bản đồ hoặc kéo marker
   const handleMapLocationSelect = useCallback(
     async (coords: LocationCoords) => {
+      if (!isValidCoordinate(coords.lat, coords.lng)) return;
       setSelectedLocation(coords);
+
+      // Cập nhật ngay lập tức tọa độ mới ghim vào Redux state
+      dispatch(
+        updateShipping({
+          latitude: coords.lat,
+          longitude: coords.lng,
+        })
+      );
 
       // Tra cứu địa chỉ ngược từ tọa độ đã ghim
       const addressName = await reverseGeocode(coords.lat, coords.lng);
-      if (!addressName) return;
-
       const currentVal = watchedAddress?.trim() || '';
 
-      // Nếu ô địa chỉ đang trống, tự động điền địa chỉ tra cứu
+      if (!addressName) return;
+
       if (!currentVal) {
-        setValue('address', addressName, { shouldValidate: true });
         dispatch(updateShipping({ address: addressName }));
+        setValue('address', addressName, { shouldValidate: true });
         setPinnedAddressSuggestion(null);
       } else {
         // Hiển thị gợi ý áp dụng để khách chủ động quyết định mà không làm mất số nhà tự nhập
@@ -429,7 +462,13 @@ export default function ShippingForm() {
   const applyPinnedAddress = () => {
     if (pinnedAddressSuggestion) {
       setValue('address', pinnedAddressSuggestion, { shouldValidate: true });
-      dispatch(updateShipping({ address: pinnedAddressSuggestion }));
+      dispatch(
+        updateShipping({
+          address: pinnedAddressSuggestion,
+          latitude: selectedLocation?.lat,
+          longitude: selectedLocation?.lng,
+        })
+      );
       setPinnedAddressSuggestion(null);
       setSelectedAddressId('custom');
     }

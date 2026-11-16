@@ -22,6 +22,7 @@ export interface ReturnResponse {
   phoneVariantId: number;
   phoneName?: string;
   variantSku?: string;
+  imeiNumber?: string;
   userId: number;
   customerName?: string;
   reason: string;
@@ -102,4 +103,3 @@ export const returnService = {
     return api.put<ApiResponse<ReturnResponse>>(`/admin/returns/${id}/complete`, data || {}).then(res => res.data.data);
   },
 };
-

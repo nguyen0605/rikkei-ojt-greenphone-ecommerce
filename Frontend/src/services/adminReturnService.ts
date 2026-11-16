@@ -69,4 +69,3 @@ export const adminWarrantyClaimService = {
   updateStatus: (id: number, data: UpdateClaimStatusRequest) =>
     put<WarrantyClaimResponseDTO>(`/admin/warranty-claims/${id}/status`, data),
 };
-

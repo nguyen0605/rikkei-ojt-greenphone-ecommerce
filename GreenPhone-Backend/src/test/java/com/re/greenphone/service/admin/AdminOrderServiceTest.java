@@ -61,6 +61,12 @@ class AdminOrderServiceTest {
     @Mock
     private com.re.greenphone.service.WarrantyService warrantyService;
 
+    @Mock
+    private com.re.greenphone.service.WarehouseTransferService warehouseTransferService;
+
+    @Mock
+    private jakarta.persistence.EntityManager entityManager;
+
     @InjectMocks
     private AdminOrderService adminOrderService;
 

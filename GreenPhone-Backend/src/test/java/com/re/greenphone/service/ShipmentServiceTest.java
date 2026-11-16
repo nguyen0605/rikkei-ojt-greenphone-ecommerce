@@ -47,6 +47,9 @@ class ShipmentServiceTest {
     @Mock
     private WarrantyRepository warrantyRepository;
 
+    @Mock
+    private WarehouseTransferService warehouseTransferService;
+
     @InjectMocks
     private ShipmentService shipmentService;
 
@@ -92,7 +95,7 @@ class ShipmentServiceTest {
     @DisplayName("Quy tắc bắt buộc: Từ chối tạo Shipment nếu Order không ở trạng thái PROCESSING")
     void testCreateShipment_WhenOrderNotProcessing_ThrowsException() {
         sampleOrder.setOrderStatus("PENDING");
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(sampleOrder));
 
         CreateShipmentRequest req = CreateShipmentRequest.builder()
                 .orderId(1L)
@@ -107,7 +110,7 @@ class ShipmentServiceTest {
     @Test
     @DisplayName("Tạo Shipment thành công khi Order ở trạng thái PROCESSING, Order tự chuyển sang SHIPPING")
     void testCreateShipment_Success() {
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(sampleOrder));
         when(shipmentRepository.existsByTrackingNumber(anyString())).thenReturn(false);
         when(shipmentRepository.save(any(Shipment.class))).thenAnswer(invocation -> {
             Shipment s = invocation.getArgument(0);
@@ -186,7 +189,7 @@ class ShipmentServiceTest {
     @Test
     @DisplayName("Quy tắc bắt buộc: Từ chối tạo Shipment nếu CarrierCode không hợp lệ")
     void testCreateShipment_WithInvalidCarrierCode_ThrowsException() {
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(sampleOrder));
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(sampleOrder));
 
         CreateShipmentRequest req = CreateShipmentRequest.builder()
                 .orderId(1L)

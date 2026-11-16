@@ -6,7 +6,7 @@ import OrderSummary from '@/components/checkout/OrderSummary';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { selectCheckoutItems, selectCheckoutSummary } from '@/store/selectors/cartSelectors';
 import { nextStep, prevStep, completeOrder, setCurrentStep, removeCheckoutVoucher, clearBuyNow } from '@/store/slices/checkoutSlice';
-import { clearCart } from '@/store/slices/cartSlice';
+import { clearCart, removeVoucher } from '@/store/slices/cartSlice';
 import { orderService, paymentService, phoneService } from '@/services';
 import { Button, App } from 'antd';
 import { Shield, CheckCircle, Banknote } from 'lucide-react';
@@ -87,6 +87,16 @@ export default function CheckoutPage() {
           quantity: item.quantity,
         })),
       );
+      const hasCoords =
+        typeof shipping.latitude === 'number' &&
+        typeof shipping.longitude === 'number' &&
+        Number.isFinite(shipping.latitude) &&
+        Number.isFinite(shipping.longitude) &&
+        shipping.latitude >= -90 &&
+        shipping.latitude <= 90 &&
+        shipping.longitude >= -180 &&
+        shipping.longitude <= 180;
+
       const orderReq = {
         receiverName: shipping.fullName,
         receiverPhone: shipping.phone,
@@ -95,6 +105,8 @@ export default function CheckoutPage() {
         note: '',
         userPromotionId: userPromotionId ?? null,
         buyNow: isBuyNow,
+        latitude: hasCoords ? shipping.latitude : undefined,
+        longitude: hasCoords ? shipping.longitude : undefined,
         items,
       };
       const order = await orderService.create(orderReq);
@@ -207,7 +219,26 @@ export default function CheckoutPage() {
                   <div className="flex justify-between text-sm"><span className="text-gray-600">Tạm tính</span><span>{formatVND(summary.subtotal)}</span></div>
                   <div className="flex justify-between text-sm"><span className="text-gray-600">Phí giao hàng</span><span className="text-green-600">{summary.shippingFee === 0 ? 'Miễn phí' : formatVND(summary.shippingFee)}</span></div>
                   {voucherDiscount > 0 && (
-                    <div className="flex justify-between text-sm"><span className="text-gray-600">Giảm giá ({voucherCode})</span><span className="text-green-600">-{formatVND(voucherDiscount)}</span></div>
+                    <div className="flex justify-between text-sm items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-600">Giảm giá ({voucherCode})</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            dispatch(removeCheckoutVoucher());
+                            if (!buyNowItem) {
+                              dispatch(removeVoucher());
+                            }
+                            message.info('Đã bỏ áp dụng mã khuyến mãi');
+                          }}
+                          className="rounded px-1.5 py-0.5 text-xs text-red-500 hover:bg-red-50 hover:underline transition-colors"
+                          title="Bỏ áp dụng mã khuyến mãi"
+                        >
+                          [Bỏ áp dụng]
+                        </button>
+                      </div>
+                      <span className="text-green-600 font-medium">-{formatVND(voucherDiscount)}</span>
+                    </div>
                   )}
                   <div className="flex justify-between border-t border-gray-100 pt-3 text-base font-bold">
                     <span>Tổng thanh toán</span>

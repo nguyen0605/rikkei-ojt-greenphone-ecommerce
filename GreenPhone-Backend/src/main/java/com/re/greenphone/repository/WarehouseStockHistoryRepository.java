@@ -10,4 +10,6 @@ public interface WarehouseStockHistoryRepository extends JpaRepository<Warehouse
     List<WarehouseStockHistory> findByWarehouseIdOrderByCreatedAtDescIdDesc(Long warehouseId, Pageable page);
     @EntityGraph(attributePaths = {"phoneVariant"})
     List<WarehouseStockHistory> findByWarehouseIdAndPhoneVariantIdOrderByCreatedAtDescIdDesc(Long warehouseId, Long variantId, Pageable page);
+
+    boolean existsByTransferReference(String transferReference);
 }

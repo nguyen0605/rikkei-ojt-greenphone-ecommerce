@@ -302,7 +302,7 @@ class CartServiceTest {
         // When / Then
         BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> cartService.addItem(request));
-        assertTrue(ex.getMessage().contains("Insufficient stock"));
+        assertTrue(ex.getMessage().contains("không đủ"));
 
         // Cart must NOT be saved
         verify(cartRepository, never()).save(any());
@@ -392,7 +392,7 @@ class CartServiceTest {
         // When / Then
         BadRequestException ex = assertThrows(BadRequestException.class,
                 () -> cartService.updateItem(1L, 10));
-        assertTrue(ex.getMessage().contains("Insufficient stock"));
+        assertTrue(ex.getMessage().contains("không đủ"));
 
         // Quantity should remain unchanged
         assertEquals(1, item.getQuantity());

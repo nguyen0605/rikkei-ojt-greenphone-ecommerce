@@ -115,4 +115,3 @@ public class NotificationServiceImpl implements NotificationService {
         return NotificationResponse.fromEntity(saved);
     }
 }
-

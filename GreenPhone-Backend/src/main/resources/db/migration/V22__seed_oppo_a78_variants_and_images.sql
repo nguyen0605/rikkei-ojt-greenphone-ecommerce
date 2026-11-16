@@ -2,16 +2,13 @@
 -- Module: CAT (Catalog & Products)
 
 INSERT INTO `phone_image` (`PHONE_ID`, `IMAGE_URL`, `IS_MAIN`, `SORT_ORDER`, `CREATED_AT`, `UPDATED_AT`)
-VALUES (
-    130,
-    'https://pub-df08b62e1cfd4f979be4298a44bb0da0.r2.dev/products/oppo-a78.png',
-    1,
-    0,
-    NOW(),
-    NOW()
+SELECT 130, 'https://pub-df08b62e1cfd4f979be4298a44bb0da0.r2.dev/products/oppo-a78.png', 1, 0, NOW(), NOW()
+FROM DUAL
+WHERE NOT EXISTS (
+    SELECT 1 FROM `phone_image` WHERE `PHONE_ID` = 130 AND `IMAGE_URL` = 'https://pub-df08b62e1cfd4f979be4298a44bb0da0.r2.dev/products/oppo-a78.png'
 );
 
-INSERT INTO `phone_variant` (`PHONE_ID`, `RAM_ITEM_ID`, `STORAGE_ITEM_ID`, `COLOR_ITEM_ID`, `PRICE`, `DISCOUNT_PRICE`, `STOCK_QUANTITY`, `SKU`, `STATUS`, `VERSION`, `CREATED_AT`, `UPDATED_AT`)
+INSERT IGNORE INTO `phone_variant` (`PHONE_ID`, `RAM_ITEM_ID`, `STORAGE_ITEM_ID`, `COLOR_ITEM_ID`, `PRICE`, `DISCOUNT_PRICE`, `STOCK_QUANTITY`, `SKU`, `STATUS`, `VERSION`, `CREATED_AT`, `UPDATED_AT`)
 VALUES (
     130,
     (SELECT `ID` FROM `option_item` WHERE `OPTION_ID` = 1 AND (`VALUE` = '8GB' OR `VALUE` LIKE '8%') LIMIT 1),

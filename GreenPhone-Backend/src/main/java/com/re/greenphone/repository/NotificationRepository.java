@@ -38,4 +38,3 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             @Param("type") NotificationType type,
             Pageable pageable);
 }
-

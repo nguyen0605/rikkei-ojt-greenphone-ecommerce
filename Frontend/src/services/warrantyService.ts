@@ -47,4 +47,3 @@ export const warrantyService = {
 };
 
 export default warrantyService;
-
