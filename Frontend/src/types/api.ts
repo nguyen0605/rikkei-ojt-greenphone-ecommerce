@@ -470,6 +470,7 @@ export interface RevenueStats {
   period: string;
   startDate: string;
   endDate: string;
+  timeSeriesData: { date: string; revenue: number }[];
 }
 
 export interface OrderStats {
@@ -478,6 +479,8 @@ export interface OrderStats {
   pendingOrders: number;
   cancelledOrders: number;
   deliveredOrders: number;
+  processingOrders: number;
+  shippingOrders: number;
   period: string;
 }
 
@@ -735,3 +738,12 @@ export interface PhoneComparisonResponseDTO {
   differencesKeys: string[];
 }
 
+
+export interface FinancialTimeSeriesPoint { date: string; revenue: number; grossProfit?: number | null }
+export interface PaymentMethodBreakdown { paymentMethod: string; revenue: number }
+export interface FinancialReport {
+  grossRevenue: number; discountAmount: number; shippingFee: number; netRevenue: number;
+  cogs: number | null; grossProfit: number | null; profitMarginPercentage: number | null;
+  refundAmount: number; uncostedQuantity: number; startDate: string; endDate: string;
+  timeSeriesData: FinancialTimeSeriesPoint[]; paymentMethodStats: PaymentMethodBreakdown[];
+}

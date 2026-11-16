@@ -11,6 +11,10 @@ import java.util.List;
 @Repository
 public interface OrderDetailRepository extends JpaRepository<OrderDetail, Long> {
 
+    @Query("select function('date', function('convert_tz', d.order.createdAt, '+00:00', '+07:00')), sum(d.unitCost*d.quantity), sum(case when d.unitCost is null then d.quantity else 0 end) from OrderDetail d where d.order.paymentStatus='PAID' and d.order.createdAt>=:from and d.order.createdAt<:to group by function('date', function('convert_tz', d.order.createdAt, '+00:00', '+07:00'))")
+    List<Object[]> costDaily(@org.springframework.data.repository.query.Param("from") LocalDateTime from,
+                            @org.springframework.data.repository.query.Param("to") LocalDateTime to);
+
     List<OrderDetail> findByOrderId(Long orderId);
 
     boolean existsByPhoneVariantId(Long phoneVariantId);
