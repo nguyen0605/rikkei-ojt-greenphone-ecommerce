@@ -40,6 +40,8 @@ public class SecurityConfig {
                         "/api/brands/**",
                         "/api/banners/**",
                         "/api/reviews/phone/**",
+                        "/api/reviews/images",
+                        "/api/reviews/images/**",
                         "/api/webhooks/**",
                         "/api/promotions/public/**",
                         "/api/settings/**",
