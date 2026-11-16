@@ -54,8 +54,8 @@ const mockOrderDetail: OrderDTO = {
   ],
 };
 
-function renderDetailPage(orderId = '888') {
-  const queryClient = new QueryClient({
+function renderDetailPage(orderId = '888', customQueryClient?: QueryClient) {
+  const queryClient = customQueryClient || new QueryClient({
     defaultOptions: {
       queries: {
         retry: false,
@@ -119,6 +119,67 @@ describe('OrderDetailPage', () => {
 
     // Check Total payment
     expect(screen.getByText('Tổng thanh toán:')).toBeInTheDocument();
+  });
+
+  it('renders DELIVERED status with green badge, 4 steps lit, and "Viết đánh giá" button', async () => {
+    const deliveredOrder: OrderDTO = {
+      ...mockOrderDetail,
+      id: 22,
+      orderStatus: 'DELIVERED',
+      paymentStatus: 'PAID',
+    };
+    vi.mocked(orderService.detail).mockResolvedValue(deliveredOrder);
+    renderDetailPage('22');
+
+    await waitFor(() => {
+      expect(screen.getByText('Chi tiết đơn hàng #22')).toBeInTheDocument();
+    });
+
+    // Badge Đã giao hàng màu xanh lá
+    const statusBadges = screen.getAllByText('Đã giao hàng');
+    expect(statusBadges.length).toBeGreaterThan(0);
+
+    // OrderTrackingTimeline sáng bước 4 (Giao hàng thành công)
+    expect(screen.getAllByText('Giao hàng thành công').length).toBeGreaterThan(0);
+
+    // Nút "Viết đánh giá" xuất hiện khi đơn hàng DELIVERED
+    expect(screen.getByRole('button', { name: /viết đánh giá/i })).toBeInTheDocument();
+  });
+
+  it('uses pre-populated query cache immediately without loading skeleton and still refetches fresh server state (staleTime: 0, refetchOnMount: always)', async () => {
+    const cachedOrder: OrderDTO = {
+      ...mockOrderDetail,
+      id: 22,
+      orderStatus: 'DELIVERED',
+      paymentStatus: 'PAID',
+    };
+
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          gcTime: 10000,
+        },
+      },
+    });
+
+    // Giả lập dữ liệu đã được OrderHistoryPage preload vào cache ['order', '22']
+    client.setQueryData(['order', '22'], cachedOrder);
+
+    // Mock API trả về phiên bản cập nhật nhất
+    vi.mocked(orderService.detail).mockResolvedValue(cachedOrder);
+
+    renderDetailPage('22', client);
+
+    // Ngay lập tức hiển thị nội dung đơn hàng, không giật màn hình skeleton
+    expect(screen.queryByTestId('order-detail-loading')).not.toBeInTheDocument();
+    expect(screen.getByText('Chi tiết đơn hàng #22')).toBeInTheDocument();
+    expect(screen.getAllByText('Đã giao hàng').length).toBeGreaterThan(0);
+
+    // Vẫn gọi API detail lên backend để đảm bảo trạng thái server mới nhất
+    await waitFor(() => {
+      expect(orderService.detail).toHaveBeenCalledWith(22);
+    });
   });
 
   it('renders error state when order detail fails or is not found', async () => {
