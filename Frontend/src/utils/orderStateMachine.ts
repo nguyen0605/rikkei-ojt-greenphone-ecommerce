@@ -205,6 +205,8 @@ export const extractCustomerNote = (note?: string | null): string | null => {
     .replace(/\[Lý do hủy:\s*.*?\]/gi, '')
     .replace(/\[(?:Hóa đơn VAT|VAT_INVOICE|VAT):\s*.*?\]/gi, '')
     .replace(/\[(?:KÈM_HÓA_ĐƠN_GIẤY|PAPER_INVOICE|YÊU CẦU HÓA ĐƠN GIẤY)\]/gi, '')
+    .replace(/\[(?:YÊU CẦU HOÀN TIỀN|REFUND).*?\]/gi, '')
+    .replace(/\s+/g, ' ')
     .trim();
   return cleaned.length > 0 ? cleaned : null;
 };

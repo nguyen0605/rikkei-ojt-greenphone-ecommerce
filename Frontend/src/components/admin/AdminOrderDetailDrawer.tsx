@@ -240,7 +240,7 @@ export default function AdminOrderDetailDrawer({
                 <div className="space-y-1.5 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold uppercase tracking-wider text-amber-800">
-                      ⚡ Yêu cầu hoàn tiền khách hàng
+                      Yêu cầu hoàn tiền khách hàng
                     </span>
                     <Tag color="volcano" className="!m-0 !font-semibold">
                       CHỜ HOÀN TIỀN
@@ -379,7 +379,7 @@ export default function AdminOrderDetailDrawer({
                   </Tag>
                 ) : (
                   <Tag color="green" className="!font-medium">
-                    Hóa đơn điện tử (🌱)
+                    Hóa đơn điện tử trực tuyến
                   </Tag>
                 )}
               </Descriptions.Item>

@@ -9,7 +9,7 @@ import { nextStep, prevStep, completeOrder, setCurrentStep, removeCheckoutVouche
 import { clearCart, removeVoucher } from '@/store/slices/cartSlice';
 import { orderService, paymentService, phoneService } from '@/services';
 import { Button, App, Input } from 'antd';
-import { Shield, CheckCircle, Banknote, Building2, FileText } from 'lucide-react';
+import { Shield, CheckCircle, Banknote, Building2, FileText, Info } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { z } from 'zod';
 import { formatVND } from '@/utils';
@@ -368,8 +368,9 @@ export default function CheckoutPage() {
                       )}
                     </div>
 
-                    <div className="rounded-lg bg-blue-50/60 p-3 text-xs text-blue-800">
-                      ℹ️ Hóa đơn điện tử sẽ được phát hành và gửi về email doanh nghiệp sau khi đơn hàng giao thành công.
+                    <div className="flex items-center gap-2 rounded-lg bg-blue-50/60 p-3 text-xs text-blue-800">
+                      <Info className="w-4 h-4 text-blue-600 shrink-0" />
+                      <span>Hóa đơn điện tử sẽ được phát hành và gửi về email doanh nghiệp sau khi đơn hàng giao thành công.</span>
                     </div>
                   </div>
                 )}
@@ -389,7 +390,7 @@ export default function CheckoutPage() {
                         Yêu cầu gửi kèm hóa đơn bán lẻ (bản giấy) khi giao hàng
                       </span>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        🌱 GreenPhone mặc định lưu trữ <strong>Hóa đơn điện tử</strong> trực tuyến để bảo vệ môi trường. Tích chọn nếu quý khách cần hóa đơn in giấy kẹp cùng kiện hàng.
+                        GreenPhone mặc định lưu trữ <strong>Hóa đơn điện tử</strong> trực tuyến để bảo vệ môi trường. Tích chọn nếu quý khách cần hóa đơn in giấy kẹp cùng kiện hàng.
                       </p>
                     </div>
                   </label>
@@ -424,7 +425,7 @@ export default function CheckoutPage() {
                 <h3 className="mb-4 text-lg font-bold text-gray-900">Xác nhận đơn hàng</h3>
 
                 <div className="mb-6 rounded-xl bg-gray-50 p-4">
-                  <h4 className="mb-2 text-sm font-semibold text-gray-700">📍 Thông tin nhận hàng</h4>
+                  <h4 className="mb-2 text-sm font-semibold text-gray-700">Thông tin nhận hàng</h4>
                   <p className="text-sm text-gray-800"><strong>{shipping.fullName}</strong> — {shipping.phone}</p>
                   <p className="text-sm text-gray-600">{shipping.address}</p>
                   {shipping.email && <p className="text-xs text-gray-500">{shipping.email}</p>}
@@ -460,7 +461,7 @@ export default function CheckoutPage() {
                       </span>
                     ) : (
                       <span className="text-gray-600">
-                        Hóa đơn điện tử trực tuyến (🌱)
+                        Hóa đơn điện tử trực tuyến
                       </span>
                     )}
                   </div>
@@ -468,7 +469,7 @@ export default function CheckoutPage() {
 
                 {/* Items */}
                 <div className="mb-6">
-                  <h4 className="mb-3 text-sm font-semibold text-gray-700">🛒 Sản phẩm ({summary.totalItems})</h4>
+                  <h4 className="mb-3 text-sm font-semibold text-gray-700">Sản phẩm ({summary.totalItems})</h4>
                   <div className="space-y-2">
                     {checkoutItems.map((item) => (
                       <div key={item.id} className="flex items-center gap-3 rounded-lg border border-gray-100 p-3">
@@ -521,7 +522,7 @@ export default function CheckoutPage() {
                 {/* Payment method */}
                 <div className="mt-4 rounded-xl bg-gray-50 p-3">
                   <span className="text-sm text-gray-700">
-                    💳 {payment === 'cod' ? 'Thanh toán khi nhận hàng (COD)' : payment === 'bank-transfer' ? 'Chuyển khoản ngân hàng (VietQR)' : payment === 'e-wallet' ? 'Ví điện tử' : payment === 'credit-card' ? 'Thẻ tín dụng' : 'Thẻ ATM'}
+                    {payment === 'cod' ? 'Thanh toán khi nhận hàng (COD)' : payment === 'bank-transfer' ? 'Chuyển khoản ngân hàng (VietQR)' : payment === 'e-wallet' ? 'Ví điện tử' : payment === 'credit-card' ? 'Thẻ tín dụng' : 'Thẻ ATM'}
                   </span>
                 </div>
               </div>

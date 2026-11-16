@@ -130,6 +130,22 @@ public class OrderService {
             }
         }
 
+        // Validate corporate VAT invoice information if requested
+        if (Boolean.TRUE.equals(request.getRequestInvoice()) || (companyName != null && !companyName.isBlank())) {
+            if (companyName == null || companyName.isBlank()) {
+                throw new BadRequestException("Tên công ty xuất hóa đơn VAT không được để trống");
+            }
+            if (taxCode == null || !taxCode.matches("^(\\d{10}|\\d{13}|\\d{10}-\\d{3})$")) {
+                throw new BadRequestException("Mã số thuế không hợp lệ (phải gồm 10 hoặc 13 chữ số)");
+            }
+            if (companyAddress == null || companyAddress.isBlank()) {
+                throw new BadRequestException("Địa chỉ công ty xuất hóa đơn VAT không được để trống");
+            }
+            if (invoiceEmail != null && !invoiceEmail.isBlank() && !invoiceEmail.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+                throw new BadRequestException("Email nhận hóa đơn không đúng định dạng");
+            }
+        }
+
         Order order = Order.builder()
                 .user(user)
                 .receiverName(request.getReceiverName())

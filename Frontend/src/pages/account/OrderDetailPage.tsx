@@ -120,6 +120,10 @@ export const OrderDetailPage: React.FC = () => {
   const canCancel = order?.orderStatus === 'PENDING' || order?.orderStatus === 'CONFIRMED';
   const canReview = order?.orderStatus === 'DELIVERED';
   const canReorder = order?.orderDetails && order.orderDetails.length > 0;
+  // Điều kiện xem hóa đơn tài chính: Đã thanh toán (PAID) hoặc đã xác nhận/đang xử lý/đang giao/đã giao
+  const canViewInvoice =
+    order?.paymentStatus === 'PAID' ||
+    ['CONFIRMED', 'PROCESSING', 'SHIPPING', 'DELIVERED', 'COMPLETED'].includes(order?.orderStatus || '');
 
   // Tính toán thời gian 7 ngày kể từ khi giao hàng thành công (DELIVERED hoặc COMPLETED)
   const isCompletedOrder = order?.orderStatus === 'COMPLETED' || order?.orderStatus === 'DELIVERED';
@@ -258,15 +262,32 @@ export const OrderDetailPage: React.FC = () => {
         {/* Cụm nút hành động trên Header */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Nút Xem hóa đơn điện tử (Dành cho khách hàng) */}
-          <button
-            type="button"
-            data-testid="view-invoice-btn"
-            onClick={() => setInvoiceModalOpen(true)}
-            className="inline-flex min-h-[36px] items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition-colors shadow-2xs"
+          <Tooltip
+            title={
+              !canViewInvoice
+                ? 'Hóa đơn đang chờ kế toán kiểm duyệt và phát hành'
+                : 'Xem và in hóa đơn bán lẻ kiêm phiếu bảo hành chính thức'
+            }
           >
-            <FileText className="h-3.5 w-3.5 text-emerald-600" />
-            <span>Xem hóa đơn</span>
-          </button>
+            <span>
+              <button
+                type="button"
+                data-testid="view-invoice-btn"
+                disabled={!canViewInvoice}
+                onClick={() => {
+                  if (canViewInvoice) setInvoiceModalOpen(true);
+                }}
+                className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-semibold transition-colors shadow-2xs ${
+                  canViewInvoice
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 cursor-pointer'
+                    : 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
+                }`}
+              >
+                <FileText className={`h-3.5 w-3.5 ${canViewInvoice ? 'text-emerald-600' : 'text-gray-400'}`} />
+                <span>Xem hóa đơn</span>
+              </button>
+            </span>
+          </Tooltip>
 
           {canCancel && (
             <button
@@ -440,7 +461,7 @@ export const OrderDetailPage: React.FC = () => {
               ) : (
                 <span className="text-gray-600 inline-flex items-center gap-1 text-xs">
                   <FileText className="w-3.5 h-3.5 text-emerald-600" />
-                  Hóa đơn điện tử trực tuyến (🌱)
+                  Hóa đơn điện tử trực tuyến
                 </span>
               )}
             </div>

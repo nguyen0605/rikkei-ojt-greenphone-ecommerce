@@ -270,7 +270,7 @@ public class EmailService {
             vatSection = """
                 <div style="margin-top: 14px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 12px 14px;">
                     <div style="font-weight: 700; color: #065f46; font-size: 13px; margin-bottom: 6px;">
-                        📄 THÔNG TIN XUẤT HÓA ĐƠN GIÁ TRỊ GIA TĂNG (VAT)
+                        THÔNG TIN XUẤT HÓA ĐƠN GIÁ TRỊ GIA TĂNG (VAT)
                     </div>
                     <table style="width: 100%%; font-size: 12px; line-height: 1.6; border-collapse: collapse; color: #1f2937;">
                         <tr>
@@ -389,7 +389,7 @@ public class EmailService {
 
                         <!-- CTA Buttons -->
                         <div style="text-align: center; margin-top: 28px;">
-                            <a href="%s" style="display: inline-block; background: #16a34a; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 12px 24px; border-radius: 8px; margin: 4px;">📄 Xem & In Hóa đơn điện tử</a>
+                            <a href="%s" style="display: inline-block; background: #16a34a; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 12px 24px; border-radius: 8px; margin: 4px;">Xem & In Hóa đơn điện tử</a>
                             <a href="%s" style="display: inline-block; background: #f3f4f6; color: #374151; text-decoration: none; font-size: 14px; font-weight: 600; padding: 12px 20px; border-radius: 8px; border: 1px solid #d1d5db; margin: 4px;">Theo dõi đơn hàng</a>
                         </div>
                     </div>

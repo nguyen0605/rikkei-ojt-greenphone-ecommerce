@@ -629,4 +629,32 @@ class OrderServiceTest {
                         && "ketoan@greentech.vn".equals(o.getInvoiceEmail())
         ));
     }
+
+    @Test
+    void createOrder_WithVatInvoice_InvalidTaxCode_ThrowsBadRequest() {
+        stubUser();
+
+        OrderRequest req = createOrderReq(List.of(createItemReq(100L, 2)), null);
+        req.setRequestInvoice(true);
+        req.setCompanyName("CÔNG TY CỔ PHẦN CÔNG NGHỆ GREEN TECH");
+        req.setTaxCode("123"); // invalid MST
+        req.setCompanyAddress("123 Phố Duy Tân, Cầu Giấy, Hà Nội");
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> orderService.createOrder(req));
+        assertTrue(ex.getMessage().contains("Mã số thuế"));
+    }
+
+    @Test
+    void createOrder_WithVatInvoice_MissingCompanyName_ThrowsBadRequest() {
+        stubUser();
+
+        OrderRequest req = createOrderReq(List.of(createItemReq(100L, 2)), null);
+        req.setRequestInvoice(true);
+        req.setCompanyName("   "); // blank
+        req.setTaxCode("0101234567");
+        req.setCompanyAddress("123 Phố Duy Tân, Cầu Giấy, Hà Nội");
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> orderService.createOrder(req));
+        assertTrue(ex.getMessage().contains("Tên công ty"));
+    }
 }

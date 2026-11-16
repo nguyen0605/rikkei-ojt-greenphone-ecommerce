@@ -53,7 +53,7 @@ describe('InvoicePrintModal', () => {
     // Header Branding
     expect(screen.getByText('GREENPHONE RETAIL')).toBeInTheDocument();
     expect(screen.getByText('Hệ thống bán lẻ thiết bị di động & công nghệ chính hãng')).toBeInTheDocument();
-    expect(screen.getByText('HD-012345')).toBeInTheDocument();
+    expect(screen.getByText('INV-2026-12345')).toBeInTheDocument();
     expect(screen.getByText('#12345')).toBeInTheDocument();
 
     // Receiver info

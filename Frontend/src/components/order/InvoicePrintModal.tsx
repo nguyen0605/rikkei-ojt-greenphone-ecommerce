@@ -183,7 +183,8 @@ export const InvoicePrintContent: React.FC<InvoicePrintContentProps> = ({
   const vatInfo = extractVatInvoice(order);
   const customerNote = extractCustomerNote(order.note);
   const isPaid = order.paymentStatus === 'PAID';
-  const formattedInvoiceNo = `HD-${String(order.id).padStart(6, '0')}`;
+  const invoiceYear = order.createdAt ? new Date(order.createdAt).getFullYear() : new Date().getFullYear();
+  const formattedInvoiceNo = `INV-${invoiceYear}-${String(order.id).padStart(5, '0')}`;
   const trackingUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/tra-cuu-bao-hanh?orderId=${order.id}`
     : `https://greenphone.vn/tra-cuu-bao-hanh?orderId=${order.id}`;

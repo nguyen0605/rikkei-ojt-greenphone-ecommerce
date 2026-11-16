@@ -76,7 +76,7 @@ describe('PublicInvoicePage', () => {
 
     expect(screen.getByText('Bản điện tử hợp lệ')).toBeInTheDocument();
     expect(screen.getByText('GREENPHONE RETAIL')).toBeInTheDocument();
-    expect(screen.getByText('HD-000282')).toBeInTheDocument();
+    expect(screen.getByText('INV-2026-00282')).toBeInTheDocument();
 
     // Corporate VAT information
     expect(screen.getByText('CÔNG TY TNHH CÔNG NGHỆ THỊNH AN')).toBeInTheDocument();
