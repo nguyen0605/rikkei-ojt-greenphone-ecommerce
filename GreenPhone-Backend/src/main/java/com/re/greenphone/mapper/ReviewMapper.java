@@ -19,8 +19,29 @@ public interface ReviewMapper extends GenericMapper<Review, ReviewDTO> {
     @Mapping(source = "phone.name", target = "phoneName")
     @Mapping(source = "orderDetail.id", target = "orderDetailId")
     @Mapping(target = "phoneImage", expression = "java(getPhoneImage(entity.getPhone()))")
-    @Mapping(target = "images", expression = "java(parseImages(entity.getImagesJson()))")
+    @Mapping(target = "images", expression = "java(mapImages(entity))")
     ReviewDTO toDto(Review entity);
+
+    @Override
+    @Mapping(target = "images", ignore = true)
+    @Mapping(target = "imagesJson", ignore = true)
+    @Mapping(target = "user", ignore = true)
+    @Mapping(target = "phone", ignore = true)
+    @Mapping(target = "orderDetail", ignore = true)
+    Review toEntity(ReviewDTO dto);
+
+    default List<String> mapImages(Review entity) {
+        if (entity == null) {
+            return Collections.emptyList();
+        }
+        if (entity.getImages() != null && !entity.getImages().isEmpty()) {
+            return entity.getImages().stream()
+                    .map(com.re.greenphone.entity.ReviewImage::getImageUrl)
+                    .filter(url -> url != null && !url.trim().isEmpty())
+                    .toList();
+        }
+        return parseImages(entity.getImagesJson());
+    }
 
     default String getPhoneImage(com.re.greenphone.entity.Phone phone) {
         if (phone == null || phone.getImages() == null || phone.getImages().isEmpty()) {

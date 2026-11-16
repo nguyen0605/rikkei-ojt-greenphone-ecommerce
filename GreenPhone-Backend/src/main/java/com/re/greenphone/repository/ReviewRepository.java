@@ -3,6 +3,7 @@ package com.re.greenphone.repository;
 import com.re.greenphone.entity.Review;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,16 +17,19 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     List<Review> findByPhoneIdAndStatus(Long phoneId, String status);
 
+    @EntityGraph(attributePaths = {"images", "user", "phone"})
     List<Review> findByPhoneIdAndStatusIn(Long phoneId, Collection<String> statuses);
 
     List<Review> findByPhoneId(Long phoneId);
 
     List<Review> findByUserId(Long userId);
 
+    @EntityGraph(attributePaths = {"images", "user", "phone"})
     Page<Review> findByUserId(Long userId, Pageable pageable);
 
     Page<Review> findByPhoneId(Long phoneId, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"images", "user", "phone"})
     Page<Review> findByPhoneIdAndStatusIn(Long phoneId, Collection<String> statuses, Pageable pageable);
 
     boolean existsByOrderDetailId(Long orderDetailId);

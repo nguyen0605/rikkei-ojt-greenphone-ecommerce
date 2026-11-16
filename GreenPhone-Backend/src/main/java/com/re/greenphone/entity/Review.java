@@ -37,4 +37,24 @@ public class Review extends BaseEntity {
 
     @Column(name = "images_json", columnDefinition = "LONGTEXT")
     private String imagesJson;
+
+    @OneToMany(mappedBy = "review", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC, id ASC")
+    @Builder.Default
+    private java.util.List<ReviewImage> images = new java.util.ArrayList<>();
+
+    public void addImage(ReviewImage image) {
+        if (images == null) {
+            images = new java.util.ArrayList<>();
+        }
+        images.add(image);
+        image.setReview(this);
+    }
+
+    public void removeImage(ReviewImage image) {
+        if (images != null) {
+            images.remove(image);
+            image.setReview(null);
+        }
+    }
 }

@@ -27,7 +27,7 @@ public class ReviewController {
     private final ReviewService reviewService;
     private final R2StorageService r2StorageService;
 
-    @PostMapping(value = "/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = {"/images", "/images/upload"}, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Tải hình ảnh đánh giá lên Cloudflare R2")
     public ResponseEntity<ApiResponse<List<String>>> uploadImages(
             @RequestParam(value = "images", required = false) List<MultipartFile> images,
@@ -45,6 +45,20 @@ public class ReviewController {
             throw new BadRequestException("Chỉ được tải lên tối đa 5 hình ảnh cho mỗi đánh giá.");
         }
 
+        long maxSizeBytes = 5L * 1024 * 1024; // 5MB
+        for (MultipartFile f : allFiles) {
+            if (f != null && !f.isEmpty()) {
+                if (f.getSize() > maxSizeBytes) {
+                    throw new BadRequestException("Kích thước mỗi ảnh không được vượt quá 5MB.");
+                }
+                String contentType = f.getContentType();
+                String originalFilename = f.getOriginalFilename();
+                if (!isAllowedImage(contentType, originalFilename)) {
+                    throw new BadRequestException("Định dạng file không hợp lệ. Chỉ chấp nhận các định dạng ảnh an toàn (JPG, PNG, WEBP).");
+                }
+            }
+        }
+
         List<String> urls = new ArrayList<>();
         for (MultipartFile f : allFiles) {
             if (f != null && !f.isEmpty()) {
@@ -52,6 +66,22 @@ public class ReviewController {
             }
         }
         return ResponseEntity.ok(ApiResponse.success(urls, "Tải ảnh đánh giá lên Cloudflare R2 thành công"));
+    }
+
+    private boolean isAllowedImage(String contentType, String filename) {
+        if (contentType != null) {
+            String lowerType = contentType.toLowerCase();
+            if (lowerType.equals("image/jpeg") || lowerType.equals("image/png")
+                    || lowerType.equals("image/webp") || lowerType.equals("image/jpg")) {
+                return true;
+            }
+        }
+        if (filename != null) {
+            String lowerName = filename.toLowerCase();
+            return lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")
+                    || lowerName.endsWith(".png") || lowerName.endsWith(".webp");
+        }
+        return false;
     }
 
     @GetMapping("/phone/{phoneId}")
