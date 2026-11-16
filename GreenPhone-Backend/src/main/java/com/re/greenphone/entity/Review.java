@@ -34,4 +34,7 @@ public class Review extends BaseEntity {
     @Column(name = "STATUS", nullable = false, length = 30)
     @Builder.Default
     private String status = "SHOW";
+
+    @Column(name = "images_json", columnDefinition = "LONGTEXT")
+    private String imagesJson;
 }

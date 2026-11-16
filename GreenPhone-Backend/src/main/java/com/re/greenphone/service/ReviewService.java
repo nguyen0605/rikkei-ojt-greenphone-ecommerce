@@ -157,6 +157,13 @@ public class ReviewService {
             throw new BadRequestException("Đơn hàng này đã được đánh giá cho sản phẩm này.");
         }
 
+        String imagesJson = null;
+        if (request.getImages() != null && !request.getImages().isEmpty()) {
+            try {
+                imagesJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(request.getImages());
+            } catch (Exception ignored) {}
+        }
+
         Review review = Review.builder()
                 .user(user)
                 .phone(phone)
@@ -164,6 +171,7 @@ public class ReviewService {
                 .rating(request.getRating())
                 .content(request.getContent())
                 .status("APPROVED")
+                .imagesJson(imagesJson)
                 .build();
 
         review = reviewRepository.save(review);
@@ -183,6 +191,11 @@ public class ReviewService {
 
         review.setRating(request.getRating());
         review.setContent(request.getContent());
+        if (request.getImages() != null) {
+            try {
+                review.setImagesJson(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(request.getImages()));
+            } catch (Exception ignored) {}
+        }
         review = reviewRepository.save(review);
         return reviewMapper.toDto(review);
     }
@@ -202,7 +215,8 @@ public class ReviewService {
     public PageResponse<ReviewDTO> getMyReviews(PageRequest pageRequest) {
         Long userId = SecurityUtils.getCurrentUserId();
         Pageable pageable = org.springframework.data.domain.PageRequest.of(
-                pageRequest.getPage(), pageRequest.getSize());
+                pageRequest.getPage(), pageRequest.getSize(),
+                Sort.by(Sort.Direction.DESC, "createdAt"));
 
         Page<Review> page = reviewRepository.findByUserId(userId, pageable);
         List<ReviewDTO> dtos = reviewMapper.toDtoList(page.getContent());

@@ -1,6 +1,7 @@
 import { get, post, put, del } from './api';
 import type {
   ReviewDTO,
+  ReviewRequest,
   ReviewSummary,
   PageResponse,
   OrderDTO,
@@ -8,6 +9,17 @@ import type {
 } from '@/types/api';
 
 export const reviewService = {
+  /**
+   * Tải ảnh đánh giá lên máy chủ / Cloudflare R2
+   */
+  uploadImages: (formData: FormData): Promise<string[]> => {
+    return post<string[]>('/reviews/images', formData, {
+      headers: {
+        'Content-Type': undefined,
+      },
+    });
+  },
+
   /**
    * Lấy danh sách đánh giá của sản phẩm theo trang và tham số lọc
    */
@@ -38,7 +50,7 @@ export const reviewService = {
   /**
    * Tạo đánh giá mới (yêu cầu đã đăng nhập và đã nhận đơn hàng)
    */
-  create: (data: { orderDetailId: number; rating: number; content: string }) => {
+  create: (data: ReviewRequest | { orderDetailId: number; rating: number; content: string; images?: string[]; phoneId?: number }) => {
     return post<ReviewDTO>('/reviews', data);
   },
 
@@ -59,14 +71,14 @@ export const reviewService = {
   /**
    * Lấy danh sách đánh giá của tôi
    */
-  myReviews: (params?: Record<string, string>) => {
+  myReviews: (params?: Record<string, string | number>) => {
     return get<PageResponse<ReviewDTO>>('/reviews/me', { params });
   },
 
   /**
    * Lấy danh sách đơn hàng đủ điều kiện đánh giá
    */
-  eligible: (params?: Record<string, string>) => {
+  eligible: (params?: Record<string, string | number>) => {
     return get<PageResponse<OrderDTO>>('/reviews/eligible', { params });
   },
 };

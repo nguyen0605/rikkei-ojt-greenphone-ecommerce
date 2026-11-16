@@ -114,6 +114,8 @@ export default function AppRoutes() {
         <Route path="/account/profile" element={<Navigate to={ROUTES.ACCOUNT_PROFILE} replace />} />
         <Route path="/account/addresses" element={<Navigate to={ROUTES.ACCOUNT_ADDRESSES} replace />} />
         <Route path="/account/orders" element={<Navigate to={ROUTES.ACCOUNT_ORDERS} replace />} />
+        <Route path="/account/reviews" element={<Navigate to={ROUTES.ACCOUNT_REVIEWS} replace />} />
+        <Route path="/account/notifications" element={<Navigate to={ROUTES.ACCOUNT_NOTIFICATIONS} replace />} />
         <Route path="/account/wishlist" element={<Navigate to={ROUTES.ACCOUNT_WISHLIST} replace />} />
         <Route path="/account/change-password" element={<Navigate to={ROUTES.ACCOUNT_CHANGE_PASSWORD} replace />} />
       </Route>

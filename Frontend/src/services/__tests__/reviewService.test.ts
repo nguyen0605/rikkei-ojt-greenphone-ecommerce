@@ -44,6 +44,36 @@ describe('reviewService', () => {
     expect(result).toEqual(mockSummary);
   });
 
+  it('calls POST /reviews/images to upload review images', async () => {
+    const mockUrls = ['https://cdn.greenphone.vn/reviews/img1.webp', 'https://cdn.greenphone.vn/reviews/img2.webp'];
+    vi.mocked(api.post).mockResolvedValue(mockUrls);
+
+    const formData = new FormData();
+    const result = await reviewService.uploadImages(formData);
+
+    expect(api.post).toHaveBeenCalledWith('/reviews/images', formData, {
+      headers: {
+        'Content-Type': undefined,
+      },
+    });
+    expect(result).toEqual(mockUrls);
+  });
+
+  it('calls POST /reviews to create a new review with images', async () => {
+    const payload = {
+      orderDetailId: 12,
+      rating: 5,
+      content: 'Tốt',
+      images: ['https://cdn.greenphone.vn/reviews/img1.webp'],
+    };
+    vi.mocked(api.post).mockResolvedValue({ id: 1, ...payload });
+
+    const result = await reviewService.create(payload);
+
+    expect(api.post).toHaveBeenCalledWith('/reviews', payload);
+    expect(result).toEqual({ id: 1, ...payload });
+  });
+
   it('calls POST /reviews to create a new review', async () => {
     const payload = { orderDetailId: 12, rating: 5, content: 'Tốt' };
     vi.mocked(api.post).mockResolvedValue({ id: 1, ...payload });

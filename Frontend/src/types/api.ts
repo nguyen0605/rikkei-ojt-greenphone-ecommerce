@@ -181,12 +181,22 @@ export interface ReviewDTO {
   userName: string;
   userAvatar?: string;
   phoneId: number;
+  phoneName?: string;
+  phoneImage?: string;
   orderDetailId?: number;
   rating: number;
   content: string;
   status: string;
   createdAt: string;
   isPurchased?: boolean;
+  images?: string[];
+}
+
+export interface ReviewRequest {
+  orderDetailId: number;
+  phoneId?: number;
+  rating: number;
+  content: string;
   images?: string[];
 }
 

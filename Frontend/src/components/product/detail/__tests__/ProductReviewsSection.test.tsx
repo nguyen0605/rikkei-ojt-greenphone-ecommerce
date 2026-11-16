@@ -196,6 +196,57 @@ describe('ProductReviewsSection', () => {
     expect(screen.queryByText(/Chụp hình đẹp nhưng pin hơi nóng/i)).not.toBeInTheDocument();
   });
 
+  it('31. Tab "Có hình ảnh" tính 1 review có nhiều ảnh là 1 đánh giá có hình ảnh', async () => {
+    // 1 review có 3 ảnh, 1 review không có ảnh
+    const customReviews: ReviewDTO[] = [
+      {
+        id: 10,
+        userId: 1,
+        userName: 'Nguyễn Văn Đa Ảnh',
+        phoneId: 5,
+        rating: 5,
+        content: 'Review có 3 ảnh',
+        status: 'SHOW',
+        createdAt: '2026-11-10T00:00:00Z',
+        images: ['https://cdn.vn/1.jpg', 'https://cdn.vn/2.jpg', 'https://cdn.vn/3.jpg'],
+      },
+      {
+        id: 20,
+        userId: 2,
+        userName: 'Trần Văn Không Ảnh',
+        phoneId: 5,
+        rating: 4,
+        content: 'Review không có ảnh',
+        status: 'SHOW',
+        createdAt: '2026-11-10T00:00:00Z',
+      },
+    ];
+
+    vi.mocked(reviewService.summary).mockResolvedValue({
+      averageRating: 4.5,
+      totalReviews: 2,
+      distribution: { 5: 1, 4: 1 },
+    });
+    vi.mocked(reviewService.byPhone).mockResolvedValue({
+      content: customReviews,
+      page: 0,
+      size: 5,
+      totalElements: 2,
+      totalPages: 1,
+      last: true,
+    });
+
+    renderWithClient(<ProductReviewsSection phoneId={5} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Review có 3 ảnh/)).toBeInTheDocument();
+    });
+
+    // Badge của tab "Có hình ảnh" phải hiển thị là 1 (chứ không phải 3)
+    const imageTab = screen.getByRole('tab', { name: /Có hình ảnh/i });
+    expect(imageTab).toHaveTextContent('1');
+  });
+
   it('renders "Xem thêm đánh giá" button when more reviews are available', async () => {
     vi.mocked(reviewService.summary).mockResolvedValue({
       averageRating: 4.8,
