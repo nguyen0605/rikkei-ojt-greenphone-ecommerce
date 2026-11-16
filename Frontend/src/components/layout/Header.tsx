@@ -35,7 +35,9 @@ import { ROUTES } from '@/routes/routePaths';
 
 export default function Header() {
   const cartCount = useAppSelector(selectCartTotalItems);
-  const wishlistCount = useAppSelector((state) => state.wishlist?.items?.length ?? 0);
+  const wishlistCount = useAppSelector((state) =>
+    state.auth?.isAuthenticated ? (state.wishlist?.items?.length ?? 0) : 0
+  );
   const { user, isAuthenticated } = useAppSelector((s) => s.auth);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();

@@ -64,8 +64,9 @@ const persistConfig = {
   storage,
   // Cart and checkout are user/session scoped. Cart is hydrated from the
   // authenticated user's backend cart, while checkout must start at step 1
-  // for every new order.
-  whitelist: ['wishlist'],
+  // for every new order. Wishlist is authenticated-only and never persisted
+  // in localStorage to prevent state leakage between sessions.
+  whitelist: [],
 };
 
 const initialState = { ...rootReducer(undefined, { type: '@@INIT' }), cart: readGuestCart() };
