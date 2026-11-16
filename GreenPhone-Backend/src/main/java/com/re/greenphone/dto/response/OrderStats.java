@@ -14,5 +14,7 @@ public class OrderStats {
     private Long pendingOrders;
     private Long cancelledOrders;
     private Long deliveredOrders;
+    private Long processingOrders;
+    private Long shippingOrders;
     private String period;
 }

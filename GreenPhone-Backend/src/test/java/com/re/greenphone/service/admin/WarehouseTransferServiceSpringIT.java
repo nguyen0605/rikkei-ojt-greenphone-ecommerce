@@ -609,23 +609,34 @@ class WarehouseTransferServiceSpringIT {
 
         startSignal.countDown();
 
-        WarehouseTransferDTO trfResult = future1.get(15, TimeUnit.SECONDS);
-        OrderDTO cancelResult = future2.get(15, TimeUnit.SECONDS);
-        executor.shutdown();
-
+        WarehouseTransferDTO trfResult;
+        OrderDTO cancelResult = null;
+        try {
+            trfResult = future1.get(15, TimeUnit.SECONDS);
+            try {
+                cancelResult = future2.get(15, TimeUnit.SECONDS);
+            } catch (java.util.concurrent.ExecutionException rejected) {
+                // Receiving may win the Order lock and advance it to PROCESSING.
+                // The existing customer cancellation contract must reject that state.
+                assertThat(rejected.getCause())
+                        .isInstanceOf(com.re.greenphone.common.exception.BadRequestException.class)
+                        .hasMessageContaining("PROCESSING");
+            }
+        } finally {
+            executor.shutdownNow();
+        }
         assertThat(trfResult).isNotNull();
-        assertThat(cancelResult).isNotNull();
-
-        // Verify Invariants:
-        // 1. Order must end in CANCELLED (cannot be PROCESSING if cancelled)
+        assertThat(warehouseTransferRepository.findById(transferId).orElseThrow().getStatus()).isEqualTo("RECEIVED");
         Order finalOrder = orderRepository.findById(orderId).orElseThrow();
-        assertThat(finalOrder.getOrderStatus()).isEqualTo("CANCELLED");
-
-        // 2. Warehouse Stock at destination (Đà Nẵng):
-        // Since order was cancelled, arriving goods MUST NOT be held in reservation!
         WarehouseStock stockDn = warehouseStockRepository.findByWarehouseIdAndPhoneVariantId(warehouseDnId, variantId).orElseThrow();
-        assertThat(stockDn.getReservedQuantity()).isEqualTo(0);
-        assertThat(stockDn.getQuantity()).isGreaterThanOrEqualTo(0);
+        assertThat(stockDn.getQuantity()).isEqualTo(1);
+        if (cancelResult != null) {
+            assertThat(finalOrder.getOrderStatus()).isEqualTo("CANCELLED");
+            assertThat(stockDn.getReservedQuantity()).isEqualTo(0);
+        } else {
+            assertThat(finalOrder.getOrderStatus()).isEqualTo("PROCESSING");
+            assertThat(stockDn.getReservedQuantity()).isEqualTo(1);
+        }
     }
 
     @Test
