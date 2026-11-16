@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import com.re.greenphone.event.NotificationEvent;
+import com.re.greenphone.event.OrderCreatedEvent;
 import com.re.greenphone.enums.NotificationType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -49,7 +50,6 @@ public class OrderService {
     private final PromotionRepository promotionRepository;
     private final CartRepository cartRepository;
     private final OrderMapper orderMapper;
-    private final EmailService emailService;
     private final SettingsService settingsService;
     private final InventoryStockHistoryService inventoryStockHistoryService;
     private final WarehouseRoutingService warehouseRoutingService;
@@ -338,11 +338,14 @@ public class OrderService {
         }
 
         // Confirmation email:
-        // - COD: confirmed at creation.
+        // - COD: confirmed at creation via OrderCreatedEvent (sent after transaction commit).
         // - Bank transfer (VIETQR): only when the payment is confirmed via the
         //   Sepay webhook — sending it here would reach the user before they pay.
-        if (!"VIETQR".equalsIgnoreCase(request.getPaymentMethod())) {
-            emailService.sendOrderConfirmation(user.getEmail(), String.valueOf(order.getId()));
+        if (!"VIETQR".equalsIgnoreCase(request.getPaymentMethod()) && eventPublisher != null) {
+            eventPublisher.publishEvent(OrderCreatedEvent.builder()
+                    .orderId(order.getId())
+                    .toEmail(user.getEmail())
+                    .build());
         }
 
         // Bắn sự kiện thông báo in-app bất đồng bộ

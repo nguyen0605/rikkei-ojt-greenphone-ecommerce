@@ -9,6 +9,7 @@ import com.re.greenphone.dto.response.OrderCreationResult;
 import com.re.greenphone.dto.response.OrderDTO;
 import com.re.greenphone.entity.*;
 import com.re.greenphone.entity.Order;
+import com.re.greenphone.event.OrderCreatedEvent;
 import com.re.greenphone.mapper.OrderMapper;
 import com.re.greenphone.repository.*;
 import com.re.greenphone.security.SecurityUtils;
@@ -123,7 +124,7 @@ class OrderServiceTest {
         ArgumentCaptor<Order> saved = ArgumentCaptor.forClass(Order.class);
         verify(orderRepository).save(saved.capture());
         assertEquals(new BigDecimal("750"), saved.getValue().getOrderDetails().get(0).getUnitCost());
-        verify(emailService).sendOrderConfirmation(eq(USER_EMAIL), anyString());
+        verify(eventPublisher).publishEvent(argThat((Object e) -> e instanceof OrderCreatedEvent oce && USER_EMAIL.equals(oce.getToEmail())));
     }
 
     @Test void createOrder_BankTransfer_NoConfirmationEmail() {
@@ -140,7 +141,7 @@ class OrderServiceTest {
         orderService.createOrder(req);
 
         // VIETQR orders are emailed only once payment is confirmed (SepayService)
-        verify(emailService, never()).sendOrderConfirmation(anyString(), anyString());
+        verify(eventPublisher, never()).publishEvent(any(OrderCreatedEvent.class));
     }
 
     @Test void createOrder_VariantNotFound() {

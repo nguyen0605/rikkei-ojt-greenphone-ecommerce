@@ -2,6 +2,7 @@ package com.re.greenphone.service;
 
 import com.re.greenphone.entity.Order;
 import com.re.greenphone.entity.OrderDetail;
+import com.re.greenphone.event.OrderCreatedEvent;
 import com.re.greenphone.repository.OrderRepository;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -11,6 +12,8 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.math.BigDecimal;
 import java.text.NumberFormat;
@@ -41,30 +44,31 @@ public class EmailService {
     }
 
     @Async("mailTaskExecutor")
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void handleOrderCreatedEvent(OrderCreatedEvent event) {
+        if (event == null || event.getOrderId() == null || event.getToEmail() == null) {
+            log.warn("[Async Mail] Invalid OrderCreatedEvent received: {}", event);
+            return;
+        }
+        log.info("[Async Mail] Received OrderCreatedEvent for order #{} after commit, sending confirmation to {}",
+                event.getOrderId(), event.getToEmail());
+        sendOrderConfirmation(event.getToEmail(), String.valueOf(event.getOrderId()));
+    }
+
+    @Async("mailTaskExecutor")
     public void sendOrderConfirmation(String toEmail, String orderId) {
         String subject = "Hóa đơn xác nhận đơn hàng #" + orderId + " - GreenPhone";
         String body = null;
         Order order = null;
         try {
             Long id = Long.parseLong(orderId);
-            // Đợi tối đa 1.5s (5 lần retry) để đảm bảo transaction tạo đơn hàng ở luồng chính đã commit hoàn toàn
-            for (int i = 0; i < 5; i++) {
-                order = orderRepository.findByIdWithDetails(id).orElse(null);
-                if (order != null) {
-                    break;
-                }
-                try {
-                    Thread.sleep(300);
-                } catch (InterruptedException ignored) {
-                    Thread.currentThread().interrupt();
-                }
-            }
+            order = orderRepository.findByIdWithDetails(id).orElse(null);
             if (order != null) {
                 body = buildInvoiceEmail(order);
                 log.info("[Async Mail] Loaded order details for #{}: companyName={}, invoiceEmail={}",
                         orderId, order.getCompanyName(), order.getInvoiceEmail());
             } else {
-                log.warn("[Async Mail] Order #{} not found after retries, falling back to simple template", orderId);
+                log.warn("[Async Mail] Order #{} not found, falling back to simple template", orderId);
             }
         } catch (Exception e) {
             log.warn("[Async Mail] Could not load full order details for id {}: {}", orderId, e.getMessage());
