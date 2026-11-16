@@ -27,6 +27,13 @@ export const orderService = {
   },
 
   /**
+   * Lấy hóa đơn điện tử công khai phục vụ tra cứu từ link email / mã QR (không yêu cầu đăng nhập)
+   */
+  getPublicInvoice: (id: number | string) => {
+    return get<OrderDTO>(`/orders/${id}/invoice`);
+  },
+
+  /**
    * Khách hàng yêu cầu hủy đơn hàng (áp dụng cho đơn PENDING/CONFIRMED)
    */
   cancel: (id: number, data?: string | CancelOrderParams) => {
