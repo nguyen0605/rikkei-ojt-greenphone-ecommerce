@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -65,6 +66,38 @@ public class Order extends BaseEntity {
 
     @Column(name = "NOTE", length = 255)
     private String note;
+
+    @Column(name = "COMPANY_NAME", length = 255)
+    private String companyName;
+
+    @Column(name = "TAX_CODE", length = 50)
+    private String taxCode;
+
+    @Column(name = "COMPANY_ADDRESS", length = 500)
+    private String companyAddress;
+
+    @Column(name = "INVOICE_EMAIL", length = 150)
+    private String invoiceEmail;
+
+    @Column(name = "INVOICE_TOKEN", length = 64, unique = true)
+    private String invoiceToken;
+
+    @Column(name = "INVOICE_STATUS", length = 20)
+    @Builder.Default
+    private String invoiceStatus = "PENDING";
+
+    @Column(name = "INVOICE_ISSUED_AT")
+    private LocalDateTime invoiceIssuedAt;
+
+    @PrePersist
+    public void ensureInvoiceToken() {
+        if (this.invoiceToken == null || this.invoiceToken.isBlank()) {
+            this.invoiceToken = java.util.UUID.randomUUID().toString();
+        }
+        if (this.invoiceStatus == null || this.invoiceStatus.isBlank()) {
+            this.invoiceStatus = "PENDING";
+        }
+    }
 
     /**
      * Optimistic lock: guards cancel/timeout vs payment-webhook races.

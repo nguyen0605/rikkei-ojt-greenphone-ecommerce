@@ -256,6 +256,12 @@ export interface OrderRequest {
   buyNow?: boolean;
   latitude?: number;
   longitude?: number;
+  requestInvoice?: boolean;
+  includePaperInvoice?: boolean;
+  companyName?: string;
+  taxCode?: string;
+  companyAddress?: string;
+  invoiceEmail?: string;
   items: OrderItemRequest[];
 }
 
@@ -287,11 +293,22 @@ export interface OrderDTO {
   paymentStatus: string;
   paymentMethod: string;
   note: string;
+  hasInvoice?: boolean;
+  includePaperInvoice?: boolean;
+  companyName?: string;
+  taxCode?: string;
+  companyAddress?: string;
+  invoiceEmail?: string;
+  invoiceToken?: string;
+  invoiceStatus?: 'PENDING' | 'ISSUED' | string;
+  invoiceIssuedAt?: string;
   promotionCode: string;
   createdAt: string;
   updatedAt?: string;
   orderDetails: OrderDetailDTO[];
 }
+
+export type OrderResponse = OrderDTO;
 
 export interface OrderHistoryDTO {
   id: number;

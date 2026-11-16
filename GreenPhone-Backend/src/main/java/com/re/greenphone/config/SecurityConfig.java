@@ -50,6 +50,8 @@ public class SecurityConfig {
                         "/api/v1/warranties/**",
                         "/api/v1/warehouses/**",
                         "/api/ai/**",
+                        "/api/orders/invoice/*",
+                        "/api/v1/orders/invoice/*",
                         "/swagger-ui/**",
                         "/v3/api-docs/**",
                         "/actuator/health/**"

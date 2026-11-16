@@ -3,6 +3,7 @@ package com.re.greenphone.service;
 import com.re.greenphone.config.MailConfig;
 import com.re.greenphone.entity.Order;
 import com.re.greenphone.entity.OrderDetail;
+import com.re.greenphone.event.OrderCreatedEvent;
 import com.re.greenphone.repository.OrderRepository;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
@@ -107,6 +108,25 @@ class EmailServiceTest {
 
         MimeMessage sentMessage = captor.getValue();
         assertThat(sentMessage.getSubject()).contains("Hóa đơn xác nhận đơn hàng #100");
+    }
+
+    @Test
+    @DisplayName("handleOrderCreatedEvent: should process event and send confirmation email")
+    void handleOrderCreatedEvent_shouldSendConfirmation() throws Exception {
+        when(orderRepository.findByIdWithDetails(101L)).thenReturn(Optional.empty());
+
+        OrderCreatedEvent event = OrderCreatedEvent.builder()
+                .orderId(101L)
+                .toEmail("customer@example.com")
+                .build();
+
+        emailService.handleOrderCreatedEvent(event);
+
+        ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(mailSender).send(captor.capture());
+
+        MimeMessage sentMessage = captor.getValue();
+        assertThat(sentMessage.getSubject()).contains("Hóa đơn xác nhận đơn hàng #101");
     }
 
     @Test

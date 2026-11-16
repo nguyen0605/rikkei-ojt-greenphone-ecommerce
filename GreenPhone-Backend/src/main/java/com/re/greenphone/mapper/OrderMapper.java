@@ -17,6 +17,8 @@ public interface OrderMapper extends GenericMapper<Order, OrderDTO> {
     // Use the stored capped discount, not the raw promotion value
     @Mapping(source = "discountAmount", target = "discountAmount")
     @Mapping(source = "orderDetails", target = "orderDetails")
+    @Mapping(target = "hasInvoice", expression = "java(entity.getCompanyName() != null && !entity.getCompanyName().isBlank())")
+    @Mapping(target = "includePaperInvoice", expression = "java(entity.getNote() != null && entity.getNote().contains(\"[KÈM_HÓA_ĐƠN_GIẤY]\"))")
     OrderDTO toDto(Order entity);
 
     default AdminOrderDetailDTO toAdminDetailDto(Order entity) {

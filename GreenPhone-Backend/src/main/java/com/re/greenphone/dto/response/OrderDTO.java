@@ -27,6 +27,15 @@ public class OrderDTO {
     private String paymentStatus;
     private String paymentMethod;
     private String note;
+    private Boolean hasInvoice;
+    private Boolean includePaperInvoice;
+    private String companyName;
+    private String taxCode;
+    private String companyAddress;
+    private String invoiceEmail;
+    private String invoiceToken;
+    private String invoiceStatus;
+    private LocalDateTime invoiceIssuedAt;
     private String promotionCode;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

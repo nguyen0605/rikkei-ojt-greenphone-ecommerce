@@ -128,6 +128,7 @@ export const adminOrderService = {
   updatePaymentStatus: (id: number, paymentStatus: string) => put<OrderDTO>('/admin/orders/' + id + '/payment-status', { paymentStatus }),
   confirm: (id: number) => put<OrderDTO>('/admin/orders/' + id + '/confirm'),
   updateDelivery: (id: number, status: string) => put<OrderDTO>('/admin/orders/' + id + '/delivery', { status }),
+  issueInvoice: (id: number) => put<OrderDTO>('/admin/orders/' + id + '/issue-invoice'),
 };
 
 export const adminUserService = {

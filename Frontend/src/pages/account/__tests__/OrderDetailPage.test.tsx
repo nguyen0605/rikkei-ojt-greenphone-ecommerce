@@ -193,4 +193,34 @@ describe('OrderDetailPage', () => {
       ).toBeInTheDocument();
     });
   });
+
+  it('renders "Xem hóa đơn" button and opens invoice modal on click', async () => {
+    vi.mocked(orderService.detail).mockResolvedValue(mockOrderDetail);
+    renderDetailPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('view-invoice-btn')).toBeInTheDocument();
+    });
+
+    const viewBtn = screen.getByTestId('view-invoice-btn');
+    expect(viewBtn).toHaveTextContent('Xem hóa đơn');
+    expect(viewBtn).not.toBeDisabled();
+  });
+
+  it('disables "Xem hóa đơn" button when order is PENDING and UNPAID', async () => {
+    const pendingOrder: OrderDTO = {
+      ...mockOrderDetail,
+      orderStatus: 'PENDING',
+      paymentStatus: 'UNPAID',
+    };
+    vi.mocked(orderService.detail).mockResolvedValue(pendingOrder);
+    renderDetailPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('view-invoice-btn')).toBeInTheDocument();
+    });
+
+    const viewBtn = screen.getByTestId('view-invoice-btn');
+    expect(viewBtn).toBeDisabled();
+  });
 });
