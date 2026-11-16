@@ -40,6 +40,10 @@ public class OrderDetail extends BaseEntity {
     @Column(name = "UNIT_PRICE", nullable = false, precision = 12, scale = 2)
     private BigDecimal unitPrice;
 
+    // Immutable cost snapshot; null means historical cost is unknown. Never exposed in customer DTOs.
+    @Column(name = "UNIT_COST", precision = 19, scale = 6, updatable = false)
+    private BigDecimal unitCost;
+
     @Column(name = "QUANTITY", nullable = false)
     private Integer quantity;
 

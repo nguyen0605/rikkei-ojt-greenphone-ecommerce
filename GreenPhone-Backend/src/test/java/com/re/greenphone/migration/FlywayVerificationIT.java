@@ -63,7 +63,9 @@ public class FlywayVerificationIT {
                 java.nio.file.Files.copy(file.toPath(), new java.io.File(targetDir, file.getName()).toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 // Legacy directory only contains pre-merge migrations (V1 to V18)
                 String fn = file.getName();
-                if (!fn.startsWith("V19__") && !fn.startsWith("V20__") && !fn.startsWith("V21__") && !fn.startsWith("V22__") && !fn.startsWith("V23__") && !fn.startsWith("V24__")) {
+                if (fn.startsWith("V") && fn.contains("__")
+                        && org.flywaydb.core.api.MigrationVersion.fromVersion(fn.substring(1, fn.indexOf("__")))
+                                .compareTo(org.flywaydb.core.api.MigrationVersion.fromVersion("19")) < 0) {
                     java.nio.file.Files.copy(file.toPath(), new java.io.File(legacyDir, file.getName()).toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 }
             }
@@ -218,6 +220,9 @@ public class FlywayVerificationIT {
         // Với outOfOrder = true (đã có sẵn trong application.yml của dự án)
         Flyway upgradedFlyway = Flyway.configure()
                 .dataSource(jdbcUrl, EXISTING_MYSQL.getUsername(), EXISTING_MYSQL.getPassword())
+                // This fixture verifies the historic V20/V21 -> V24 transition.
+                // Later additions (including V25) have their own additive migration test.
+                .target("24")
                 .locations("filesystem:build/test-migrations")
                 .outOfOrder(true)
                 .validateOnMigrate(false)

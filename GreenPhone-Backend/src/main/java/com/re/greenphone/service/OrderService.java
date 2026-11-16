@@ -40,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final OrderCostService orderCostService;
     private final com.re.greenphone.repository.OrderHistoryRepository orderHistoryRepository;
     private final UserRepository userRepository;
     private final PhoneVariantRepository phoneVariantRepository;
@@ -56,6 +57,7 @@ public class OrderService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final ApplicationEventPublisher eventPublisher;
 
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public OrderCreationResult createOrderWithIdempotency(OrderRequest request, String idempotencyKey) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             OrderDTO order = executeCreateOrder(request);
@@ -104,6 +106,7 @@ public class OrderService {
         }
     }
 
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public OrderDTO createOrder(OrderRequest request) {
         return createOrderWithIdempotency(request, null).getOrder();
     }
@@ -227,6 +230,7 @@ public class OrderService {
                     .storage(storageVal)
                     .color(colorVal)
                     .quantity(itemReq.getQuantity())
+                    .unitCost(orderCostService.snapshot(variant.getId()))
                     .unitPrice(price)
                     .subtotal(subtotal)
                     .build();

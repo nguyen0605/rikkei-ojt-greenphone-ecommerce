@@ -32,6 +32,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
+    @org.mockito.Mock com.re.greenphone.service.OrderCostService orderCostService;
+
 
     @Mock private OrderRepository orderRepository;
     @Mock private com.re.greenphone.repository.OrderHistoryRepository orderHistoryRepository;
@@ -113,11 +115,14 @@ class OrderServiceTest {
         when(orderMapper.toDto(any())).thenReturn(new OrderDTO());
         when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
+        when(orderCostService.snapshot(100L)).thenReturn(new BigDecimal("750"));
         orderService.createOrder(req);
 
         assertEquals(8, v.getStockQuantity());
         verify(inventoryStockHistoryService).recordAtWarehouse(eq(v), eq(10), eq(-2), eq("EXPORT"), anyString(), eq(1L));
-        verify(orderRepository).save(any());
+        ArgumentCaptor<Order> saved = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(saved.capture());
+        assertEquals(new BigDecimal("750"), saved.getValue().getOrderDetails().get(0).getUnitCost());
         verify(emailService).sendOrderConfirmation(eq(USER_EMAIL), anyString());
     }
 

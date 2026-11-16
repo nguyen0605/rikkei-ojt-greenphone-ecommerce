@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchWishlist, syncWishlistToServer } from '@/store/slices/wishlistSlice';
+import { fetchWishlist, clearWishlist } from '@/store/slices/wishlistSlice';
 
 /**
- * Tự động đồng bộ danh sách yêu thích giữa Local (Khách vãng lai) và Server (Khách đăng nhập)
+ * Chỉ tải danh sách yêu thích từ máy chủ khi phiên đăng nhập hợp lệ.
+ * Khi chưa đăng nhập hoặc đăng xuất, đảm bảo state wishlist luôn được giữ ở mảng rỗng [].
  */
 export default function WishlistHydrator() {
   const dispatch = useAppDispatch();
@@ -15,26 +16,22 @@ export default function WishlistHydrator() {
   const syncedUserRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const wasAuth = prevAuthRef.current;
     prevAuthRef.current = isAuthenticated;
 
     if (isAuthenticated && userId !== undefined && token) {
       if (syncedUserRef.current === userId) return;
       syncedUserRef.current = userId;
 
-      // Khi người dùng vừa đăng nhập từ trạng thái khách vãng lai:
-      if (!wasAuth && items.length > 0) {
-        // Đồng bộ các sản phẩm đã thích từ local lên server
-        void dispatch(syncWishlistToServer());
-      } else {
-        // Tải danh sách yêu thích mới nhất từ tài khoản server
-        void dispatch(fetchWishlist());
-      }
-    } else if (wasAuth && !isAuthenticated) {
+      // Khi người dùng đăng nhập hợp lệ: tải danh sách từ máy chủ
+      void dispatch(fetchWishlist());
+    } else {
       syncedUserRef.current = null;
+      // Khi không đăng nhập: đảm bảo state items của wishlist luôn ở trạng thái mảng rỗng []
+      if (items.length > 0) {
+        dispatch(clearWishlist());
+      }
     }
   }, [isAuthenticated, userId, token, dispatch, items.length]);
 
   return null;
 }
-

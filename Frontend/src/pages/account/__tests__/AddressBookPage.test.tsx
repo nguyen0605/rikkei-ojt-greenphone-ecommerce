@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App } from 'antd';
@@ -6,6 +6,17 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AddressBookPage from '@/pages/account/AddressBookPage';
 import { userService } from '@/services';
 import type { AddressItem } from '@/types/api';
+
+// The page lazy-loads the real form; map SDK/network behavior is tested separately.
+vi.mock('@/components/checkout/CheckoutDeliveryMap', () => ({
+  default: () => <div data-testid="address-map" />,
+}));
+
+beforeAll(async () => {
+  // Resolve the cold module graph outside DOM assertion timeouts. The page still
+  // opens its real lazy modal, including its title, fields and validation.
+  await import('@/components/account/AddressModal');
+}, 60000);
 
 vi.mock('@/services', () => ({
   userService: {
@@ -39,7 +50,7 @@ describe('AddressBookPage', () => {
   });
 
   it('renders empty state when there are no addresses', async () => {
-    vi.mocked(userService.getAddresses).mockResolvedValueOnce([]);
+    vi.mocked(userService.getAddresses).mockResolvedValue([]);
 
     renderPage();
 
@@ -98,9 +109,9 @@ describe('AddressBookPage', () => {
     const addBtn = screen.getByRole('button', { name: /thêm địa chỉ mới/i });
     await user.click(addBtn);
 
-    await waitFor(() => {
-      expect(screen.getByText('Thêm địa chỉ nhận hàng mới')).toBeInTheDocument();
-    });
+    expect(await screen.findByRole('dialog', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByText('Thêm địa chỉ nhận hàng mới')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Nguyễn Văn A')).toBeInTheDocument();
   });
 
   it('disables delete button for single default address', async () => {

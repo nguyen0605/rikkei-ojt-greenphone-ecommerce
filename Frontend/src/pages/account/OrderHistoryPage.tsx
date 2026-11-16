@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ShoppingBag,
   RotateCw,
@@ -12,8 +12,10 @@ import type { OrderDTO } from '@/types/api';
 import OrderCard from '@/components/order/OrderCard';
 import OrderCancelModal from '@/components/order/OrderCancelModal';
 import { STATUS_TABS, type OrderTabKey } from '@/components/order/orderHelpers';
+import { syncOrdersCache } from '@/lib/queryClient';
 
 export const OrderHistoryPage: React.FC = () => {
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const rawStatus = (searchParams.get('status') || 'all').toLowerCase();
   const currentTab: OrderTabKey = STATUS_TABS.some((t) => t.key === rawStatus)
@@ -36,6 +38,13 @@ export const OrderHistoryPage: React.FC = () => {
   });
 
   const orders = useMemo(() => pageData?.content || [], [pageData]);
+
+  // Đồng bộ trước dữ liệu bộ nhớ đệm từ danh sách đơn hàng sang chi tiết đơn hàng qua queryClient
+  useEffect(() => {
+    if (orders.length > 0) {
+      syncOrdersCache(queryClient, orders);
+    }
+  }, [orders, queryClient]);
 
   // Bộ lọc theo tab
   const filteredOrders = useMemo(() => {

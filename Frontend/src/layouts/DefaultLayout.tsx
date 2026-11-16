@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
+import AiChatWidget from '@/components/chat/AiChatWidget';
 
 export default function DefaultLayout() {
   return (
@@ -10,6 +11,7 @@ export default function DefaultLayout() {
         <Outlet />
       </main>
       <Footer />
+      <AiChatWidget />
     </div>
   );
 }

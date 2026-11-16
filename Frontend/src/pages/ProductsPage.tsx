@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { Breadcrumb, NewsletterCTA, ProductCardSkeleton } from '@/components/common';
 import ProductFilters from '@/components/products/ProductFilters';
 import ProductsToolbar, { ProductsPagination, ProductGrid } from '@/components/products/ProductsToolbar';
 import { phoneService } from '@/services';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { setBrandId, setBrands, setSearch, setSortBy } from '@/store/slices/filterSlice';
+import { clearAllFilters, setBrandId, setBrands, setSearch, setSortBy } from '@/store/slices/filterSlice';
 
 const PAGE_SIZE = 12;
 
@@ -16,39 +16,50 @@ export default function ProductsPage() {
   const dispatch = useAppDispatch();
   const filters = useAppSelector((s) => s.filter);
   const [page, setPage] = useState(1);
+  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const lastUrlKey = useRef('');
+  const lastNavKey = useRef('');
 
   // ── Đồng bộ URL → Redux (1 chiều): ?brandId= & ?q= & ?sort= ──
-  // Chỉ dispatch khi URL thay đổi (tránh re-render loop),
-  // đồng thời reset page về 1 mỗi khi URL query khác đi.
-  const urlKey = `${searchParams.get('brandId') ?? ''}|${searchParams.get('q') ?? ''}|${searchParams.get('sort') ?? ''}`;
+  // Khi người dùng điều hướng vào /san-pham không có query params (click menu "Sản phẩm"),
+  // reset toàn bộ bộ lọc bằng clearAllFilters() để dọn sạch state tồn đọng trong Redux.
+  // Không reset khi người dùng chỉ thao tác bộ lọc trên chính trang /san-pham (navKey không đổi).
   useEffect(() => {
-    if (urlKey === lastUrlKey.current) return;
-    lastUrlKey.current = urlKey;
+    const navKey = `${location.key}:${searchParams.toString()}`;
+    if (navKey === lastNavKey.current) return;
+    lastNavKey.current = navKey;
 
     const brandParam = searchParams.get('brandId');
     const qParam = searchParams.get('q');
     const sortParam = searchParams.get('sort');
 
-    if (brandParam !== null && Number.isInteger(Number(brandParam))) {
-      dispatch(setBrandId(Number(brandParam)));
-    } else {
-      dispatch(setBrands([]));
-    }
+    const hasAnyFilterParam =
+      (brandParam !== null && brandParam.trim() !== '') ||
+      (qParam !== null && qParam.trim() !== '') ||
+      (sortParam !== null && sortParam.trim() !== '');
 
-    if (qParam !== null && qParam.trim() !== '') {
-      dispatch(setSearch(qParam.trim()));
+    if (!hasAnyFilterParam) {
+      dispatch(clearAllFilters());
     } else {
-      dispatch(setSearch(''));
-    }
+      if (brandParam !== null && Number.isInteger(Number(brandParam))) {
+        dispatch(setBrandId(Number(brandParam)));
+      } else {
+        dispatch(setBrands([]));
+      }
 
-    if (sortParam !== null && (SORT_OPTIONS as readonly string[]).includes(sortParam)) {
-      dispatch(setSortBy(sortParam as (typeof SORT_OPTIONS)[number]));
+      if (qParam !== null && qParam.trim() !== '') {
+        dispatch(setSearch(qParam.trim()));
+      } else {
+        dispatch(setSearch(''));
+      }
+
+      if (sortParam !== null && (SORT_OPTIONS as readonly string[]).includes(sortParam)) {
+        dispatch(setSortBy(sortParam as (typeof SORT_OPTIONS)[number]));
+      }
     }
 
     setPage(1);
-  }, [urlKey, searchParams, dispatch]);
+  }, [location.key, searchParams, dispatch]);
 
   const hasQuery = filters.search.trim().length > 0;
 

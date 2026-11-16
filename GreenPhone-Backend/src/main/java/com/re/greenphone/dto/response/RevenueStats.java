@@ -16,4 +16,5 @@ public class RevenueStats {
     private String period;
     private String startDate;
     private String endDate;
+    private java.util.List<RevenueTimeSeriesPoint> timeSeriesData;
 }
