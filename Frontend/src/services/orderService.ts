@@ -27,10 +27,10 @@ export const orderService = {
   },
 
   /**
-   * Lấy hóa đơn điện tử công khai phục vụ tra cứu từ link email / mã QR (không yêu cầu đăng nhập)
+   * Lấy hóa đơn điện tử công khai qua invoiceToken bí mật (không yêu cầu đăng nhập, bảo vệ IDOR)
    */
-  getPublicInvoice: (id: number | string) => {
-    return get<OrderDTO>(`/orders/${id}/invoice`);
+  getPublicInvoice: (token: number | string) => {
+    return get<OrderDTO>(`/orders/invoice/${token}`);
   },
 
   /**

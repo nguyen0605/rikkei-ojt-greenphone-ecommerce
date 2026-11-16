@@ -33,6 +33,7 @@ public class OrderDTO {
     private String taxCode;
     private String companyAddress;
     private String invoiceEmail;
+    private String invoiceToken;
     private String promotionCode;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

@@ -79,8 +79,8 @@ export default function AppRoutes() {
         <Route path={ROUTES.CHINH_SACH_BAO_MAT} element={withSuspense(PrivacyPage)} />
         <Route path={ROUTES.WARRANTY_CHECK} element={withSuspense(WarrantyCheckPage)} />
         <Route path={ROUTES.PHONE_COMPARE} element={withSuspense(PhoneComparePage)} />
-        <Route path="/hoa-don/:id" element={withSuspense(PublicInvoicePage)} />
-        <Route path="/hoa-don-dien-tu/:id" element={withSuspense(PublicInvoicePage)} />
+        <Route path="/hoa-don/:token" element={withSuspense(PublicInvoicePage)} />
+        <Route path="/hoa-don-dien-tu/:token" element={withSuspense(PublicInvoicePage)} />
         <Route path="*" element={withSuspense(NotFoundPage)} />
       </Route>
 

@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -157,6 +158,7 @@ public class OrderService {
                 .taxCode(taxCode)
                 .companyAddress(companyAddress)
                 .invoiceEmail(invoiceEmail)
+                .invoiceToken(UUID.randomUUID().toString())
                 .orderStatus("PENDING")
                 .paymentStatus("UNPAID")
                 .discountAmount(BigDecimal.ZERO)
@@ -433,13 +435,56 @@ public class OrderService {
     }
 
     /**
-     * Lấy dữ liệu hóa đơn điện tử công khai phục vụ tra cứu từ link email / mã QR
+     * Tra cứu hóa đơn điện tử công khai qua invoiceToken bí mật (UUID v4)
+     * Ngăn chặn triệt để lỗ hổng IDOR & rò rỉ dữ liệu PII
+     */
+    @Transactional(readOnly = true)
+    public OrderDTO getPublicInvoiceByToken(String invoiceToken) {
+        if (invoiceToken == null || invoiceToken.isBlank()) {
+            throw new BadRequestException("Mã tra cứu hóa đơn không hợp lệ");
+        }
+        Order order = orderRepository.findByInvoiceTokenWithDetails(invoiceToken)
+                .orElseThrow(() -> new ResourceNotFoundException("Hóa đơn", "invoiceToken", invoiceToken));
+
+        // Kiểm tra điều kiện xuất hóa đơn: Đơn hàng phải đã thanh toán (PAID) hoặc đã được duyệt/đang giao/đã giao
+        boolean isInvoiceEligible = "PAID".equalsIgnoreCase(order.getPaymentStatus()) ||
+                java.util.Set.of("CONFIRMED", "PROCESSING", "SHIPPING", "DELIVERED", "COMPLETED")
+                        .contains(order.getOrderStatus());
+        if (!isInvoiceEligible) {
+            throw new BadRequestException("Hóa đơn đang chờ kế toán kiểm duyệt và phát hành");
+        }
+
+        OrderDTO dto = orderMapper.toDto(order);
+
+        // Bảo vệ thông tin cá nhân (PII Masking)
+        if (dto.getReceiverPhone() != null && dto.getReceiverPhone().length() >= 7) {
+            String phone = dto.getReceiverPhone();
+            String maskedPhone = phone.substring(0, 3) + "****" + phone.substring(phone.length() - 3);
+            dto.setReceiverPhone(maskedPhone);
+        }
+
+        // Loại bỏ các thẻ kỹ thuật nội bộ trong ghi chú
+        if (dto.getNote() != null) {
+            String cleanNote = dto.getNote()
+                    .replaceAll("\\[Lý do hủy:.*?\\]", "")
+                    .replaceAll("\\[(?:Hóa đơn VAT|VAT_INVOICE|VAT):.*?\\]", "")
+                    .replaceAll("\\[(?:KÈM_HÓA_ĐƠN_GIẤY|PAPER_INVOICE|YÊU CẦU HÓA ĐƠN GIẤY)\\]", "")
+                    .replaceAll("\\[(?:YÊU CẦU HOÀN TIỀN|REFUND).*?\\]", "")
+                    .trim();
+            dto.setNote(cleanNote.isEmpty() ? null : cleanNote);
+        }
+
+        return dto;
+    }
+
+    /**
+     * Tra cứu hóa đơn theo Order ID (chỉ dành cho internal/test hoặc user đã xác thực)
      */
     @Transactional(readOnly = true)
     public OrderDTO getPublicInvoice(Long orderId) {
         Order order = orderRepository.findByIdWithDetails(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
-        return orderMapper.toDto(order);
+        return getPublicInvoiceByToken(order.getInvoiceToken() != null ? order.getInvoiceToken() : String.valueOf(order.getId()));
     }
 
     public OrderDTO cancelOrder(Long orderId) {

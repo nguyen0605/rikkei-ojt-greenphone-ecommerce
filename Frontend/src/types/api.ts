@@ -299,6 +299,7 @@ export interface OrderDTO {
   taxCode?: string;
   companyAddress?: string;
   invoiceEmail?: string;
+  invoiceToken?: string;
   promotionCode: string;
   createdAt: string;
   updatedAt?: string;

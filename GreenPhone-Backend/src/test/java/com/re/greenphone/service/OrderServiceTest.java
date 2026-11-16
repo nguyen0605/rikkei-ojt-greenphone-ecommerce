@@ -657,4 +657,59 @@ class OrderServiceTest {
         BadRequestException ex = assertThrows(BadRequestException.class, () -> orderService.createOrder(req));
         assertTrue(ex.getMessage().contains("Tên công ty"));
     }
+
+    @Test
+    void getPublicInvoiceByToken_Success_MasksPhoneAndStripsInternalTags() {
+        String token = "uuid-secret-token-12345";
+        Order order = Order.builder()
+                .receiverName("Trần Văn A")
+                .receiverPhone("0912345678")
+                .orderStatus("CONFIRMED")
+                .paymentStatus("PAID")
+                .note("Giao sáng [KÈM_HÓA_ĐƠN_GIẤY] [VAT_INVOICE: test]")
+                .invoiceToken(token)
+                .build();
+        order.setId(282L);
+
+        when(orderRepository.findByInvoiceTokenWithDetails(token)).thenReturn(Optional.of(order));
+        when(orderMapper.toDto(order)).thenReturn(OrderDTO.builder()
+                .id(282L)
+                .receiverName("Trần Văn A")
+                .receiverPhone("0912345678")
+                .orderStatus("CONFIRMED")
+                .paymentStatus("PAID")
+                .note("Giao sáng [KÈM_HÓA_ĐƠN_GIẤY] [VAT_INVOICE: test]")
+                .invoiceToken(token)
+                .build());
+
+        OrderDTO result = orderService.getPublicInvoiceByToken(token);
+
+        assertNotNull(result);
+        assertEquals(282L, result.getId());
+        assertEquals("091****678", result.getReceiverPhone()); // PII masked!
+        assertEquals("Giao sáng", result.getNote()); // Internal tags cleaned!
+    }
+
+    @Test
+    void getPublicInvoiceByToken_UnapprovedPendingOrder_ThrowsBadRequest() {
+        String token = "uuid-pending-token-999";
+        Order order = Order.builder()
+                .orderStatus("PENDING")
+                .paymentStatus("UNPAID")
+                .invoiceToken(token)
+                .build();
+
+        when(orderRepository.findByInvoiceTokenWithDetails(token)).thenReturn(Optional.of(order));
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> orderService.getPublicInvoiceByToken(token));
+        assertTrue(ex.getMessage().contains("chờ kế toán kiểm duyệt"));
+    }
+
+    @Test
+    void getPublicInvoiceByToken_NotFound_ThrowsResourceNotFound() {
+        String token = "unknown-token";
+        when(orderRepository.findByInvoiceTokenWithDetails(token)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> orderService.getPublicInvoiceByToken(token));
+    }
 }

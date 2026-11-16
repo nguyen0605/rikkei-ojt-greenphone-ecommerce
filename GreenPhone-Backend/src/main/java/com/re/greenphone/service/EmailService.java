@@ -215,7 +215,10 @@ public class EmailService {
 
     private String buildInvoiceEmail(Order order) {
         String frontendUrl = getEnv("FRONTEND_URL", "http://localhost:5173");
-        String invoiceViewUrl = frontendUrl + "/hoa-don/" + order.getId();
+        String invoiceToken = (order.getInvoiceToken() != null && !order.getInvoiceToken().isBlank())
+                ? order.getInvoiceToken()
+                : String.valueOf(order.getId());
+        String invoiceViewUrl = frontendUrl + "/hoa-don/" + invoiceToken;
         String orderTrackingUrl = frontendUrl + "/tai-khoan/don-hang/" + order.getId();
         String orderDate = order.getCreatedAt() != null ? order.getCreatedAt().format(DATE_FORMATTER) : "Vừa xong";
 

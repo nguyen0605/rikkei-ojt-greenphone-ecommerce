@@ -32,6 +32,7 @@ const mockOrder: OrderDTO = {
   taxCode: '1231231231',
   companyAddress: 'Tầng 10, Tòa nhà Landmark, Hà Nội',
   invoiceEmail: 'pdat7737@gmail.com',
+  invoiceToken: 'inv-tok-uuid-999',
   createdAt: '2026-11-16T11:56:00Z',
   orderDetails: [
     {
@@ -48,11 +49,11 @@ const mockOrder: OrderDTO = {
   ],
 };
 
-function renderPage(orderId = '282') {
+function renderPage(token = 'inv-tok-uuid-999') {
   return render(
-    <MemoryRouter initialEntries={[`/hoa-don/${orderId}`]}>
+    <MemoryRouter initialEntries={[`/hoa-don/${token}`]}>
       <Routes>
-        <Route path="/hoa-don/:id" element={<PublicInvoicePage />} />
+        <Route path="/hoa-don/:token" element={<PublicInvoicePage />} />
       </Routes>
     </MemoryRouter>
   );

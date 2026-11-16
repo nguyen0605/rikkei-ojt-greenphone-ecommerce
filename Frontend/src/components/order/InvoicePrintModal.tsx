@@ -185,9 +185,10 @@ export const InvoicePrintContent: React.FC<InvoicePrintContentProps> = ({
   const isPaid = order.paymentStatus === 'PAID';
   const invoiceYear = order.createdAt ? new Date(order.createdAt).getFullYear() : new Date().getFullYear();
   const formattedInvoiceNo = `INV-${invoiceYear}-${String(order.id).padStart(5, '0')}`;
+  const invoiceTokenOrId = order.invoiceToken || String(order.id);
   const trackingUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/tra-cuu-bao-hanh?orderId=${order.id}`
-    : `https://greenphone.vn/tra-cuu-bao-hanh?orderId=${order.id}`;
+    ? `${window.location.origin}/hoa-don/${invoiceTokenOrId}`
+    : `https://greenphone.vn/hoa-don/${invoiceTokenOrId}`;
 
   return (
     <div

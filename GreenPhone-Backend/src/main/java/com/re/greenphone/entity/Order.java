@@ -78,6 +78,16 @@ public class Order extends BaseEntity {
     @Column(name = "INVOICE_EMAIL", length = 150)
     private String invoiceEmail;
 
+    @Column(name = "INVOICE_TOKEN", length = 64, unique = true)
+    private String invoiceToken;
+
+    @PrePersist
+    public void ensureInvoiceToken() {
+        if (this.invoiceToken == null || this.invoiceToken.isBlank()) {
+            this.invoiceToken = java.util.UUID.randomUUID().toString();
+        }
+    }
+
     /**
      * Optimistic lock: guards cancel/timeout vs payment-webhook races.
      */

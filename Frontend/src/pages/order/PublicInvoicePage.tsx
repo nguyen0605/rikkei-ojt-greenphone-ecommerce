@@ -14,18 +14,19 @@ import type { OrderDTO } from '@/types/api';
 import { InvoicePrintContent } from '@/components/order/InvoicePrintModal';
 
 export const PublicInvoicePage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { token, id } = useParams<{ token?: string; id?: string }>();
+  const invoiceIdentifier = token || id;
   const [order, setOrder] = useState<OrderDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
 
   const fetchInvoice = async () => {
-    if (!id) return;
+    if (!invoiceIdentifier) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await orderService.getPublicInvoice(id);
+      const res = await orderService.getPublicInvoice(invoiceIdentifier);
       // res may be wrapped in ApiResponse or direct data depending on interceptor
       const orderData = (res as any)?.data || res;
       setOrder(orderData);
@@ -42,7 +43,7 @@ export const PublicInvoicePage: React.FC = () => {
 
   useEffect(() => {
     fetchInvoice();
-  }, [id]);
+  }, [invoiceIdentifier]);
 
   const handlePrint = () => {
     window.print();
