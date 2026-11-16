@@ -300,6 +300,8 @@ export interface OrderDTO {
   companyAddress?: string;
   invoiceEmail?: string;
   invoiceToken?: string;
+  invoiceStatus?: 'PENDING' | 'ISSUED' | string;
+  invoiceIssuedAt?: string;
   promotionCode: string;
   createdAt: string;
   updatedAt?: string;

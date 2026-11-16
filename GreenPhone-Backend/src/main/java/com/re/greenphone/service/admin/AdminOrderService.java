@@ -267,6 +267,41 @@ public class AdminOrderService {
         return updateStatus(id, "CONFIRMED");
     }
 
+    public OrderDTO issueInvoice(Long id) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
+
+        if (order.getCompanyName() == null || order.getCompanyName().isBlank()) {
+            throw new BadRequestException("Đơn hàng không có thông tin yêu cầu xuất hóa đơn VAT");
+        }
+
+        if ("ISSUED".equalsIgnoreCase(order.getInvoiceStatus())) {
+            throw new BadRequestException("Hóa đơn VAT cho đơn hàng này đã được phát hành trước đó");
+        }
+
+        if ("CANCELLED".equalsIgnoreCase(order.getOrderStatus())) {
+            throw new BadRequestException("Không thể phát hành hóa đơn cho đơn hàng đã bị hủy");
+        }
+
+        order.setInvoiceStatus("ISSUED");
+        order.setInvoiceIssuedAt(LocalDateTime.now());
+        if (order.getInvoiceToken() == null || order.getInvoiceToken().isBlank()) {
+            order.setInvoiceToken(java.util.UUID.randomUUID().toString());
+        }
+        order = orderRepository.save(order);
+
+        orderHistoryRepository.save(com.re.greenphone.entity.OrderHistory.builder()
+                .order(order)
+                .fromStatus(order.getOrderStatus())
+                .toStatus(order.getOrderStatus())
+                .note("Kế toán / Quản trị viên đã kiểm tra và duyệt phát hành Hóa đơn điện tử GTGT")
+                .changedBy("ADMIN")
+                .build());
+
+        log.info("Invoice issued for order #{}: companyName={}, taxCode={}", id, order.getCompanyName(), order.getTaxCode());
+        return orderMapper.toDto(order);
+    }
+
     public OrderDTO updateDeliveryStatus(Long id, String status) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));

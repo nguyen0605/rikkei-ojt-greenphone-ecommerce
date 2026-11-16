@@ -42,6 +42,9 @@ public class AdminOrderDetailDTO extends OrderDTO {
         adminDto.setTaxCode(dto.getTaxCode());
         adminDto.setCompanyAddress(dto.getCompanyAddress());
         adminDto.setInvoiceEmail(dto.getInvoiceEmail());
+        adminDto.setInvoiceToken(dto.getInvoiceToken());
+        adminDto.setInvoiceStatus(dto.getInvoiceStatus());
+        adminDto.setInvoiceIssuedAt(dto.getInvoiceIssuedAt());
         adminDto.setPromotionCode(dto.getPromotionCode());
         adminDto.setCreatedAt(dto.getCreatedAt());
         adminDto.setOrderDetails(dto.getOrderDetails());

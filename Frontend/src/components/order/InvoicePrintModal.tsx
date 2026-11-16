@@ -334,6 +334,14 @@ export const InvoicePrintContent: React.FC<InvoicePrintContentProps> = ({
                 <span className="text-blue-700">{vatInfo.invoiceEmail}</span>
               </div>
             )}
+            {order.invoiceStatus && (
+              <div>
+                <span className="text-gray-500">Trạng thái HĐ: </span>
+                <span className={`font-semibold ${order.invoiceStatus === 'ISSUED' ? 'text-emerald-700' : 'text-amber-700'}`}>
+                  {order.invoiceStatus === 'ISSUED' ? 'Đã phát hành chính thức' : 'Chờ kiểm duyệt'}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}

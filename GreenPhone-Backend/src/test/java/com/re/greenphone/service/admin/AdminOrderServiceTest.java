@@ -174,5 +174,83 @@ class AdminOrderServiceTest {
         assertThat(order.getOrderStatus()).isEqualTo("COMPLETED");
         verify(warrantyService).activateWarrantyForOrder(order);
     }
+
+    @Test
+    @DisplayName("issueInvoice: Duyệt phát hành hóa đơn VAT thành công")
+    void issueInvoice_success() {
+        Order order = Order.builder()
+                .orderStatus("CONFIRMED")
+                .paymentStatus("PAID")
+                .companyName("Công Ty TNHH Rikkei")
+                .taxCode("0102030405")
+                .invoiceEmail("vat@rikkei.vn")
+                .invoiceStatus("PENDING")
+                .build();
+        order.setId(6L);
+
+        when(orderRepository.findById(6L)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderMapper.toDto(any(Order.class))).thenAnswer(inv -> {
+            Order o = inv.getArgument(0);
+            return OrderDTO.builder()
+                    .id(o.getId())
+                    .invoiceStatus(o.getInvoiceStatus())
+                    .invoiceIssuedAt(o.getInvoiceIssuedAt())
+                    .build();
+        });
+
+        OrderDTO result = adminOrderService.issueInvoice(6L);
+
+        assertThat(order.getInvoiceStatus()).isEqualTo("ISSUED");
+        assertThat(order.getInvoiceIssuedAt()).isNotNull();
+        assertThat(result.getInvoiceStatus()).isEqualTo("ISSUED");
+        verify(orderHistoryRepository).save(any());
+    }
+
+    @Test
+    @DisplayName("issueInvoice: Báo lỗi khi đơn không yêu cầu xuất hóa đơn VAT")
+    void issueInvoice_noVatInfo_throwsBadRequest() {
+        Order order = Order.builder()
+                .orderStatus("CONFIRMED")
+                .paymentStatus("PAID")
+                .companyName(null)
+                .build();
+        order.setId(7L);
+
+        when(orderRepository.findById(7L)).thenReturn(Optional.of(order));
+
+        assertThrows(BadRequestException.class, () -> adminOrderService.issueInvoice(7L));
+    }
+
+    @Test
+    @DisplayName("issueInvoice: Báo lỗi khi hóa đơn đã được phát hành trước đó")
+    void issueInvoice_alreadyIssued_throwsBadRequest() {
+        Order order = Order.builder()
+                .orderStatus("CONFIRMED")
+                .paymentStatus("PAID")
+                .companyName("Công Ty TNHH Rikkei")
+                .invoiceStatus("ISSUED")
+                .build();
+        order.setId(8L);
+
+        when(orderRepository.findById(8L)).thenReturn(Optional.of(order));
+
+        assertThrows(BadRequestException.class, () -> adminOrderService.issueInvoice(8L));
+    }
+
+    @Test
+    @DisplayName("issueInvoice: Báo lỗi khi đơn hàng đã bị hủy")
+    void issueInvoice_cancelledOrder_throwsBadRequest() {
+        Order order = Order.builder()
+                .orderStatus("CANCELLED")
+                .companyName("Công Ty TNHH Rikkei")
+                .invoiceStatus("PENDING")
+                .build();
+        order.setId(9L);
+
+        when(orderRepository.findById(9L)).thenReturn(Optional.of(order));
+
+        assertThrows(BadRequestException.class, () -> adminOrderService.issueInvoice(9L));
+    }
 }
 

@@ -120,10 +120,14 @@ export const OrderDetailPage: React.FC = () => {
   const canCancel = order?.orderStatus === 'PENDING' || order?.orderStatus === 'CONFIRMED';
   const canReview = order?.orderStatus === 'DELIVERED';
   const canReorder = order?.orderDetails && order.orderDetails.length > 0;
-  // Điều kiện xem hóa đơn tài chính: Đã thanh toán (PAID) hoặc đã xác nhận/đang xử lý/đang giao/đã giao
-  const canViewInvoice =
-    order?.paymentStatus === 'PAID' ||
-    ['CONFIRMED', 'PROCESSING', 'SHIPPING', 'DELIVERED', 'COMPLETED'].includes(order?.orderStatus || '');
+  // Điều kiện xem hóa đơn tài chính:
+  // - Nếu đơn hàng có yêu cầu xuất hóa đơn VAT: Bắt buộc đã được kế toán/hệ thống duyệt phát hành (invoiceStatus === 'ISSUED')
+  // - Nếu đơn hàng thông thường: Đã thanh toán (PAID) hoặc đã xác nhận/đang xử lý/đang giao/đã giao/hoàn tất
+  const isVatOrder = Boolean(order?.hasInvoice || order?.companyName);
+  const canViewInvoice = isVatOrder
+    ? order?.invoiceStatus === 'ISSUED'
+    : order?.paymentStatus === 'PAID' ||
+      ['CONFIRMED', 'PROCESSING', 'SHIPPING', 'DELIVERED', 'COMPLETED'].includes(order?.orderStatus || '');
 
   // Tính toán thời gian 7 ngày kể từ khi giao hàng thành công (DELIVERED hoặc COMPLETED)
   const isCompletedOrder = order?.orderStatus === 'COMPLETED' || order?.orderStatus === 'DELIVERED';
@@ -265,7 +269,9 @@ export const OrderDetailPage: React.FC = () => {
           <Tooltip
             title={
               !canViewInvoice
-                ? 'Hóa đơn đang chờ kế toán kiểm duyệt và phát hành'
+                ? isVatOrder
+                  ? 'Hóa đơn GTGT đang chờ kế toán kiểm duyệt và phát hành'
+                  : 'Hóa đơn đang chờ kiểm duyệt và phát hành'
                 : 'Xem và in hóa đơn bán lẻ kiêm phiếu bảo hành chính thức'
             }
           >

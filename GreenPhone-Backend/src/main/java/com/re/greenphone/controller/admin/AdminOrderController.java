@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/admin/orders")
+@RequestMapping({"/api/admin/orders", "/api/v1/admin/orders"})
 @RequiredArgsConstructor
 @Tag(name = "Admin - Order", description = "Admin order management")
 @PreAuthorize("hasAnyRole('ADMIN', 'SALES', 'WAREHOUSE')")
@@ -61,6 +61,14 @@ public class AdminOrderController {
     @PutMapping("/{id}/confirm")
     public ResponseEntity<ApiResponse<?>> confirm(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(adminOrderService.confirmOrder(id)));
+    }
+
+    @PutMapping("/{id}/issue-invoice")
+    public ResponseEntity<ApiResponse<com.re.greenphone.dto.response.OrderDTO>> issueInvoice(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(
+                adminOrderService.issueInvoice(id),
+                "Đã duyệt và phát hành hóa đơn điện tử thành công"
+        ));
     }
 
     @PutMapping("/{id}/delivery")

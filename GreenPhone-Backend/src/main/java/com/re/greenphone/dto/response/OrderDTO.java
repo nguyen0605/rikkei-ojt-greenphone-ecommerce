@@ -34,6 +34,8 @@ public class OrderDTO {
     private String companyAddress;
     private String invoiceEmail;
     private String invoiceToken;
+    private String invoiceStatus;
+    private LocalDateTime invoiceIssuedAt;
     private String promotionCode;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
