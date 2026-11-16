@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   MapPin,
@@ -19,7 +19,7 @@ import { orderService } from '@/services/orderService';
 import { paymentService } from '@/services';
 import { returnService, type ReturnResponse } from '@/services/returnService';
 import ClaimProgressModal from '@/components/warranty/ClaimProgressModal';
-import type { OrderDetailDTO } from '@/types/api';
+import type { OrderDTO, OrderDetailDTO } from '@/types/api';
 import { formatVND } from '@/utils';
 import { ROUTES } from '@/routes/routePaths';
 import { extractCustomerNote } from '@/utils/orderStateMachine';
@@ -39,6 +39,7 @@ export const OrderDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useAppDispatch();
+  const queryClient = useQueryClient();
   const { resolveItem } = useOrderProductLookup();
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
@@ -58,6 +59,26 @@ export const OrderDetailPage: React.FC = () => {
     queryKey: ['order', id],
     queryFn: () => orderService.detail(Number(id)),
     enabled: !!id,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    initialData: () => {
+      if (!id) return undefined;
+      const cached =
+        queryClient.getQueryData<OrderDTO>(['order', id]) ??
+        queryClient.getQueryData<OrderDTO>(['order', Number(id)]);
+      if (cached) return cached;
+
+      const ordersData = queryClient.getQueryData<{ content?: OrderDTO[] } | OrderDTO[]>(['orders']);
+      const list = Array.isArray(ordersData) ? ordersData : ordersData?.content;
+      return list?.find((item) => String(item.id) === String(id));
+    },
+    initialDataUpdatedAt: () => {
+      if (!id) return undefined;
+      return (
+        queryClient.getQueryState(['order', id])?.dataUpdatedAt ??
+        queryClient.getQueryState(['order', Number(id)])?.dataUpdatedAt
+      );
+    },
     refetchInterval: (query) => {
       const o = query.state.data;
       // Tự động polling 5s khi đơn PENDING chờ thanh toán ngân hàng
