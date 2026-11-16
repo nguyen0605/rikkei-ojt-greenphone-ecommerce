@@ -32,11 +32,19 @@ const FILTER_SECTION_LABELS: Record<string, string> = {
   FEATURE: 'Tính năng nổi bật',
 };
 
-const { Group: CheckboxGroup } = Checkbox;
-
 export default function ProductFilters() {
   const dispatch = useAppDispatch();
   const filters = useAppSelector((s) => s.filter);
+
+  const isAllProducts =
+    filters.brandIds.length === 0 &&
+    filters.rams.length === 0 &&
+    filters.storages.length === 0 &&
+    filters.colors.length === 0 &&
+    filters.features.length === 0 &&
+    filters.search === '' &&
+    filters.priceRange[0] === 0 &&
+    filters.priceRange[1] === 50_000_000;
 
   // Load brands từ API
   const { data: brands, isLoading: brandsLoading } = useQuery({
@@ -70,7 +78,7 @@ export default function ProductFilters() {
     return (
       <div>
         <h4 className="mb-3 text-sm font-semibold text-gray-900">{label}</h4>
-        <CheckboxGroup className="!flex !flex-col gap-2">
+        <div className="flex flex-col gap-2">
           {values.map((v) => (
             <Checkbox
               key={v}
@@ -81,7 +89,7 @@ export default function ProductFilters() {
               <span className="text-sm">{v}</span>
             </Checkbox>
           ))}
-        </CheckboxGroup>
+        </div>
       </div>
     );
   };
@@ -108,7 +116,7 @@ export default function ProductFilters() {
         <h4 className="mb-3 text-sm font-semibold text-gray-900">Hãng</h4>
         <div className="space-y-2">
           <Checkbox
-            checked={filters.brandIds.length === 0}
+            checked={isAllProducts}
             onChange={() => dispatch(clearAllFilters())}
           >
             <span className="text-sm">Tất cả sản phẩm</span>
