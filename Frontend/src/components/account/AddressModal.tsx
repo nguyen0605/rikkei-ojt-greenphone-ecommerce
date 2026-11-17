@@ -10,7 +10,7 @@ import {
   InfoCircleOutlined,
   CloseOutlined,
 } from '@ant-design/icons';
-import { Sparkles, MapPin, Home, Building2, Users, Navigation, ArrowUp } from 'lucide-react';
+import { Sparkles, MapPin, Home, Building2, Users, Navigation } from 'lucide-react';
 import { VIETNAM_PROVINCES, findMatchingProvince, parseAddressComponents } from '@/utils/provinces';
 import {
   getDistrictsForProvince,
@@ -1201,117 +1201,106 @@ export default function AddressModal({
       </Form>
     </Modal>
 
-    {/* Hộp thoại trỏ trực tiếp lên thanh địa chỉ trình duyệt khi chưa bật Location */}
+    {/* Hop thoai mo phong bang cai dat quyen trinh duyet Chrome o goc tren ben trai giong anh 2 */}
     {showLocationPointer && (
       <div
         role="dialog"
-        aria-label="Hướng dẫn bật quyền vị trí"
-        className="fixed top-2 left-6 z-[99999] w-88 max-w-[calc(100vw-3rem)] animate-in fade-in slide-in-from-top-4 duration-300"
+        aria-label="Cấp quyền truy cập vị trí hiện tại"
+        className="fixed top-2 left-6 z-[99999] w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-[#3c4043] bg-[#202124] p-4 text-white shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 font-sans"
       >
-        {/* Mũi tên động trỏ thẳng lên biểu tượng Cài đặt / Ổ khóa trên thanh địa chỉ */}
-        <div className="flex items-center gap-2 mb-2 pl-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-xl animate-bounce">
-            <ArrowUp className="w-5 h-5 stroke-[2.5]" />
-          </div>
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 px-3.5 py-1 text-xs font-bold text-white shadow-lg">
-            <span className="h-2 w-2 rounded-full bg-white animate-ping" />
-            <span>Nhấp biểu tượng Cài đặt ở ngay phía trên</span>
+        {/* Header: domain + nut dong */}
+        <div className="flex items-center justify-between pb-3 border-b border-[#3c4043]">
+          <span className="text-sm font-semibold text-gray-200">
+            {typeof window !== 'undefined' ? window.location.host : 'localhost:5173'}
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowLocationPointer(false)}
+            className="rounded-full p-1 text-gray-400 hover:bg-[#3c4043] hover:text-white transition-colors"
+            aria-label="Đóng hướng dẫn"
+          >
+            <CloseOutlined className="text-xs" />
+          </button>
+        </div>
+
+        {/* Khung canh bao trang thai giong bieu tuong tam giac tren Chrome */}
+        <div className="pt-3 pb-2.5">
+          <div className="flex items-start gap-2.5">
+            <span className="text-amber-400 text-sm mt-0.5 shrink-0">▲</span>
+            <div className="space-y-0.5">
+              <div className="text-xs font-semibold text-gray-100">Cấp quyền truy cập vị trí hiện tại</div>
+              <div className="text-[11px] text-gray-400 leading-snug">
+                Trình duyệt đang chặn định vị GPS. Vui lòng bật quyền để tự động ghim vị trí và điền địa chỉ giao hàng.
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Khung hướng dẫn nổi bật */}
-        <div className="rounded-2xl border-2 border-blue-500 bg-white p-4 shadow-2xl ring-4 ring-blue-100">
-          <div className="flex items-start justify-between gap-2 border-b border-gray-100 pb-2.5">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
-                <Navigation className="w-4 h-4" />
-              </div>
+        {/* Muc Location voi cong tac bat/tat giong het Chrome o anh 2 */}
+        <div className="my-2 rounded-xl bg-[#292a2d] p-3 border border-[#3c4043]/60">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <EnvironmentOutlined className="text-blue-400 text-base" />
               <div>
-                <div className="text-sm font-bold text-gray-900">Cấp quyền truy cập vị trí hiện tại</div>
-                <div className="text-[11px] text-gray-500">Trình duyệt đang chặn định vị GPS</div>
+                <div className="text-xs font-semibold text-gray-200">Vị trí (Location)</div>
+                <div className="text-[10px] text-gray-400">Gạt sang để cho phép định vị</div>
               </div>
             </div>
+            <Switch
+              checked={isLocationSwitchOn}
+              loading={isLocatingCurrentGps}
+              onChange={handleToggleLocationSwitch}
+              className={isLocationSwitchOn ? '!bg-blue-600' : ''}
+            />
+          </div>
+
+          {/* Nut Reset / Thu lai quyen vi tri giong nut Reset permission o anh 2 */}
+          <div className="mt-2.5 pt-2 border-t border-[#3c4043]/50 flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setShowLocationPointer(false)}
-              className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-              aria-label="Đóng hướng dẫn"
-            >
-              <CloseOutlined className="text-xs" />
-            </button>
-          </div>
-
-          {/* Công tắc trực quan trong hộp thoại */}
-          <div className="my-2.5 rounded-xl border border-blue-200 bg-blue-50/70 p-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <EnvironmentOutlined className="text-blue-600 text-base" />
-                <div>
-                  <div className="text-xs font-semibold text-gray-900">Vị trí (Location)</div>
-                  <div className="text-[10px] text-gray-500">Bật để tự động điền địa chỉ</div>
-                </div>
-              </div>
-              <Switch
-                checked={isLocationSwitchOn}
-                loading={isLocatingCurrentGps}
-                onChange={handleToggleLocationSwitch}
-                className={isLocationSwitchOn ? '!bg-blue-600' : ''}
-              />
-            </div>
-          </div>
-
-          {/* Mô phỏng trực quan bảng cài đặt trình duyệt như hình chụp của Chrome */}
-          <div className="my-2.5 rounded-xl border border-gray-700 bg-gray-900 p-3 text-white shadow-inner">
-            <div className="flex items-center justify-between text-[11px] text-gray-400 font-mono mb-2">
-              <span>{typeof window !== 'undefined' ? window.location.host : 'localhost:5173'}</span>
-              <span className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] text-blue-300">Biểu tượng góc trái</span>
-            </div>
-            <div className="flex items-center justify-between rounded-lg bg-gray-800 p-2.5 border border-gray-700/80">
-              <div className="flex items-center gap-2">
-                <EnvironmentOutlined className="text-blue-400 text-sm" />
-                <span className="text-xs font-semibold text-gray-100">Location (Vị trí)</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold text-blue-300">Gạt BẬT</span>
-                <div className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-blue-600 transition-colors">
-                  <span className="translate-x-4 pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Trạng thái lắng nghe tự động (Không cần tải lại trang) */}
-          <div className="rounded-xl border border-blue-200 bg-blue-50/80 p-2.5 text-xs text-blue-900 mb-3 space-y-1">
-            <div className="flex items-center gap-1.5 font-semibold text-blue-800">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
-              </span>
-              <span>Tự động nhận diện (Không cần tải lại trang):</span>
-            </div>
-            <p className="text-[11px] text-gray-600 leading-relaxed pl-3.5">
-              Ngay khi bạn gạt bật mục <strong>Location</strong> trên trình duyệt, hệ thống sẽ tự động ghim vị trí và điền địa chỉ ngay lập tức mà không cần F5 hay tải lại trang.
-            </p>
-          </div>
-
-          <div className="flex items-center justify-end gap-2 pt-1 border-t border-gray-100">
-            <Button
-              size="small"
-              onClick={() => setShowLocationPointer(false)}
-              className="!rounded-lg text-xs"
-            >
-              Đóng
-            </Button>
-            <Button
-              size="small"
-              type="primary"
-              loading={isLocatingCurrentGps}
               onClick={() => handleUseCurrentLocation()}
-              className="!rounded-lg !bg-blue-600 hover:!bg-blue-700 text-xs font-semibold"
+              className="rounded-full border border-blue-500/80 px-3 py-1 text-[11px] font-medium text-blue-300 hover:bg-blue-500/10 transition-colors"
             >
-              Thử lại ngay
-            </Button>
+              Cấp lại quyền (Reset permission)
+            </button>
+            <span className="text-[10px] text-gray-400">
+              Nhấp biểu tượng Cài đặt ở ngay phía trên
+            </span>
           </div>
+        </div>
+
+        {/* Trang thai tu dong nhan dien theo thoi gian thuc khong can tai lai trang */}
+        <div className="rounded-xl border border-blue-500/30 bg-blue-950/40 p-2.5 text-xs text-blue-200 mb-3 space-y-1">
+          <div className="flex items-center gap-1.5 font-semibold text-blue-300">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+            </span>
+            <span>Tự động nhận diện (Không cần tải lại trang):</span>
+          </div>
+          <p className="text-[11px] text-gray-300 leading-relaxed pl-3.5">
+            Ngay khi bạn gạt bật mục <strong>Location</strong> trên trình duyệt, hệ thống sẽ tự động ghim vị trí và điền địa chỉ tức thì mà không cần F5.
+          </p>
+        </div>
+
+        {/* Nut hanh dong cuoi hop thoai */}
+        <div className="flex items-center justify-end gap-2 pt-1 border-t border-[#3c4043]">
+          <Button
+            size="small"
+            onClick={() => setShowLocationPointer(false)}
+            className="!rounded-lg text-xs !bg-transparent !border-gray-600 !text-gray-300 hover:!border-gray-500 hover:!text-white"
+          >
+            Đóng
+          </Button>
+          <Button
+            size="small"
+            type="primary"
+            loading={isLocatingCurrentGps}
+            onClick={() => handleUseCurrentLocation()}
+            className="!rounded-lg !bg-blue-600 hover:!bg-blue-700 text-xs font-semibold"
+          >
+            Thử lại ngay
+          </Button>
         </div>
       </div>
     )}
