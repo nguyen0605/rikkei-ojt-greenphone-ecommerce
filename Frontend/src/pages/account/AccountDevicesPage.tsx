@@ -36,8 +36,8 @@ export const AccountDevicesPage: React.FC = () => {
           const lng = position.coords.longitude.toFixed(2);
           setCurrentLocation(`Vị trí: ${lat}°, ${lng}°`);
         },
-        (error) => {
-          console.log('Người dùng từ chối hoặc không lấy được vị trí:', error.message);
+        () => {
+          // Từ chối cấp quyền hoặc timeout: Giữ nguyên currentLocation là null, không log console
         },
         { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
       );

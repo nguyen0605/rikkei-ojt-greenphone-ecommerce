@@ -38,9 +38,15 @@ public class DeviceSessionServiceImpl implements DeviceSessionService {
 
         // Tự động thu hồi phiên cũ nhất nếu đạt giới hạn 5 thiết bị
         List<UserDeviceSession> active = sessionRepository.findActiveSessionsByUserId(user.getId(), now);
-        for (int i = active.size() - 1; i >= MAX_ACTIVE_SESSIONS - 1 && i >= 0; i--) {
-            active.get(i).setIsRevoked(true);
-            sessionRepository.save(active.get(i));
+        if (active.size() >= MAX_ACTIVE_SESSIONS) {
+            List<UserDeviceSession> toRevoke = new java.util.ArrayList<>();
+            for (int i = active.size() - 1; i >= MAX_ACTIVE_SESSIONS - 1 && i >= 0; i--) {
+                active.get(i).setIsRevoked(true);
+                toRevoke.add(active.get(i));
+            }
+            if (!toRevoke.isEmpty()) {
+                sessionRepository.saveAll(toRevoke);
+            }
         }
 
         String userAgent = request != null ? request.getHeader("User-Agent") : null;

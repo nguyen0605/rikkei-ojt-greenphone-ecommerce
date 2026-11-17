@@ -29,16 +29,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.re.greenphone.repository.UserDeviceSessionRepository userDeviceSessionRepository;
 
-    public JwtAuthenticationFilter() {
-        this.jwtTokenProvider = null;
-        this.userRepository = null;
-        this.redisTemplate = null;
-    }
-
     public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider, UserRepository userRepository, StringRedisTemplate redisTemplate) {
-        this.jwtTokenProvider = jwtTokenProvider;
-        this.userRepository = userRepository;
-        this.redisTemplate = redisTemplate;
+        this(jwtTokenProvider, userRepository, redisTemplate, null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
