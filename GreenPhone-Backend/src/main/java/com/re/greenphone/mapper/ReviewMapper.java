@@ -24,23 +24,19 @@ public interface ReviewMapper extends GenericMapper<Review, ReviewDTO> {
 
     @Override
     @Mapping(target = "images", ignore = true)
-    @Mapping(target = "imagesJson", ignore = true)
     @Mapping(target = "user", ignore = true)
     @Mapping(target = "phone", ignore = true)
     @Mapping(target = "orderDetail", ignore = true)
     Review toEntity(ReviewDTO dto);
 
     default List<String> mapImages(Review entity) {
-        if (entity == null) {
+        if (entity == null || entity.getImages() == null || entity.getImages().isEmpty()) {
             return Collections.emptyList();
         }
-        if (entity.getImages() != null && !entity.getImages().isEmpty()) {
-            return entity.getImages().stream()
-                    .map(com.re.greenphone.entity.ReviewImage::getImageUrl)
-                    .filter(url -> url != null && !url.trim().isEmpty())
-                    .toList();
-        }
-        return parseImages(entity.getImagesJson());
+        return entity.getImages().stream()
+                .map(com.re.greenphone.entity.ReviewImage::getImageUrl)
+                .filter(url -> url != null && !url.trim().isEmpty())
+                .toList();
     }
 
     default String getPhoneImage(com.re.greenphone.entity.Phone phone) {
@@ -52,19 +48,5 @@ public interface ReviewMapper extends GenericMapper<Review, ReviewDTO> {
                 .map(com.re.greenphone.entity.PhoneImage::getImageUrl)
                 .findFirst()
                 .orElse(phone.getImages().get(0).getImageUrl());
-    }
-
-    default List<String> parseImages(String imagesJson) {
-        if (imagesJson == null || imagesJson.trim().isEmpty()) {
-            return Collections.emptyList();
-        }
-        try {
-            return new com.fasterxml.jackson.databind.ObjectMapper().readValue(
-                    imagesJson,
-                    new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {}
-            );
-        } catch (Exception e) {
-            return Collections.emptyList();
-        }
     }
 }

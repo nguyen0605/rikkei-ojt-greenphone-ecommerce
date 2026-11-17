@@ -165,13 +165,6 @@ public class ReviewService {
             throw new BadRequestException("Chỉ được tải lên tối đa 5 hình ảnh cho mỗi đánh giá.");
         }
 
-        String imagesJson = null;
-        if (request.getImages() != null && !request.getImages().isEmpty()) {
-            try {
-                imagesJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(request.getImages());
-            } catch (Exception ignored) {}
-        }
-
         Review review = Review.builder()
                 .user(user)
                 .phone(phone)
@@ -179,7 +172,6 @@ public class ReviewService {
                 .rating(request.getRating())
                 .content(request.getContent())
                 .status("APPROVED")
-                .imagesJson(imagesJson)
                 .images(new java.util.ArrayList<>())
                 .build();
 
@@ -218,9 +210,6 @@ public class ReviewService {
             if (request.getImages().size() > 5) {
                 throw new BadRequestException("Chỉ được tải lên tối đa 5 hình ảnh cho mỗi đánh giá.");
             }
-            try {
-                review.setImagesJson(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(request.getImages()));
-            } catch (Exception ignored) {}
 
             if (review.getImages() != null) {
                 review.getImages().clear();

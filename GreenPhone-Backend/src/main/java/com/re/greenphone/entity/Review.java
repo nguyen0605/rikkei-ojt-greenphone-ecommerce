@@ -35,9 +35,6 @@ public class Review extends BaseEntity {
     @Builder.Default
     private String status = "SHOW";
 
-    @Column(name = "images_json", columnDefinition = "LONGTEXT")
-    private String imagesJson;
-
     @OneToMany(mappedBy = "review", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC, id ASC")
     @Builder.Default
