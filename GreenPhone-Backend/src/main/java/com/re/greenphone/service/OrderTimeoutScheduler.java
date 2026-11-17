@@ -21,14 +21,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * Auto-cancels PENDING orders that have been unpaid for more than configured timeout minutes (default 15).
- */
+// [ORD-05] Tự động hủy đơn hàng quá 15 phút chưa thanh toán & hoàn tồn kho + voucher
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class OrderTimeoutScheduler {
 
+    // Chỉ áp dụng cho thanh toán online (VIETQR, SEPAY)
     private static final List<String> EXPIRABLE_PAYMENT_METHODS = List.of("VIETQR", "SEPAY");
 
     private final OrderRepository orderRepository;
@@ -40,10 +39,7 @@ public class OrderTimeoutScheduler {
     @Value("${app.order.timeout-minutes:15}")
     private int timeoutMinutes = 15;
 
-    /**
-     * Runs every 60 seconds. Cancels orders that are PENDING + UNPAID for > timeoutMinutes
-     * with payment methods VIETQR / SEPAY. COD orders are strictly excluded.
-     */
+    // Chạy mỗi phút 1 lần để quét đơn quá hạn (TUYỆT ĐỐI KHÔNG hủy đơn COD)
     @Scheduled(cron = "0 * * * * *")
     @Transactional
     public void cancelExpiredPendingOrders() {
@@ -53,46 +49,47 @@ public class OrderTimeoutScheduler {
 
         if (expiredOrders.isEmpty()) return;
 
-        log.info("Auto-cancelling {} expired PENDING orders (older than {} min)", expiredOrders.size(), timeoutMinutes);
+        log.info("Tự động hủy {} đơn hàng hết hạn", expiredOrders.size());
 
         for (Order order : expiredOrders) {
             try {
                 cancelOne(order);
             } catch (OptimisticLockException e) {
-                // Another writer (payment webhook, user cancel) updated this order concurrently —
-                // skip it this round, it will be re-evaluated next tick.
-                log.warn("Order #{} skipped: concurrent modification ({}). Will re-evaluate next tick.",
-                        order.getId(), e.getMessage());
+                // Bỏ qua nếu có xung đột với Webhook thanh toán, sẽ quét lại ở lần chạy sau
+                log.warn("Đơn #{} đang có giao dịch khác, bỏ qua lần này", order.getId());
             }
         }
     }
 
+    // Xử lý hủy 1 đơn hàng cụ thể
     private void cancelOne(Order order) {
-        // Re-check freshness + terminal state inside the same transaction to
-        // avoid acting on an order that was paid since the query.
+        // Khóa bi quan đơn hàng để tránh xung đột với khách vừa thanh toán
         Order fresh = orderRepository.findByIdForUpdate(order.getId()).orElse(null);
         if (fresh == null) return;
         entityManager.refresh(fresh, LockModeType.PESSIMISTIC_WRITE);
+
+        // Đơn đã thanh toán hoặc đã đổi trạng thái thì dừng lại
         if (!"PENDING".equals(fresh.getOrderStatus()) || !"UNPAID".equals(fresh.getPaymentStatus())) {
-            return; // paid or otherwise changed — leave it alone
+            return;
         }
 
-        // Strictly do not cancel COD orders
+        // Không bao giờ hủy đơn COD
         if (!EXPIRABLE_PAYMENT_METHODS.contains(fresh.getPaymentMethod())) {
             return;
         }
 
-        // Restore stock
+        // 1. Hoàn tồn kho cho từng sản phẩm
         for (OrderDetail detail : fresh.getOrderDetails()) {
             PhoneVariant variant = detail.getPhoneVariant();
             if (variant != null && variant.getStockQuantity() != null) {
                 PhoneVariant locked = phoneVariantRepository.findByIdWithLock(variant.getId())
-                        .orElseThrow(() -> new IllegalStateException("Inventory variant not found: " + variant.getId()));
-                // OrderDetail eagerly loads variants; reload stock after acquiring the lock
-                // rather than reusing a possibly stale entity from the persistence context.
+                        .orElseThrow(() -> new IllegalStateException("Không tìm thấy sản phẩm: " + variant.getId()));
+                
                 entityManager.refresh(locked, LockModeType.PESSIMISTIC_WRITE);
                 int quantityBefore = locked.getStockQuantity();
-                locked.setStockQuantity(quantityBefore + detail.getQuantity());
+                locked.setStockQuantity(quantityBefore + detail.getQuantity()); // Cộng lại kho
+                
+                // Ghi nhật ký hoàn kho (Audit Log)
                 if (detail.getWarehouseId() == null) {
                     inventoryStockHistoryService.record(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Hoàn kho do đơn hết hạn");
                 } else {
@@ -102,7 +99,7 @@ public class OrderTimeoutScheduler {
             }
         }
 
-        // Restore voucher/promotion if applied
+        // 2. Hoàn lại voucher nếu có
         UserPromotion up = fresh.getUserPromotion();
         if (up != null) {
             up.setStatus("AVAILABLE");
@@ -111,10 +108,11 @@ public class OrderTimeoutScheduler {
             fresh.setUserPromotion(null);
         }
 
+        // 3. Đánh dấu đơn hàng là ĐÃ HỦY
         fresh.setOrderStatus("CANCELLED");
         fresh.setPaymentStatus("UNPAID");
         fresh.setNote("Quá hạn thanh toán " + timeoutMinutes + " phút");
         orderRepository.save(fresh);
-        log.info("Cancelled expired order #{} and restored stock", fresh.getId());
+        log.info("Đã hủy đơn hàng hết hạn #{}", fresh.getId());
     }
 }

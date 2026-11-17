@@ -21,12 +21,29 @@ import java.util.Optional;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
     private final StringRedisTemplate redisTemplate;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.re.greenphone.repository.UserDeviceSessionRepository userDeviceSessionRepository;
+
+    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider, UserRepository userRepository, StringRedisTemplate redisTemplate) {
+        this(jwtTokenProvider, userRepository, redisTemplate, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider,
+                                   UserRepository userRepository,
+                                   StringRedisTemplate redisTemplate,
+                                   @org.springframework.beans.factory.annotation.Autowired(required = false)
+                                   com.re.greenphone.repository.UserDeviceSessionRepository userDeviceSessionRepository) {
+        this.jwtTokenProvider = jwtTokenProvider;
+        this.userRepository = userRepository;
+        this.redisTemplate = redisTemplate;
+        this.userDeviceSessionRepository = userDeviceSessionRepository;
+    }
 
     public static final String BLACKLIST_TOKEN_PREFIX = "blacklist:";
 
@@ -79,6 +96,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
 
                 if (jwtTokenProvider.validateToken(jwt)) {
+                    // 2. Kiểm tra nếu phiên thiết bị đã bị thu hồi từ xa (USR-15 / USR-16 Remote Revocation)
+                    Long sessionId = jwtTokenProvider.getSessionIdFromToken(jwt);
+                    if (sessionId != null && userDeviceSessionRepository != null) {
+                        boolean isRevoked = userDeviceSessionRepository.findIsRevokedById(sessionId)
+                                .orElse(false);
+                        if (isRevoked) {
+                            // Chặn đứng ngay lập tức nếu phiên đã bị đăng xuất từ xa
+                            response.setContentType("application/json");
+                            response.setCharacterEncoding("UTF-8");
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.getWriter().write("{\"code\":401,\"message\":\"Phiên đăng nhập đã bị đăng xuất từ xa.\",\"data\":null}");
+                            return;
+                        }
+                    }
+
+                    // 3. Trích xuất thông tin người dùng và xác thực tài khoản còn hoạt động
                     String username = jwtTokenProvider.getUsernameFromToken(jwt);
                     Optional<User> userOpt = userRepository.findByEmail(username);
 
