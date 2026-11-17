@@ -350,7 +350,7 @@ describe('AddressModal', () => {
     });
   });
 
-  it('displays location permission guide modal when browser denies geolocation', async () => {
+  it('displays warning notification when browser denies geolocation', async () => {
     const user = userEvent.setup();
     // Giả lập quyền vị trí bị từ chối (PERMISSION_DENIED = 1)
     Object.defineProperty(navigator, 'geolocation', {
@@ -371,11 +371,9 @@ describe('AddressModal', () => {
     await user.click(currentLocationBtn);
 
     await waitFor(() => {
-      expect(screen.getByText('Cấp quyền truy cập vị trí hiện tại')).toBeInTheDocument();
-      expect(screen.getByText('Vị trí (Location)')).toBeInTheDocument();
-      expect(screen.getByRole('switch')).toBeInTheDocument();
-      expect(screen.getByText(/Nhấp biểu tượng Cài đặt ở ngay phía trên/i)).toBeInTheDocument();
-      expect(screen.getByText(/Tự động nhận diện \(Không cần tải lại trang\)/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Vui lòng bật quyền truy cập vị trí trên trình duyệt/i)
+      ).toBeInTheDocument();
     });
   });
 });
