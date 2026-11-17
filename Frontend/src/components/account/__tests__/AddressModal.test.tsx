@@ -317,4 +317,36 @@ describe('AddressModal', () => {
     });
     expect(handleSubmit).not.toHaveBeenCalled();
   });
+
+  it('auto-fills all address fields including province, district and ward from GPS coords in TP. HCM', async () => {
+    const user = userEvent.setup();
+    const { reverseGeocodeDetails } = await import('@/components/checkout/checkoutGeocodingService');
+    vi.mocked(reverseGeocodeDetails).mockResolvedValueOnce({
+      id: 'nom-1',
+      place_name: 'Đường Anh Đào 1, Vinhomes Grand Park, Phường Long Bình, Thành phố Hồ Chí Minh',
+      title: 'Đường Anh Đào 1, Vinhomes Grand Park',
+      subtitle: 'Phường Long Bình, Thành phố Hồ Chí Minh',
+      lat: 10.8465,
+      lng: 106.8365,
+      source: 'nominatim',
+      components: {
+        province: 'Thành phố Hồ Chí Minh',
+        district: '',
+        ward: 'Phường Long Bình',
+        streetAddress: 'Đường Anh Đào 1, Vinhomes Grand Park',
+      },
+    });
+
+    render(<AddressModal open={true} onCancel={vi.fn()} onSubmit={vi.fn()} />);
+
+    const currentLocationBtn = screen.getByRole('button', { name: /Vị trí hiện tại/i });
+    await user.click(currentLocationBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('TP. Hồ Chí Minh')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Thành phố Thủ Đức')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Phường Long Bình')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Đường Anh Đào 1, Vinhomes Grand Park')).toBeInTheDocument();
+    });
+  });
 });

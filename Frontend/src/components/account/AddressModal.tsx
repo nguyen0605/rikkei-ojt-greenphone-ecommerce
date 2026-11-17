@@ -15,6 +15,8 @@ import {
   getDistrictsForProvince,
   getWardsForDistrict,
   isDistrictInProvince,
+  findDistrictByWard,
+  getProvinceFromCoords,
   normalizeAdminName,
 } from '@/utils/vietnamAdministrative';
 import type { LocationCoords } from '@/components/checkout/CheckoutDeliveryMap';
@@ -461,36 +463,46 @@ export default function AddressModal({
           setMapValidationError(null);
           hasUserOverriddenCoords.current = true;
 
-          // Cập nhật tọa độ vào form
+          // Suy đoán và đồng bộ đầy đủ các trường Tỉnh/Thành, Quận/Huyện, Phường/Xã, Địa chỉ cụ thể
+          const resolvedProv =
+            findMatchingProvince(details?.components?.province) ||
+            findMatchingProvince(fullPlaceName) ||
+            getProvinceFromCoords(latitude, longitude) ||
+            'TP. Hồ Chí Minh';
+
+          let resolvedWard = details?.components?.ward || parseAddressComponents(fullPlaceName).ward || '';
+          let resolvedDist = details?.components?.district || parseAddressComponents(fullPlaceName).district || '';
+
+          if (!resolvedDist && resolvedProv && resolvedWard) {
+            resolvedDist = findDistrictByWard(resolvedProv, resolvedWard) || '';
+          }
+
+          // Nếu chưa có phường nhưng có quận, lấy phường đầu tiên của quận để form không bị trống
+          if (!resolvedWard && resolvedProv && resolvedDist) {
+            const wardsInDist = getWardsForDistrict(resolvedProv, resolvedDist);
+            if (wardsInDist.length > 0) {
+              resolvedWard = wardsInDist[0];
+            }
+          }
+
+          let resolvedStreet =
+            details?.components?.streetAddress ||
+            (details?.title && !details.title.startsWith('Vị trí') ? details.title : '') ||
+            (fullPlaceName && !fullPlaceName.startsWith('Vị trí') ? fullPlaceName.split(',')[0] : '') ||
+            `Khu vực tọa độ (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
+
+          // Gán đồng thời toàn bộ giá trị để cập nhật form tức thì, không bị thiếu sót trường nào
+          prevProvinceRef.current = resolvedProv;
           form.setFieldsValue({
+            province: resolvedProv,
+            district: resolvedDist,
+            ward: resolvedWard,
+            streetAddress: resolvedStreet,
             latitude,
             longitude,
           });
 
-          // Tự động điền các trường địa chỉ từ vị trí hiện tại để người dùng không cần nhập
-          if (details?.components) {
-            const detectedProv =
-              findMatchingProvince(details.components.province) ||
-              findMatchingProvince(fullPlaceName);
-            if (detectedProv) {
-              form.setFieldsValue({ province: detectedProv });
-            }
-            if (details.components.district) {
-              form.setFieldsValue({ district: details.components.district });
-            }
-            if (details.components.ward) {
-              form.setFieldsValue({ ward: details.components.ward });
-            }
-            if (details.components.streetAddress) {
-              form.setFieldsValue({ streetAddress: details.components.streetAddress });
-            } else if (fullPlaceName) {
-              form.setFieldsValue({ streetAddress: fullPlaceName });
-            }
-          } else if (fullPlaceName) {
-            form.setFieldsValue({ streetAddress: fullPlaceName });
-          }
-
-          message.success('Đã lấy vị trí hiện tại và tự động cập nhật bản đồ!');
+          message.success('Đã xác định vị trí hiện tại và tự động điền đầy đủ địa chỉ!');
         } catch {
           message.warning('Đã xác định tọa độ nhưng không thể phân tích địa chỉ chi tiết.');
         } finally {
@@ -519,21 +531,51 @@ export default function AddressModal({
       setIsEstimateLocation(false);
       setMapValidationError(null);
 
-      form.setFieldsValue({
+      // Tra cứu chi tiết địa chỉ khi click/kéo ghim trên bản đồ
+      const details = await reverseGeocodeDetails(coords.lat, coords.lng);
+      const fullPlaceName =
+        details?.place_name || coords.displayName || `Vị trí (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)})`;
+
+      const resolvedProv =
+        findMatchingProvince(details?.components?.province) ||
+        findMatchingProvince(fullPlaceName) ||
+        getProvinceFromCoords(coords.lat, coords.lng);
+
+      let resolvedWard = details?.components?.ward || parseAddressComponents(fullPlaceName).ward || '';
+      let resolvedDist = details?.components?.district || parseAddressComponents(fullPlaceName).district || '';
+
+      if (!resolvedDist && resolvedProv && resolvedWard) {
+        resolvedDist = findDistrictByWard(resolvedProv, resolvedWard) || '';
+      }
+
+      const currentStreet = form.getFieldValue('streetAddress');
+      let finalStreet = currentStreet;
+      if (!currentStreet || !currentStreet.trim() || currentStreet.startsWith('Vị trí')) {
+        finalStreet =
+          details?.components?.streetAddress ||
+          (details?.title && !details.title.startsWith('Vị trí') ? details.title : '') ||
+          (fullPlaceName && !fullPlaceName.startsWith('Vị trí') ? fullPlaceName.split(',')[0] : '') ||
+          `Vị trí (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)})`;
+      }
+
+      const updateValues: Partial<AddressRequest> = {
         latitude: coords.lat,
         longitude: coords.lng,
-      });
+        streetAddress: finalStreet,
+      };
 
-      // Nếu ô địa chỉ cụ thể đang trống, tra cứu địa chỉ ngược để hỗ trợ người dùng
-      const currentStreet = form.getFieldValue('streetAddress');
-      if (!currentStreet || !currentStreet.trim()) {
-        const reverseName = await reverseGeocode(coords.lat, coords.lng);
-        if (reverseName) {
-          form.setFieldsValue({
-            streetAddress: reverseName,
-          });
-        }
+      if (resolvedProv) {
+        prevProvinceRef.current = resolvedProv;
+        updateValues.province = resolvedProv;
       }
+      if (resolvedDist) {
+        updateValues.district = resolvedDist;
+      }
+      if (resolvedWard) {
+        updateValues.ward = resolvedWard;
+      }
+
+      form.setFieldsValue(updateValues);
     },
     [form]
   );

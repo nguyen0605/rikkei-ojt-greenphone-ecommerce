@@ -4,7 +4,8 @@
  * Không phụ thuộc Mapbox token, tuân thủ chính sách sử dụng, không bị chặn mạng tại VN.
  */
 
-import { findMatchingProvince } from '@/utils/provinces';
+import { findMatchingProvince, parseAddressComponents } from '@/utils/provinces';
+import { findDistrictByWard, getProvinceFromCoords } from '@/utils/vietnamAdministrative';
 
 export interface AddressSuggestion {
   id: string;
@@ -385,7 +386,97 @@ export async function reverseGeocodeDetails(
   lng: number,
   signal?: AbortSignal
 ): Promise<AddressSuggestion | null> {
-  // 1. Thử qua Photon Reverse Geocoding
+  // 1. Thử qua OpenStreetMap Nominatim Reverse Geocoding (độ chính xác cao, đầy đủ các cấp hành chính VN)
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
+    const res = await fetchWithTimeout(
+      url,
+      {
+        signal,
+        headers: {
+          Accept: 'application/json',
+        },
+      },
+      3500
+    );
+
+    if (res.ok) {
+      const data = await res.json();
+      // Hỗ trợ cả định dạng Nominatim ({ address }) lẫn Photon ({ features })
+      if (Array.isArray(data.features) && data.features.length > 0) {
+        const suggestion = mapPhotonFeatureToSuggestion(data.features[0]);
+        if (suggestion) {
+          return suggestion;
+        }
+      }
+
+      if (data && data.address) {
+        const addr = data.address;
+        const road = addr.road || addr.pedestrian || addr.footway || addr.path || addr.street || '';
+        const houseNumber = addr.house_number || '';
+        const residential = addr.residential || addr.neighbourhood || addr.subdivision || '';
+        const rawWard = addr.suburb || addr.quarter || addr.village || addr.commune || addr.neighbourhood || '';
+        const rawDistrict = addr.city_district || addr.district || addr.county || addr.town || '';
+        const rawProvince = addr.city || addr.province || addr.state || '';
+
+        const resolvedProv =
+          findMatchingProvince(rawProvince) ||
+          findMatchingProvince(data.display_name) ||
+          getProvinceFromCoords(lat, lng) ||
+          'TP. Hồ Chí Minh';
+
+        let resolvedWard = rawWard;
+        let resolvedDist = rawDistrict;
+
+        // Nếu thiếu quận/huyện nhưng có phường/xã, tự tra cứu quận/huyện trực thuộc
+        if (!resolvedDist && resolvedProv && resolvedWard) {
+          resolvedDist = findDistrictByWard(resolvedProv, resolvedWard) || '';
+        }
+
+        // Nếu thiếu phường/xã hoặc quận/huyện, phân tích display_name
+        if (!resolvedDist || !resolvedWard) {
+          const parsed = parseAddressComponents(data.display_name || '');
+          if (!resolvedDist && parsed.district) resolvedDist = parsed.district;
+          if (!resolvedWard && parsed.ward) resolvedWard = parsed.ward;
+        }
+
+        let streetAddress = '';
+        if (houseNumber && road) {
+          streetAddress = `${houseNumber} ${road}`;
+        } else if (road && residential && !road.includes(residential)) {
+          streetAddress = `${road}, ${residential}`;
+        } else if (road) {
+          streetAddress = road;
+        } else if (residential) {
+          streetAddress = residential;
+        } else if (data.name && data.name !== resolvedWard && data.name !== resolvedDist) {
+          streetAddress = data.name;
+        } else {
+          streetAddress = data.display_name?.split(',')[0] || '';
+        }
+
+        return {
+          id: `nominatim-${data.place_id || `${lat}-${lng}`}`,
+          place_name: data.display_name,
+          title: streetAddress || resolvedWard || resolvedDist || 'Vị trí hiện tại',
+          subtitle: [resolvedWard, resolvedDist, resolvedProv].filter(Boolean).join(', ') || 'Việt Nam',
+          lat,
+          lng,
+          source: 'nominatim',
+          components: {
+            province: resolvedProv,
+            district: resolvedDist,
+            ward: resolvedWard,
+            streetAddress,
+          },
+        };
+      }
+    }
+  } catch {
+    // Tiếp tục fallback sang Photon
+  }
+
+  // 2. Thử qua Photon Reverse Geocoding
   try {
     const url = `https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`;
     const res = await fetchWithTimeout(
@@ -396,7 +487,7 @@ export async function reverseGeocodeDetails(
           Accept: 'application/json',
         },
       },
-      4000
+      3500
     );
 
     if (res.ok) {
@@ -404,43 +495,79 @@ export async function reverseGeocodeDetails(
       if (Array.isArray(data.features) && data.features.length > 0) {
         const suggestion = mapPhotonFeatureToSuggestion(data.features[0]);
         if (suggestion) {
+          const resolvedProv =
+            findMatchingProvince(suggestion.components?.province) ||
+            findMatchingProvince(suggestion.place_name) ||
+            getProvinceFromCoords(lat, lng);
+
+          let resolvedDist = suggestion.components?.district || '';
+          const resolvedWard = suggestion.components?.ward || '';
+
+          if (!resolvedDist && resolvedProv && resolvedWard) {
+            resolvedDist = findDistrictByWard(resolvedProv, resolvedWard) || '';
+          }
+
+          if (suggestion.components) {
+            suggestion.components.province = resolvedProv || suggestion.components.province;
+            suggestion.components.district = resolvedDist || suggestion.components.district;
+          }
+
           return suggestion;
         }
       }
     }
   } catch {
-    // Không ném lỗi ra ngoài khi mất mạng
+    // Tiếp tục fallback sang từ điển nội bộ
   }
 
-  // 2. Fallback: Tìm địa danh gần nhất trong từ điển (nếu trong bán kính < 5km)
+  // 3. Fallback: Tìm địa danh gần nhất trong từ điển nội bộ
+  let nearestItem: KnownLocation | null = null;
+  let minDistance = 0.15; // ~15km
   for (const item of KNOWN_VN_LOCATIONS) {
     const dLat = Math.abs(item.lat - lat);
     const dLng = Math.abs(item.lng - lng);
-    if (dLat < 0.03 && dLng < 0.03) {
-      return {
-        id: `dict-${item.lat}-${item.lng}`,
-        place_name: item.name,
-        title: item.name.split(',')[0] || item.name,
-        subtitle: item.name.split(',').slice(1).join(',').trim() || 'Việt Nam',
-        lat: item.lat,
-        lng: item.lng,
-        source: 'dictionary',
-        components: {
-          province: item.province,
-          district: item.district,
-        },
-      };
+    const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+    if (dist < minDistance) {
+      minDistance = dist;
+      nearestItem = item;
     }
   }
 
+  const provFromCoord = getProvinceFromCoords(lat, lng);
+  const resolvedProv = nearestItem?.province || provFromCoord || 'TP. Hồ Chí Minh';
+  const resolvedDist = nearestItem?.district || (resolvedProv === 'TP. Hồ Chí Minh' ? 'Thành phố Thủ Đức' : '');
+
+  if (nearestItem) {
+    return {
+      id: `dict-${nearestItem.lat}-${nearestItem.lng}`,
+      place_name: nearestItem.name,
+      title: nearestItem.name.split(',')[0] || nearestItem.name,
+      subtitle: nearestItem.name.split(',').slice(1).join(',').trim() || 'Việt Nam',
+      lat: nearestItem.lat,
+      lng: nearestItem.lng,
+      source: 'dictionary',
+      components: {
+        province: resolvedProv,
+        district: resolvedDist,
+        streetAddress: nearestItem.name.split(',')[0] || '',
+      },
+    };
+  }
+
+  // 4. Fallback cuối cùng: Tự động gắn tỉnh/thành phố theo vùng tọa độ
   return {
     id: `coords-${lat.toFixed(4)}-${lng.toFixed(4)}`,
     place_name: `Vị trí tọa độ (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
     title: `Vị trí tọa độ (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
-    subtitle: 'Việt Nam',
+    subtitle: resolvedProv || 'Việt Nam',
     lat,
     lng,
     source: 'dictionary',
+    components: {
+      province: resolvedProv,
+      district: resolvedDist,
+      streetAddress: `Khu vực tọa độ (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
+    },
   };
 }
 

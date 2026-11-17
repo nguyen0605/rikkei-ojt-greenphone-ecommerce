@@ -1026,3 +1026,87 @@ export function isDistrictInProvince(
     return normD === normTarget || normD.includes(normTarget) || normTarget.includes(normD);
   });
 }
+
+/**
+ * Tìm Quận / Huyện dựa trên Phường / Xã và Tỉnh / Thành phố
+ */
+export function findDistrictByWard(
+  provinceName?: string | null,
+  wardName?: string | null
+): string | undefined {
+  if (!provinceName || !wardName) return undefined;
+  const matchedProv = findMatchingProvince(provinceName);
+  if (!matchedProv) return undefined;
+
+  const provData = VIETNAM_ADMINISTRATIVE_DATA[matchedProv];
+  if (!provData) return undefined;
+
+  const normWard = normalizeAdminName(wardName);
+  if (!normWard) return undefined;
+
+  for (const d of provData.districts) {
+    const hasWard = d.wards.some((w) => {
+      const normW = normalizeAdminName(w);
+      return normW === normWard || normW.includes(normWard) || normWard.includes(normW);
+    });
+    if (hasWard) {
+      return d.name;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Suy đoán Tỉnh/Thành và Quận/Huyện từ tên Phường/Xã độc nhất
+ */
+export function findLocationByWard(
+  wardName?: string | null
+): { province: string; district: string; ward: string } | null {
+  if (!wardName) return null;
+  const normWard = normalizeAdminName(wardName);
+  if (!normWard || normWard.length < 3) return null;
+
+  for (const [provName, provData] of Object.entries(VIETNAM_ADMINISTRATIVE_DATA)) {
+    for (const d of provData.districts) {
+      const matchedWard = d.wards.find((w) => {
+        const normW = normalizeAdminName(w);
+        return normW === normWard || (normW.length >= 6 && normW.includes(normWard));
+      });
+      if (matchedWard) {
+        return {
+          province: provName,
+          district: d.name,
+          ward: matchedWard,
+        };
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Suy đoán Tỉnh / Thành phố từ tọa độ địa lý (Bounding boxes cho các đô thị lớn tại Việt Nam)
+ */
+export function getProvinceFromCoords(lat: number, lng: number): string | undefined {
+  // TP. Hồ Chí Minh & vùng ven (10.35 - 11.15, 106.35 - 107.05)
+  if (lat >= 10.35 && lat <= 11.15 && lng >= 106.35 && lng <= 107.05) {
+    return 'TP. Hồ Chí Minh';
+  }
+  // Hà Nội & vùng ven (20.55 - 21.45, 105.40 - 106.15)
+  if (lat >= 20.55 && lat <= 21.45 && lng >= 105.40 && lng <= 106.15) {
+    return 'Hà Nội';
+  }
+  // Đà Nẵng (15.90 - 16.25, 108.00 - 108.40)
+  if (lat >= 15.90 && lat <= 16.25 && lng >= 108.00 && lng <= 108.40) {
+    return 'Đà Nẵng';
+  }
+  // Hải Phòng (20.60 - 21.05, 106.50 - 107.15)
+  if (lat >= 20.60 && lat <= 21.05 && lng >= 106.50 && lng <= 107.15) {
+    return 'Hải Phòng';
+  }
+  // Cần Thơ (9.90 - 10.30, 105.40 - 105.90)
+  if (lat >= 9.90 && lat <= 10.30 && lng >= 105.40 && lng <= 105.90) {
+    return 'Cần Thơ';
+  }
+  return undefined;
+}
