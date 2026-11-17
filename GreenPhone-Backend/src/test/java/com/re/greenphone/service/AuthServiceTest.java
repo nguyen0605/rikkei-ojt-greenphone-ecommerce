@@ -286,13 +286,45 @@ class AuthServiceTest {
         when(valueOperations.get("otp:test@example.com")).thenReturn("123456");
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
         when(passwordEncoder.encode("newPassword123")).thenReturn("encoded_new");
+        when(jwtTokenProvider.generateToken(any(UserPrincipal.class))).thenReturn("mock_token_jwt");
+        when(jwtConfig.getExpiration()).thenReturn(86400000L);
+        when(jwtConfig.getRefreshExpiration()).thenReturn(604800000L);
 
-        authService.resetPassword("test@example.com", "123456", "newPassword123");
+        AuthResponse expectedAuth = AuthResponse.builder()
+                .token("mock_token_jwt")
+                .refreshToken("mock_refresh_token")
+                .email("test@example.com")
+                .build();
+        when(authMapper.toAuthResponse(eq(testUser), eq("mock_token_jwt"), anyString(), eq(86400000L))).thenReturn(expectedAuth);
+
+        AuthResponse result = authService.resetPassword("test@example.com", "123456", "newPassword123");
 
         verify(redisTemplate).delete("otp:test@example.com");
         verify(redisTemplate).delete("otp_attempts:test@example.com");
         verify(userRepository).save(testUser);
         assertThat(testUser.getPassword()).isEqualTo("encoded_new");
+        assertThat(result).isNotNull();
+        assertThat(result.getToken()).isEqualTo("mock_token_jwt");
+    }
+
+    @Test void resetPassword_InvalidOTP_ThrowsBadRequestException() {
+        when(redisTemplate.hasKey("otp_lock:test@example.com")).thenReturn(false);
+        when(valueOperations.get("otp:test@example.com")).thenReturn("123456");
+        when(valueOperations.increment("otp_attempts:test@example.com")).thenReturn(1L);
+
+        assertThatThrownBy(() -> authService.resetPassword("test@example.com", "999999", "newPassword123"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Mã OTP không chính xác");
+    }
+
+    @Test void resetPassword_UserNotFound_ThrowsResourceNotFoundException() {
+        when(redisTemplate.hasKey("otp_lock:test@example.com")).thenReturn(false);
+        when(valueOperations.get("otp:test@example.com")).thenReturn("123456");
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.resetPassword("test@example.com", "123456", "newPassword123"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("User not found");
     }
 
     // === RESEND OTP ===

@@ -302,13 +302,18 @@ public class AuthService {
         });
     }
 
-    public void resetPassword(String email, String otp, String newPassword) {
+    public AuthResponse resetPassword(String email, String otp, String newPassword) {
         validateAndConsumeOTP(email, otp);
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
+
+        log.info("[AUTH] Password reset successfully for email: {}. Generating auto-login tokens.", email);
+        String token = jwtTokenProvider.generateToken(UserPrincipal.create(user));
+        String refreshToken = createAndStoreRefreshToken(user.getId());
+        return authMapper.toAuthResponse(user, token, refreshToken, jwtConfig.getExpiration());
     }
 
     public void resendOTP(String email) {

@@ -27,6 +27,7 @@ const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
 const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage'));
 const ForgotPasswordPage = lazy(() => import('@/pages/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('@/pages/auth/ResetPasswordPage'));
 const VerifyOTPPage = lazy(() => import('@/pages/auth/VerifyOTPPage'));
 const AccountProfilePage = lazy(() => import('@/pages/account/AccountProfilePage'));
 const NotificationCenterPage = lazy(() => import('@/pages/account/NotificationCenterPage'));
@@ -98,6 +99,7 @@ export default function AppRoutes() {
         <Route path={ROUTES.ADMIN_LOGIN} element={withSuspense(LoginPage)} />
         <Route path={ROUTES.REGISTER} element={withSuspense(RegisterPage)} />
         <Route path={ROUTES.FORGOT_PASSWORD} element={withSuspense(ForgotPasswordPage)} />
+        <Route path={ROUTES.RESET_PASSWORD} element={withSuspense(ResetPasswordPage)} />
         <Route path={ROUTES.VERIFY_OTP} element={withSuspense(VerifyOTPPage)} />
       </Route>
 
