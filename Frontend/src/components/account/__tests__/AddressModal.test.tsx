@@ -16,6 +16,21 @@ vi.mock('@/components/checkout/checkoutGeocodingService', () => ({
   }),
   searchAddressSuggestions: vi.fn().mockResolvedValue([]),
   reverseGeocode: vi.fn().mockResolvedValue('Cầu Giấy, Hà Nội'),
+  reverseGeocodeDetails: vi.fn().mockResolvedValue({
+    id: 'geo-1',
+    place_name: 'Số 123 Đường Cầu Giấy, Hà Nội',
+    title: 'Số 123 Đường Cầu Giấy',
+    subtitle: 'Hà Nội, Việt Nam',
+    lat: 21.0362,
+    lng: 105.7906,
+    source: 'photon',
+    components: {
+      province: 'Hà Nội',
+      district: 'Cầu Giấy',
+      ward: 'Dịch Vọng',
+      streetAddress: 'Số 123 Đường Cầu Giấy',
+    },
+  }),
   isValidCoordinate: vi.fn().mockImplementation((lat, lng) => {
     return (
       typeof lat === 'number' &&
@@ -56,6 +71,20 @@ describe('AddressModal', () => {
         removeEventListener: vi.fn(),
         dispatchEvent: vi.fn(),
       })),
+    });
+    Object.defineProperty(navigator, 'geolocation', {
+      writable: true,
+      value: {
+        getCurrentPosition: vi.fn().mockImplementation((success) =>
+          success({
+            coords: {
+              latitude: 21.0362,
+              longitude: 105.7906,
+              accuracy: 10,
+            },
+          })
+        ),
+      },
     });
   });
 
@@ -231,6 +260,38 @@ describe('AddressModal', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Chưa có trên bản đồ')).toBeInTheDocument();
+    });
+  });
+
+  it('warns user if attempting to locate when street address has not been entered', async () => {
+    const user = userEvent.setup();
+    render(<AddressModal open={true} onCancel={vi.fn()} onSubmit={vi.fn()} />);
+
+    // Ô streetAddress đang trống, bấm nút Định vị
+    const locateBtn = screen.getByRole('button', { name: /Định vị từ địa chỉ đã nhập/i });
+    await user.click(locateBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByText('Vui lòng nhập số nhà, tên đường hoặc địa chỉ cụ thể trước khi định vị.').length
+      ).toBeGreaterThan(0);
+    });
+  });
+
+  it('allows locating current position and auto-filling address fields via GPS button next to other', async () => {
+    const user = userEvent.setup();
+    render(<AddressModal open={true} onCancel={vi.fn()} onSubmit={vi.fn()} />);
+
+    // Kiểm tra nút Vị trí hiện tại hiển thị bên cạnh mục Khác
+    const currentLocationBtn = screen.getByRole('button', { name: /Vị trí hiện tại/i });
+    expect(currentLocationBtn).toBeInTheDocument();
+
+    await user.click(currentLocationBtn);
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Số 123 Đường Cầu Giấy')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Cầu Giấy')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Dịch Vọng')).toBeInTheDocument();
     });
   });
 });

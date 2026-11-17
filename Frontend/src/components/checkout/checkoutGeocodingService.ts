@@ -376,35 +376,33 @@ export async function searchAddressSuggestions(
 }
 
 /**
- * Reverse geocoding: Lấy tên địa chỉ tương ứng từ tọa độ [lat, lng]
+ * Reverse geocoding chi tiết: Lấy đầy đủ thông tin địa chỉ và các thành phần cấu trúc (components)
  */
-export async function reverseGeocode(
+export async function reverseGeocodeDetails(
   lat: number,
   lng: number,
   signal?: AbortSignal
-): Promise<string | null> {
-  const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)}`;
-  if (reverseMemoryCache.has(cacheKey)) {
-    return reverseMemoryCache.get(cacheKey)!;
-  }
-
+): Promise<AddressSuggestion | null> {
   // 1. Thử qua Photon Reverse Geocoding
   try {
     const url = `https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`;
-    const res = await fetchWithTimeout(url, {
-      signal,
-      headers: {
-        Accept: 'application/json',
+    const res = await fetchWithTimeout(
+      url,
+      {
+        signal,
+        headers: {
+          Accept: 'application/json',
+        },
       },
-    }, 4000);
+      4000
+    );
 
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data.features) && data.features.length > 0) {
         const suggestion = mapPhotonFeatureToSuggestion(data.features[0]);
-        if (suggestion && suggestion.place_name) {
-          reverseMemoryCache.set(cacheKey, suggestion.place_name);
-          return suggestion.place_name;
+        if (suggestion) {
+          return suggestion;
         }
       }
     }
@@ -417,11 +415,72 @@ export async function reverseGeocode(
     const dLat = Math.abs(item.lat - lat);
     const dLng = Math.abs(item.lng - lng);
     if (dLat < 0.03 && dLng < 0.03) {
-      return item.name;
+      return {
+        id: `dict-${item.lat}-${item.lng}`,
+        place_name: item.name,
+        title: item.name.split(',')[0] || item.name,
+        subtitle: item.name.split(',').slice(1).join(',').trim() || 'Việt Nam',
+        lat: item.lat,
+        lng: item.lng,
+        source: 'dictionary',
+        components: {
+          province: item.province,
+          district: item.district,
+        },
+      };
     }
   }
 
+  return {
+    id: `coords-${lat.toFixed(4)}-${lng.toFixed(4)}`,
+    place_name: `Vị trí tọa độ (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
+    title: `Vị trí tọa độ (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
+    subtitle: 'Việt Nam',
+    lat,
+    lng,
+    source: 'dictionary',
+  };
+}
+
+/**
+ * Reverse geocoding: Lấy tên địa chỉ tương ứng từ tọa độ [lat, lng]
+ */
+export async function reverseGeocode(
+  lat: number,
+  lng: number,
+  signal?: AbortSignal
+): Promise<string | null> {
+  const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+  if (reverseMemoryCache.has(cacheKey)) {
+    return reverseMemoryCache.get(cacheKey)!;
+  }
+
+  const details = await reverseGeocodeDetails(lat, lng, signal);
+  if (details && details.place_name) {
+    reverseMemoryCache.set(cacheKey, details.place_name);
+    return details.place_name;
+  }
+
   return `Vị trí tọa độ (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+}
+
+/**
+ * Lấy tọa độ trung tâm gần đúng của tỉnh/thành phố phục vụ điều chỉnh camera bản đồ
+ */
+export function getProvinceCoords(provinceName?: string): [number, number] | null {
+  if (!provinceName) return null;
+  const norm = normalizeVietnamese(provinceName);
+  for (const item of KNOWN_VN_LOCATIONS) {
+    if (item.province && normalizeVietnamese(item.province) === norm) {
+      return [item.lat, item.lng];
+    }
+  }
+  for (const item of KNOWN_VN_LOCATIONS) {
+    if (normalizeVietnamese(item.name).includes(norm)) {
+      return [item.lat, item.lng];
+    }
+  }
+  return null;
 }
 
 export interface AddressComponents {

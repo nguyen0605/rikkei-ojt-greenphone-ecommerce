@@ -9,7 +9,7 @@ import {
   CheckCircleOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
-import { Sparkles, MapPin, Home, Building2, Users } from 'lucide-react';
+import { Sparkles, MapPin, Home, Building2, Users, Navigation } from 'lucide-react';
 import { VIETNAM_PROVINCES, findMatchingProvince, parseAddressComponents } from '@/utils/provinces';
 import type { LocationCoords } from '@/components/checkout/CheckoutDeliveryMap';
 
@@ -17,6 +17,7 @@ const CheckoutDeliveryMap = lazy(() => import('@/components/checkout/CheckoutDel
 import {
   geocodeInitialAddress,
   reverseGeocode,
+  reverseGeocodeDetails,
   searchAddressSuggestions,
   isValidCoordinate,
   type AddressSuggestion,
@@ -42,10 +43,12 @@ export default function AddressModal({
   existingAddresses,
 }: AddressModalProps) {
   const [form] = Form.useForm<AddressRequest>();
+  const watchedProvince = Form.useWatch('province', form);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
   const [mapValidationError, setMapValidationError] = useState<string | null>(null);
   const [selectedCoords, setSelectedCoords] = useState<LocationCoords | null>(null);
   const [isLocatingAddress, setIsLocatingAddress] = useState(false);
+  const [isLocatingCurrentGps, setIsLocatingCurrentGps] = useState(false);
   const [isEstimateLocation, setIsEstimateLocation] = useState(false);
   const hasUserOverriddenCoords = useRef(false);
 
@@ -66,7 +69,18 @@ export default function AddressModal({
       const ward = form.getFieldValue('ward') || '';
       const streetAddress = form.getFieldValue('streetAddress') || '';
 
-      const queryParts = [streetAddress, ward, district, province].filter(
+      const trimmedStreet = streetAddress.trim();
+      // YÊU CẦU: Nếu người dùng chưa nhập địa chỉ cụ thể mà bấm định vị thì phải báo là chưa nhập
+      if (!trimmedStreet) {
+        const emptyMsg = 'Vui lòng nhập số nhà, tên đường hoặc địa chỉ cụ thể trước khi định vị.';
+        setMapValidationError(emptyMsg);
+        if (showToast) {
+          message.warning(emptyMsg);
+        }
+        return;
+      }
+
+      const queryParts = [trimmedStreet, ward, district, province].filter(
         (p) => typeof p === 'string' && p.trim().length > 0
       );
 
@@ -77,7 +91,7 @@ export default function AddressModal({
       try {
         const fullQuery = queryParts.join(', ');
         const result = await geocodeInitialAddress(fullQuery, {
-          streetAddress,
+          streetAddress: trimmedStreet,
           ward,
           district,
           province,
@@ -339,6 +353,88 @@ export default function AddressModal({
       setFocusedIndex(-1);
     }
   };
+
+  // Xử lý khi người dùng bấm nút lấy vị trí GPS hiện tại (cạnh mục Khác)
+  const handleUseCurrentLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      message.error('Trình duyệt của bạn không hỗ trợ định vị GPS.');
+      return;
+    }
+
+    setIsLocatingCurrentGps(true);
+    setMapValidationError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          if (!isValidCoordinate(latitude, longitude)) {
+            message.error('Tọa độ vị trí hiện tại không hợp lệ.');
+            return;
+          }
+
+          // Phân tích chi tiết địa chỉ từ tọa độ GPS
+          const details = await reverseGeocodeDetails(latitude, longitude);
+          const fullPlaceName = details?.place_name || `Vị trí (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
+
+          setSelectedCoords({
+            lat: latitude,
+            lng: longitude,
+            displayName: fullPlaceName,
+          });
+          setIsEstimateLocation(false);
+          setMapValidationError(null);
+          hasUserOverriddenCoords.current = true;
+
+          // Cập nhật tọa độ vào form
+          form.setFieldsValue({
+            latitude,
+            longitude,
+          });
+
+          // Tự động điền các trường địa chỉ từ vị trí hiện tại để người dùng không cần nhập
+          if (details?.components) {
+            const detectedProv =
+              findMatchingProvince(details.components.province) ||
+              findMatchingProvince(fullPlaceName);
+            if (detectedProv) {
+              form.setFieldsValue({ province: detectedProv });
+            }
+            if (details.components.district) {
+              form.setFieldsValue({ district: details.components.district });
+            }
+            if (details.components.ward) {
+              form.setFieldsValue({ ward: details.components.ward });
+            }
+            if (details.components.streetAddress) {
+              form.setFieldsValue({ streetAddress: details.components.streetAddress });
+            } else if (fullPlaceName) {
+              form.setFieldsValue({ streetAddress: fullPlaceName });
+            }
+          } else if (fullPlaceName) {
+            form.setFieldsValue({ streetAddress: fullPlaceName });
+          }
+
+          message.success('Đã lấy vị trí hiện tại và tự động cập nhật bản đồ!');
+        } catch {
+          message.warning('Đã xác định tọa độ nhưng không thể phân tích địa chỉ chi tiết.');
+        } finally {
+          setIsLocatingCurrentGps(false);
+        }
+      },
+      (err) => {
+        setIsLocatingCurrentGps(false);
+        if (err.code === err.PERMISSION_DENIED) {
+          message.warning('Trình duyệt đã từ chối quyền truy cập vị trí. Vui lòng cấp quyền trong cài đặt trình duyệt.');
+        } else if (err.code === err.TIMEOUT) {
+          message.warning('Hết thời gian chờ định vị GPS. Vui lòng thử lại.');
+        } else {
+          message.warning('Không thể xác định vị trí hiện tại của thiết bị.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+  }, [form]);
 
   // Xử lý khi người dùng tương tác trực tiếp trên bản đồ (click hoặc kéo marker)
   const handleMapLocationSelect = useCallback(
@@ -706,26 +802,40 @@ export default function AddressModal({
           )}
         </div>
 
-        {/* Address Label Selector */}
+        {/* Address Label Selector and Current Location Button */}
         <Form.Item
-          name="label"
           label={<span className="text-sm font-medium text-gray-700">Loại địa chỉ</span>}
-          initialValue="HOME"
+          className="!mb-4"
         >
-          <Radio.Group buttonStyle="solid" className="w-full">
-            <Radio.Button value="HOME" className="!rounded-l-xl">
-              <span className="inline-flex items-center gap-1.5"><Home className="w-3.5 h-3.5" /> Nhà riêng</span>
-            </Radio.Button>
-            <Radio.Button value="OFFICE">
-              <span className="inline-flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5" /> Văn phòng</span>
-            </Radio.Button>
-            <Radio.Button value="FAMILY">
-              <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Người thân</span>
-            </Radio.Button>
-            <Radio.Button value="OTHER" className="!rounded-r-xl">
-              <span className="inline-flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> Khác</span>
-            </Radio.Button>
-          </Radio.Group>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Form.Item name="label" noStyle initialValue="HOME">
+              <Radio.Group buttonStyle="solid">
+                <Radio.Button value="HOME" className="!rounded-l-xl">
+                  <span className="inline-flex items-center gap-1.5"><Home className="w-3.5 h-3.5" /> Nhà riêng</span>
+                </Radio.Button>
+                <Radio.Button value="OFFICE">
+                  <span className="inline-flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5" /> Văn phòng</span>
+                </Radio.Button>
+                <Radio.Button value="FAMILY">
+                  <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Người thân</span>
+                </Radio.Button>
+                <Radio.Button value="OTHER" className="!rounded-r-xl">
+                  <span className="inline-flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> Khác</span>
+                </Radio.Button>
+              </Radio.Group>
+            </Form.Item>
+
+            {/* Nút trỏ vị trí hiện tại cạnh mục Khác để người dùng không cần nhập địa chỉ hiện tại */}
+            <Button
+              type="default"
+              icon={<Navigation className="w-3.5 h-3.5 text-blue-600" />}
+              onClick={handleUseCurrentLocation}
+              loading={isLocatingCurrentGps}
+              className="!rounded-xl !border-blue-200 !bg-blue-50/80 !text-blue-700 hover:!bg-blue-100 hover:!border-blue-400 !font-medium !text-xs !h-8 !px-3 shadow-2xs"
+            >
+              Vị trí hiện tại
+            </Button>
+          </div>
         </Form.Item>
 
         {/* Interactive Location Confirmation Map */}
@@ -797,6 +907,7 @@ export default function AddressModal({
               <CheckoutDeliveryMap
                 selectedLocation={selectedCoords}
                 onLocationSelect={handleMapLocationSelect}
+                focusProvince={watchedProvince}
                 className="!h-[240px]"
               />
             </Suspense>
