@@ -140,15 +140,18 @@ export default function CartPage() {
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         {/* ── Items column ── */}
         <div className="min-w-0 flex-1">
-          {/* List header */}
-          <div className="mb-2 flex items-center gap-3 px-1 text-sm text-gray-500">
-            <Checkbox checked={allSelected} indeterminate={selectedIds.size > 0 && !allSelected} onChange={toggleAll} />
-            <span>Chọn tất cả ({items.length})</span>
+          {/* List header / Select all */}
+          <div className="mb-3 flex h-11 items-center gap-2 px-1 text-sm text-gray-600">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center">
+              <Checkbox checked={allSelected} indeterminate={selectedIds.size > 0 && !allSelected} onChange={toggleAll} />
+            </div>
+            <span className="font-medium">Chọn tất cả ({items.length} sản phẩm)</span>
           </div>
 
-          <div className="space-y-3">
+          {/* Desktop Table Layout (hidden on mobile < 640px) */}
+          <div className="hidden space-y-3 sm:block">
             {items.map((item) => (
-              <CartRow
+              <DesktopCartRow
                 key={item.id}
                 item={item}
                 checked={selectedIds.has(item.id)}
@@ -158,6 +161,27 @@ export default function CartPage() {
                   else dispatch(updateQuantity({ id: item.id, quantity: q }));
                 }}
                 onMove={(dir) => dispatch(moveCartItem({ id: item.id, dir }))}
+                onRemove={async () => {
+                  if (isAuthenticated) await dispatch(removeCartItem(item.id)).unwrap();
+                  else dispatch(removeFromCart(item.id));
+                  message.success('Đã xóa sản phẩm');
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Mobile Card List Layout (< 640px, touch-friendly, no overflow) */}
+          <div className="space-y-3 sm:hidden">
+            {items.map((item) => (
+              <MobileCartCard
+                key={item.id}
+                item={item}
+                checked={selectedIds.has(item.id)}
+                onToggle={() => toggleItem(item.id)}
+                onUpdate={(q) => {
+                  if (isAuthenticated) void dispatch(updateCartItem({ id: item.id, quantity: q }));
+                  else dispatch(updateQuantity({ id: item.id, quantity: q }));
+                }}
                 onRemove={async () => {
                   if (isAuthenticated) await dispatch(removeCartItem(item.id)).unwrap();
                   else dispatch(removeFromCart(item.id));
@@ -257,8 +281,8 @@ export default function CartPage() {
   );
 }
 
-/* ── Cart row ── */
-function CartRow({
+/* ── Desktop Cart Row (Screen >= 640px) ── */
+function DesktopCartRow({
   item, checked, onToggle, onUpdate, onMove, onRemove,
 }: {
   item: CartItem;
@@ -270,26 +294,30 @@ function CartRow({
 }) {
   const price = item.product.price;
   return (
-    <div className="flex gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm transition animate-[fade-in_0.25s_ease-out] sm:gap-4 sm:p-4">
+    <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:shadow-md animate-[fade-in_0.25s_ease-out]">
       {/* Select */}
-      <div className="flex items-center">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center">
         <Checkbox checked={checked} onChange={onToggle} />
       </div>
+
       {/* Image */}
       <Link to={ROUTES.PRODUCT_DETAIL(String(item.productId))} className="block shrink-0">
         <img
           src={item.product.thumbnail || '/placeholder.png'}
           alt={item.product.name}
-          className="h-16 w-16 rounded-lg border object-cover sm:h-20 sm:w-20"
+          className="h-20 w-20 rounded-xl border border-gray-100 object-cover"
         />
       </Link>
+
       {/* Info */}
       <div className="min-w-0 flex-1">
-        <Link to={ROUTES.PRODUCT_DETAIL(String(item.productId))} className="line-clamp-2 text-sm font-medium text-gray-900 hover:underline sm:line-clamp-1">
+        <Link to={ROUTES.PRODUCT_DETAIL(String(item.productId))} className="line-clamp-2 text-sm font-semibold text-gray-900 hover:text-green-600 transition-colors">
           {item.product.name}
         </Link>
-        <div className="mt-0.5 text-xs text-gray-500">
-          {[item.selectedStorage, item.selectedColor].filter(Boolean).join(' • ') || '—'}
+        <div className="mt-1 text-xs text-gray-500">
+          <span className="inline-block rounded-md bg-gray-50 px-2 py-0.5 font-medium text-gray-600 border border-gray-100">
+            {[item.selectedStorage, item.selectedColor].filter(Boolean).join(' • ') || '—'}
+          </span>
         </div>
         <div className="mt-1.5 flex items-baseline gap-2">
           <span className="font-semibold text-red-600">{formatVND(price)}</span>
@@ -298,27 +326,143 @@ function CartRow({
           )}
         </div>
       </div>
-      {/* Quantity + actions */}
-      <div className="flex flex-col items-end justify-between gap-2">
-        <div className="flex items-center gap-1 rounded-lg border border-gray-200 p-0.5">
-          <button
-            onClick={() => onUpdate(Math.max(1, item.quantity - 1))}
-            className="flex h-6 w-6 items-center justify-center rounded text-gray-500 hover:bg-gray-100"
-            aria-label="Giảm số lượng"
-          >−</button>
-          <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
-          <button
-            onClick={() => onUpdate(item.quantity + 1)}
-            className="flex h-6 w-6 items-center justify-center rounded text-gray-500 hover:bg-gray-100"
-            aria-label="Tăng số lượng"
-          >+</button>
+
+      {/* Quantity Stepper */}
+      <div className="flex items-center rounded-xl border border-gray-200 bg-gray-50/70 p-1">
+        <button
+          onClick={() => onUpdate(Math.max(1, item.quantity - 1))}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-white hover:text-green-600 font-bold transition-colors"
+          aria-label="Giảm số lượng"
+        >−</button>
+        <span className="w-8 text-center text-sm font-bold text-gray-900">{item.quantity}</span>
+        <button
+          onClick={() => onUpdate(item.quantity + 1)}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-white hover:text-green-600 font-bold transition-colors"
+          aria-label="Tăng số lượng"
+        >+</button>
+      </div>
+
+      {/* Total for this line */}
+      <div className="w-28 text-right font-bold text-red-600">
+        {formatVND(price * item.quantity)}
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1">
+        <button onClick={() => onMove(-1)} className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors" aria-label="Lên"><ArrowUpOutlined className="text-xs" /></button>
+        <button onClick={() => onMove(1)} className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors" aria-label="Xuống"><ArrowDownOutlined className="text-xs" /></button>
+        <Popconfirm title="Xóa sản phẩm này?" onConfirm={onRemove} okText="Xóa" cancelText="Hủy">
+          <button className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors" aria-label="Xóa"><CloseOutlined className="text-xs" /></button>
+        </Popconfirm>
+      </div>
+    </div>
+  );
+}
+
+/* ── Mobile Cart Card (Screen < 640px) ── */
+function MobileCartCard({
+  item, checked, onToggle, onUpdate, onRemove,
+}: {
+  item: CartItem;
+  checked: boolean;
+  onToggle: () => void;
+  onUpdate: (q: number) => void;
+  onRemove: () => void;
+}) {
+  const price = item.product.price;
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm space-y-3 transition animate-[fade-in_0.25s_ease-out]">
+      {/* Card Header: Checkbox + Product Name + Trash Delete Button */}
+      <div className="flex items-start gap-2.5">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center -ml-1">
+          <Checkbox checked={checked} onChange={onToggle} />
         </div>
-        <div className="flex items-center gap-1">
-          <button onClick={() => onMove(-1)} className="flex h-6 w-6 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600" aria-label="Lên"><ArrowUpOutlined className="text-[10px]" /></button>
-          <button onClick={() => onMove(1)} className="flex h-6 w-6 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600" aria-label="Xuống"><ArrowDownOutlined className="text-[10px]" /></button>
-          <Popconfirm title="Xóa sản phẩm này?" onConfirm={onRemove} okText="Xóa" cancelText="Hủy">
-            <button className="flex h-6 w-6 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-500" aria-label="Xóa"><CloseOutlined className="text-[10px]" /></button>
-          </Popconfirm>
+        <div className="min-w-0 flex-1 pt-2">
+          <Link
+            to={ROUTES.PRODUCT_DETAIL(String(item.productId))}
+            className="line-clamp-2 text-sm font-semibold text-gray-900 hover:text-green-600 leading-snug"
+          >
+            {item.product.name}
+          </Link>
+        </div>
+        <Popconfirm
+          title="Xóa sản phẩm này?"
+          onConfirm={onRemove}
+          okText="Xóa"
+          cancelText="Hủy"
+        >
+          <button
+            type="button"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+            aria-label="Xóa sản phẩm"
+          >
+            <DeleteOutlined className="text-base" />
+          </button>
+        </Popconfirm>
+      </div>
+
+      {/* Card Body: Square Image + Variant Tags + Unit Price */}
+      <div className="flex gap-3 items-center pl-1">
+        <Link
+          to={ROUTES.PRODUCT_DETAIL(String(item.productId))}
+          className="block shrink-0"
+        >
+          <img
+            src={item.product.thumbnail || '/placeholder.png'}
+            alt={item.product.name}
+            className="h-20 w-20 rounded-xl border border-gray-100 object-cover shadow-xs"
+          />
+        </Link>
+        <div className="min-w-0 flex-1 space-y-1">
+          {(item.selectedStorage || item.selectedColor) && (
+            <span className="inline-block rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+              {[item.selectedStorage, item.selectedColor].filter(Boolean).join(' • ')}
+            </span>
+          )}
+          <div className="flex items-baseline gap-2 pt-0.5">
+            <span className="text-sm font-bold text-red-600">
+              {formatVND(price)}
+            </span>
+            {item.product.originalPrice && item.product.originalPrice > price && (
+              <span className="text-xs text-gray-400 line-through">
+                {formatVND(item.product.originalPrice)}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Card Footer: Quantity Stepper (>= 44x44px touch target) + Line Total */}
+      <div className="flex items-center justify-between border-t border-gray-50 pt-2.5">
+        {/* Stepper with 44x44px buttons */}
+        <div className="flex items-center rounded-xl border border-gray-200 bg-gray-50/80 p-0.5">
+          <button
+            type="button"
+            onClick={() => onUpdate(Math.max(1, item.quantity - 1))}
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-base font-bold text-gray-600 hover:bg-white hover:text-green-600 active:bg-gray-200 transition-colors"
+            aria-label="Giảm số lượng"
+          >
+            −
+          </button>
+          <span className="w-10 text-center text-sm font-bold text-gray-900">
+            {item.quantity}
+          </span>
+          <button
+            type="button"
+            onClick={() => onUpdate(item.quantity + 1)}
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-base font-bold text-gray-600 hover:bg-white hover:text-green-600 active:bg-gray-200 transition-colors"
+            aria-label="Tăng số lượng"
+          >
+            +
+          </button>
+        </div>
+
+        {/* Subtotal */}
+        <div className="text-right">
+          <span className="block text-[11px] text-gray-400">Thành tiền</span>
+          <span className="text-base font-bold text-red-600">
+            {formatVND(price * item.quantity)}
+          </span>
         </div>
       </div>
     </div>

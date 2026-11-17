@@ -218,7 +218,7 @@ export default function ProductDetailPage() {
 
   return (
     <>
-      <div className="mx-auto max-w-7xl px-4 py-6 pb-28 sm:pb-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-6 pb-28 sm:pb-8 sm:px-6 lg:px-8">
         <Breadcrumb items={[{ label: 'Trang chủ', href: '/' }, { label: 'Sản phẩm', href: '/san-pham' }, { label: phone.name }]} className="mb-6" />
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
@@ -382,52 +382,78 @@ export default function ProductDetailPage() {
               </div>
             )}
 
-            {/* Buy Now, Add to Cart & Wishlist action bar */}
+            {/* Sticky Action Bar on Mobile / Inline Action Bar on Desktop */}
             <div
               data-testid="pdp-action-bar"
-              className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-2.5 border-t border-gray-200 bg-white/95 px-4 py-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] backdrop-blur sm:static sm:z-auto sm:mb-2 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-none"
+              className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 bg-white/95 px-4 py-2.5 shadow-[0_-4px_20px_rgba(0,0,0,0.12)] backdrop-blur sm:static sm:z-auto sm:mb-2 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-none"
             >
-              <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:gap-3">
-                <Button
-                  type="primary"
-                  size="large"
-                  data-testid="buy-now-button"
-                  loading={isBuyingNow}
-                  disabled={!canPurchase || isSubmitting}
-                  onClick={handleBuyNow}
-                  className="!h-12 !w-full sm:!flex-1 !rounded-full !border-0 !bg-gradient-to-r !from-green-600 !to-emerald-600 !text-base !font-semibold !text-white !shadow-md hover:!from-green-700 hover:!to-emerald-700 disabled:!bg-none disabled:!bg-gray-200 disabled:!text-gray-400 disabled:!shadow-none"
-                >
-                  Mua ngay
-                </Button>
-                <Button
-                  size="large"
-                  data-testid="add-to-cart-button"
-                  loading={isAddingToCart}
-                  disabled={!canPurchase || isSubmitting}
-                  onClick={handleAddToCart}
-                  icon={<ShoppingCart className="h-5 w-5" />}
-                  className="!h-12 !w-full sm:!flex-1 !rounded-full !border-2 !border-green-600 !bg-white !text-base !font-semibold !text-green-700 hover:!border-green-700 hover:!bg-green-50 hover:!text-green-800 disabled:!border-gray-200 disabled:!bg-gray-100 disabled:!text-gray-400"
-                >
-                  {isProductInactive
-                    ? 'Sản phẩm ngừng kinh doanh'
-                    : isVariantInactive
-                      ? 'Phiên bản ngừng kinh doanh'
-                      : selectedVariant && selectedVariant.stockQuantity > 0
-                        ? 'Thêm vào giỏ hàng'
-                        : 'Hết hàng'}
-                </Button>
+              {/* Giá bán hiện tại hiển thị trên thanh dính đáy mobile */}
+              {selectedVariant && (
+                <div className="mb-2 flex items-center justify-between sm:hidden">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-xs text-gray-500 font-medium">Giá bán:</span>
+                    <span className="text-lg font-bold text-red-600">
+                      {formatVND(selectedVariant.discountPrice ?? selectedVariant.price)}
+                    </span>
+                    {selectedVariant.discountPrice && (
+                      <span className="text-xs text-gray-400 line-through">
+                        {formatVND(selectedVariant.price)}
+                      </span>
+                    )}
+                  </div>
+                  {selectedVariant.stockQuantity > 0 ? (
+                    <span className="text-xs font-semibold text-green-600">
+                      Còn hàng ({selectedVariant.stockQuantity})
+                    </span>
+                  ) : (
+                    <span className="text-xs font-semibold text-red-500">Hết hàng</span>
+                  )}
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <div className="flex flex-1 gap-2 sm:gap-3">
+                  <Button
+                    size="large"
+                    data-testid="add-to-cart-button"
+                    loading={isAddingToCart}
+                    disabled={!canPurchase || isSubmitting}
+                    onClick={handleAddToCart}
+                    icon={<ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />}
+                    className="!h-11 sm:!h-12 !w-full sm:!flex-1 !rounded-full !border-2 !border-green-600 !bg-white !text-xs sm:!text-base !font-semibold !text-green-700 hover:!border-green-700 hover:!bg-green-50 hover:!text-green-800 disabled:!border-gray-200 disabled:!bg-gray-100 disabled:!text-gray-400"
+                  >
+                    {isProductInactive
+                      ? 'Ngừng kinh doanh'
+                      : isVariantInactive
+                        ? 'Ngừng kinh doanh'
+                        : selectedVariant && selectedVariant.stockQuantity > 0
+                          ? 'Thêm vào giỏ hàng'
+                          : 'Hết hàng'}
+                  </Button>
+                  <Button
+                    type="primary"
+                    size="large"
+                    data-testid="buy-now-button"
+                    loading={isBuyingNow}
+                    disabled={!canPurchase || isSubmitting}
+                    onClick={handleBuyNow}
+                    className="!h-11 sm:!h-12 !w-full sm:!flex-1 !rounded-full !border-0 !bg-gradient-to-r !from-green-600 !to-emerald-600 !text-sm sm:!text-base !font-semibold !text-white !shadow-md hover:!from-green-700 hover:!to-emerald-700 disabled:!bg-none disabled:!bg-gray-200 disabled:!text-gray-400 disabled:!shadow-none"
+                  >
+                    Mua ngay
+                  </Button>
+                </div>
+                <WishlistButton
+                  productId={String(phone.id)}
+                  name={phone.name}
+                  price={selectedVariant?.discountPrice ?? selectedVariant?.price}
+                  originalPrice={selectedVariant?.discountPrice ? selectedVariant?.price : undefined}
+                  imageUrl={phone.images?.[0]?.imageUrl || phone.mainImageUrl || ''}
+                  brandName={phone.brandName || ''}
+                  inStock={selectedVariant ? selectedVariant.stockQuantity > 0 : true}
+                  className="!h-11 !w-11 sm:!h-12 sm:!w-12 shrink-0 border border-gray-200 bg-white shadow-sm hover:border-red-200 hover:bg-red-50"
+                  iconSize={20}
+                />
               </div>
-              <WishlistButton
-                productId={String(phone.id)}
-                name={phone.name}
-                price={selectedVariant?.discountPrice ?? selectedVariant?.price}
-                originalPrice={selectedVariant?.discountPrice ? selectedVariant?.price : undefined}
-                imageUrl={phone.images?.[0]?.imageUrl || phone.mainImageUrl || ''}
-                brandName={phone.brandName || ''}
-                inStock={selectedVariant ? selectedVariant.stockQuantity > 0 : true}
-                className="!h-12 !w-12 shrink-0 border border-gray-200 bg-white shadow-sm hover:border-red-200 hover:bg-red-50"
-                iconSize={22}
-              />
             </div>
           </div>
         </div>

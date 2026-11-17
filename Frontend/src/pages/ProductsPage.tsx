@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation, useSearchParams } from 'react-router-dom';
+import { Drawer, Button } from 'antd';
+import { Filter } from 'lucide-react';
 import { Breadcrumb, NewsletterCTA, ProductCardSkeleton } from '@/components/common';
 import ProductFilters from '@/components/products/ProductFilters';
 import ProductsToolbar, { ProductsPagination, ProductGrid } from '@/components/products/ProductsToolbar';
@@ -16,6 +18,7 @@ export default function ProductsPage() {
   const dispatch = useAppDispatch();
   const filters = useAppSelector((s) => s.filter);
   const [page, setPage] = useState(1);
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const lastNavKey = useRef('');
@@ -83,13 +86,53 @@ export default function ProductsPage() {
   const phones = data?.content || [];
   const total = data?.totalElements || 0;
 
+  const activeFilterCount =
+    filters.brandIds.length +
+    filters.rams.length +
+    filters.storages.length +
+    filters.colors.length +
+    filters.features.length +
+    (filters.priceRange[0] > 0 || filters.priceRange[1] < 50_000_000 ? 1 : 0);
+
   return (
     <>
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <Breadcrumb items={[{ label: 'Trang chủ', href: '/' }, { label: 'Sản phẩm' }]} className="mb-6" />
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
-          <div className="lg:col-span-1"><ProductFilters /></div>
+          {/* Desktop Fixed Sidebar */}
+          <div className="hidden lg:col-span-1 lg:block">
+            <ProductFilters />
+          </div>
+
           <div className="lg:col-span-3">
+            {/* Mobile Filter Trigger Button */}
+            <div className="mb-4 flex items-center justify-between gap-3 lg:hidden">
+              <Button
+                type="default"
+                size="large"
+                data-testid="mobile-filter-button"
+                icon={<Filter className="h-4 w-4 text-green-600" />}
+                onClick={() => setFilterDrawerOpen(true)}
+                className="!h-11 !rounded-xl !border-gray-200 !font-semibold !text-gray-700 hover:!border-green-600 hover:!text-green-600 shadow-sm flex items-center gap-2"
+              >
+                <span>Bộ lọc</span>
+                {activeFilterCount > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-green-600 px-1.5 text-xs font-bold text-white">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </Button>
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => dispatch(clearAllFilters())}
+                  className="flex h-11 items-center px-3 text-xs font-medium text-gray-500 hover:text-red-500 transition-colors"
+                >
+                  Xóa lọc ({activeFilterCount})
+                </button>
+              )}
+            </div>
+
             <ProductsToolbar total={total} current={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
             {isLoading ? (
               <div
@@ -108,6 +151,34 @@ export default function ProductsPage() {
           </div>
         </div>
       </div>
+
+      {/* Mobile Filter Drawer */}
+      <Drawer
+        title="Bộ lọc sản phẩm"
+        placement="right"
+        open={filterDrawerOpen}
+        onClose={() => setFilterDrawerOpen(false)}
+        styles={{
+          body: { padding: '16px' },
+          wrapper: { maxWidth: '85vw', width: 320 },
+        }}
+        footer={
+          <div className="p-2">
+            <Button
+              type="primary"
+              size="large"
+              block
+              onClick={() => setFilterDrawerOpen(false)}
+              className="!h-11 !rounded-full !bg-green-600 hover:!bg-green-700 !font-semibold !text-white !text-base"
+            >
+              Áp dụng {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
+            </Button>
+          </div>
+        }
+      >
+        <ProductFilters />
+      </Drawer>
+
       <NewsletterCTA />
     </>
   );

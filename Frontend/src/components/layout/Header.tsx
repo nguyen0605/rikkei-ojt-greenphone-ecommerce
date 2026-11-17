@@ -11,11 +11,13 @@ import {
   LogIn,
   LayoutDashboard,
   Star,
+  Menu,
 } from 'lucide-react';
 import BrandLogo from '@/components/common/BrandLogo';
 import HeaderSearch from '@/components/layout/HeaderSearch';
 import BrandDropdown from '@/components/layout/BrandDropdown';
 import NotificationBell from '@/components/layout/NotificationBell';
+import MobileNavDrawer from '@/components/layout/MobileNavDrawer';
 import { getStoredCompareSlots, COMPARE_UPDATED_EVENT } from '@/services/phoneComparisonService';
 const navItems = [
   { key: 'home', label: 'Trang chủ', href: '/' },
@@ -41,6 +43,7 @@ export default function Header() {
   const { user, isAuthenticated } = useAppSelector((s) => s.auth);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const [compareCount, setCompareCount] = useState<number>(() => {
     const slots = getStoredCompareSlots();
@@ -132,8 +135,19 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-gray-100 bg-white shadow-sm">
-      {/* Row 1: Logo | Brand | Search | Actions */}
-      <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
+      {/* Row 1: Mobile Hamburger | Logo | Brand | Search | Actions */}
+      <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 sm:gap-3 px-3 sm:px-6 lg:px-8">
+        {/* Mobile Hamburger Button */}
+        <button
+          type="button"
+          onClick={() => setMobileNavOpen(true)}
+          className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-700 hover:bg-gray-100 hover:text-green-600 focus:outline-none md:hidden -ml-1 shrink-0 transition-colors"
+          aria-label="Mở menu điều hướng"
+          data-testid="mobile-menu-button"
+        >
+          <Menu className="h-6 w-6" />
+        </button>
+
         <BrandLogo size="md" />
 
         <div className="ml-4 hidden shrink-0 md:block">
@@ -207,10 +221,10 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Row 2: Navigation */}
-      <div className="border-t border-gray-100">
+      {/* Row 2: Navigation (desktop only) */}
+      <div className="hidden border-t border-gray-100 md:block">
         <div className="mx-auto flex h-12 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <nav className="hidden items-center gap-2 md:flex">
+          <nav className="flex items-center gap-2">
             {navItems.map((item) => {
               return (
                 <NavLink
@@ -242,6 +256,13 @@ export default function Header() {
           </nav>
         </div>
       </div>
+
+      {/* Mobile Navigation Drawer */}
+      <MobileNavDrawer
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        compareCount={compareCount}
+      />
     </header>
   );
 }
