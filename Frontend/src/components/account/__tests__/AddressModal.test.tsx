@@ -374,7 +374,8 @@ describe('AddressModal', () => {
       expect(screen.getByText('Cấp quyền truy cập vị trí hiện tại')).toBeInTheDocument();
       expect(screen.getByText('Vị trí (Location)')).toBeInTheDocument();
       expect(screen.getByRole('switch')).toBeInTheDocument();
-      expect(screen.getByText(/Nếu công tắc chưa bật được/i)).toBeInTheDocument();
+      expect(screen.getByText(/Nhấp biểu tượng Cài đặt ở ngay phía trên/i)).toBeInTheDocument();
+      expect(screen.getByText(/Tự động nhận diện \(Không cần tải lại trang\)/i)).toBeInTheDocument();
     });
   });
 });

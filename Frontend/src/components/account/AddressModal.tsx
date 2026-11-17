@@ -8,8 +8,9 @@ import {
   SearchOutlined,
   CheckCircleOutlined,
   InfoCircleOutlined,
+  CloseOutlined,
 } from '@ant-design/icons';
-import { Sparkles, MapPin, Home, Building2, Users, Navigation } from 'lucide-react';
+import { Sparkles, MapPin, Home, Building2, Users, Navigation, ArrowUp } from 'lucide-react';
 import { VIETNAM_PROVINCES, findMatchingProvince, parseAddressComponents } from '@/utils/provinces';
 import {
   getDistrictsForProvince,
@@ -59,7 +60,7 @@ export default function AddressModal({
   const [isLocatingAddress, setIsLocatingAddress] = useState(false);
   const [isLocatingCurrentGps, setIsLocatingCurrentGps] = useState(false);
   const [isEstimateLocation, setIsEstimateLocation] = useState(false);
-  const [showLocationPermissionModal, setShowLocationPermissionModal] = useState(false);
+  const [showLocationPointer, setShowLocationPointer] = useState(false);
   const [isLocationSwitchOn, setIsLocationSwitchOn] = useState(false);
   const hasUserOverriddenCoords = useRef(false);
 
@@ -446,7 +447,7 @@ export default function AddressModal({
         const permStatus = await navigator.permissions.query({ name: 'geolocation' });
         if (permStatus.state === 'denied') {
           setIsLocationSwitchOn(false);
-          setShowLocationPermissionModal(true);
+          setShowLocationPointer(true);
           return;
         }
       } catch {
@@ -460,7 +461,7 @@ export default function AddressModal({
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         setIsLocationSwitchOn(true);
-        setShowLocationPermissionModal(false);
+        setShowLocationPointer(false);
         try {
           const { latitude, longitude } = pos.coords;
           if (!isValidCoordinate(latitude, longitude)) {
@@ -531,7 +532,7 @@ export default function AddressModal({
         setIsLocatingCurrentGps(false);
         if (err.code === 1 || err.code === (window.GeolocationPositionError?.PERMISSION_DENIED ?? 1)) {
           setIsLocationSwitchOn(false);
-          setShowLocationPermissionModal(true);
+          setShowLocationPointer(true);
         } else if (err.code === 3 || err.code === (window.GeolocationPositionError?.TIMEOUT ?? 3)) {
           message.warning('Hết thời gian chờ định vị GPS. Vui lòng thử lại.');
         } else {
@@ -551,7 +552,41 @@ export default function AddressModal({
     }
   };
 
-  // Lắng nghe thay đổi trạng thái quyền vị trí từ trình duyệt theo thời gian thực
+  // Tự động phát hiện khi người dùng vừa gạt bật quyền vị trí trên trình duyệt
+  // Hoạt động tức thời (0.5s polling + window focus) mà KHÔNG CẦN TẢI LẠI TRANG FRONTEND
+  useEffect(() => {
+    if (!showLocationPointer) return;
+    let isDisposed = false;
+
+    const checkGranted = async () => {
+      if (typeof navigator === 'undefined' || !('permissions' in navigator)) return;
+      try {
+        const permStatus = await navigator.permissions.query({ name: 'geolocation' });
+        if (permStatus.state === 'granted' && !isDisposed) {
+          setIsLocationSwitchOn(true);
+          setShowLocationPointer(false);
+          handleUseCurrentLocation();
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    const onWindowFocus = () => {
+      checkGranted();
+    };
+
+    window.addEventListener('focus', onWindowFocus);
+    const intervalId = setInterval(checkGranted, 500);
+
+    return () => {
+      isDisposed = true;
+      window.removeEventListener('focus', onWindowFocus);
+      clearInterval(intervalId);
+    };
+  }, [showLocationPointer, handleUseCurrentLocation]);
+
+  // Lắng nghe thay đổi trạng thái quyền vị trí từ trình duyệt theo thời gian thực qua Permissions API
   useEffect(() => {
     if (typeof navigator === 'undefined' || !('permissions' in navigator)) return;
     let permObj: PermissionStatus | null = null;
@@ -565,7 +600,7 @@ export default function AddressModal({
         const handlePermChange = () => {
           if (status.state === 'granted') {
             setIsLocationSwitchOn(true);
-            setShowLocationPermissionModal(false);
+            setShowLocationPointer(false);
             handleUseCurrentLocation();
           } else if (status.state === 'denied') {
             setIsLocationSwitchOn(false);
@@ -1166,85 +1201,120 @@ export default function AddressModal({
       </Form>
     </Modal>
 
-    {/* Modal / Hộp thoại hướng dẫn và gạt bật quyền vị trí hiện tại */}
-    <Modal
-      open={showLocationPermissionModal}
-      onCancel={() => setShowLocationPermissionModal(false)}
-      footer={null}
-      centered
-      destroyOnHidden
-      width={480}
-      title={
-        <div className="flex items-center gap-2 text-base font-bold text-gray-900 border-b border-gray-100 pb-3">
-          <Navigation className="w-5 h-5 text-blue-600" />
-          <span>Cấp quyền truy cập vị trí hiện tại</span>
+    {/* Hộp thoại trỏ trực tiếp lên thanh địa chỉ trình duyệt khi chưa bật Location */}
+    {showLocationPointer && (
+      <div
+        role="dialog"
+        aria-label="Hướng dẫn bật quyền vị trí"
+        className="fixed top-2 left-6 z-[99999] w-88 max-w-[calc(100vw-3rem)] animate-in fade-in slide-in-from-top-4 duration-300"
+      >
+        {/* Mũi tên động trỏ thẳng lên biểu tượng Cài đặt / Ổ khóa trên thanh địa chỉ */}
+        <div className="flex items-center gap-2 mb-2 pl-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-xl animate-bounce">
+            <ArrowUp className="w-5 h-5 stroke-[2.5]" />
+          </div>
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 px-3.5 py-1 text-xs font-bold text-white shadow-lg">
+            <span className="h-2 w-2 rounded-full bg-white animate-ping" />
+            <span>Nhấp biểu tượng Cài đặt ở ngay phía trên</span>
+          </div>
         </div>
-      }
-    >
-      <div className="pt-2 space-y-4">
-        {/* Box công tắc gạt bật vị trí */}
-        <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
-                <EnvironmentOutlined className="text-xl" />
+
+        {/* Khung hướng dẫn nổi bật */}
+        <div className="rounded-2xl border-2 border-blue-500 bg-white p-4 shadow-2xl ring-4 ring-blue-100">
+          <div className="flex items-start justify-between gap-2 border-b border-gray-100 pb-2.5">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+                <Navigation className="w-4 h-4" />
               </div>
               <div>
-                <div className="text-sm font-semibold text-gray-900">Vị trí (Location)</div>
-                <div className="text-xs text-gray-500">
-                  Cho phép GreenPhone xác định địa chỉ giao hàng
+                <div className="text-sm font-bold text-gray-900">Cấp quyền truy cập vị trí hiện tại</div>
+                <div className="text-[11px] text-gray-500">Trình duyệt đang chặn định vị GPS</div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowLocationPointer(false)}
+              className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+              aria-label="Đóng hướng dẫn"
+            >
+              <CloseOutlined className="text-xs" />
+            </button>
+          </div>
+
+          {/* Công tắc trực quan trong hộp thoại */}
+          <div className="my-2.5 rounded-xl border border-blue-200 bg-blue-50/70 p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <EnvironmentOutlined className="text-blue-600 text-base" />
+                <div>
+                  <div className="text-xs font-semibold text-gray-900">Vị trí (Location)</div>
+                  <div className="text-[10px] text-gray-500">Bật để tự động điền địa chỉ</div>
+                </div>
+              </div>
+              <Switch
+                checked={isLocationSwitchOn}
+                loading={isLocatingCurrentGps}
+                onChange={handleToggleLocationSwitch}
+                className={isLocationSwitchOn ? '!bg-blue-600' : ''}
+              />
+            </div>
+          </div>
+
+          {/* Mô phỏng trực quan bảng cài đặt trình duyệt như hình chụp của Chrome */}
+          <div className="my-2.5 rounded-xl border border-gray-700 bg-gray-900 p-3 text-white shadow-inner">
+            <div className="flex items-center justify-between text-[11px] text-gray-400 font-mono mb-2">
+              <span>{typeof window !== 'undefined' ? window.location.host : 'localhost:5173'}</span>
+              <span className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] text-blue-300">Biểu tượng góc trái</span>
+            </div>
+            <div className="flex items-center justify-between rounded-lg bg-gray-800 p-2.5 border border-gray-700/80">
+              <div className="flex items-center gap-2">
+                <EnvironmentOutlined className="text-blue-400 text-sm" />
+                <span className="text-xs font-semibold text-gray-100">Location (Vị trí)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-blue-300">Gạt BẬT</span>
+                <div className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-blue-600 transition-colors">
+                  <span className="translate-x-4 pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out" />
                 </div>
               </div>
             </div>
-            <Switch
-              checked={isLocationSwitchOn}
+          </div>
+
+          {/* Trạng thái lắng nghe tự động (Không cần tải lại trang) */}
+          <div className="rounded-xl border border-blue-200 bg-blue-50/80 p-2.5 text-xs text-blue-900 mb-3 space-y-1">
+            <div className="flex items-center gap-1.5 font-semibold text-blue-800">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
+              </span>
+              <span>Tự động nhận diện (Không cần tải lại trang):</span>
+            </div>
+            <p className="text-[11px] text-gray-600 leading-relaxed pl-3.5">
+              Ngay khi bạn gạt bật mục <strong>Location</strong> trên trình duyệt, hệ thống sẽ tự động ghim vị trí và điền địa chỉ ngay lập tức mà không cần F5 hay tải lại trang.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-1 border-t border-gray-100">
+            <Button
+              size="small"
+              onClick={() => setShowLocationPointer(false)}
+              className="!rounded-lg text-xs"
+            >
+              Đóng
+            </Button>
+            <Button
+              size="small"
+              type="primary"
               loading={isLocatingCurrentGps}
-              onChange={handleToggleLocationSwitch}
-              className={isLocationSwitchOn ? '!bg-blue-600' : ''}
-            />
+              onClick={() => handleUseCurrentLocation()}
+              className="!rounded-lg !bg-blue-600 hover:!bg-blue-700 text-xs font-semibold"
+            >
+              Thử lại ngay
+            </Button>
           </div>
-        </div>
-
-        {/* Hướng dẫn thao tác khi trình duyệt đã chặn quyền ở cấp độ cài đặt trang web */}
-        <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 text-xs text-amber-900 space-y-2">
-          <div className="font-semibold flex items-center gap-1.5 text-amber-800">
-            <InfoCircleOutlined className="text-amber-600" />
-            <span>Nếu công tắc chưa bật được, hãy bật trên trình duyệt:</span>
-          </div>
-          <ol className="list-decimal list-inside space-y-1.5 text-gray-700 pl-1 leading-relaxed">
-            <li>
-              Nhấp vào biểu tượng <strong>Cài đặt trang web / Ổ khóa</strong> bên trái thanh địa chỉ{' '}
-              <code className="rounded bg-white px-1.5 py-0.5 border border-amber-200 font-mono text-amber-900">
-                {typeof window !== 'undefined' ? window.location.host : 'localhost:5173'}
-              </code>
-            </li>
-            <li>
-              Tìm mục <strong>Location (Vị trí)</strong> và <strong>gạt công tắc sang trạng thái BẬT</strong>.
-            </li>
-            <li>
-              Sau khi bật xong, quay lại đây gạt công tắc ở trên hoặc bấm nút <strong>"Thử lại định vị"</strong>.
-            </li>
-          </ol>
-        </div>
-
-        <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
-          <Button
-            onClick={() => setShowLocationPermissionModal(false)}
-            className="!rounded-xl text-xs"
-          >
-            Đóng
-          </Button>
-          <Button
-            type="primary"
-            loading={isLocatingCurrentGps}
-            onClick={() => handleUseCurrentLocation()}
-            className="!rounded-xl !bg-blue-600 hover:!bg-blue-700 text-xs font-medium"
-          >
-            Thử lại định vị
-          </Button>
         </div>
       </div>
-    </Modal>
+    )}
   </>
 );
 }
