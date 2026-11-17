@@ -87,17 +87,31 @@ class AuthServiceTest {
         when(authMapper.toEntity(registerReq)).thenReturn(testUser);
         when(passwordEncoder.encode(anyString())).thenReturn("encoded");
         when(userRepository.save(any(User.class))).thenReturn(testUser);
-        when(jwtTokenProvider.generateToken(any())).thenReturn("jwt_token_xyz");
-        when(jwtConfig.getExpiration()).thenReturn(86400000L);
-        when(authMapper.toAuthResponse(any(), anyString(), anyString(), anyLong()))
-                .thenReturn(new AuthResponse(1L, "", "refresh_xyz", "Test User", "test@example.com", "CUSTOMER", 86400000L));
+        when(authMapper.toAuthResponse(any(), isNull(), isNull(), eq(0L)))
+                .thenReturn(new AuthResponse(1L, null, null, "Test User", "test@example.com", "CUSTOMER", 0L));
 
         AuthResponse r = authService.register(registerReq);
 
         assertThat(r.getEmail()).isEqualTo("test@example.com");
+        assertThat(testUser.getStatus()).isEqualTo("UNVERIFIED");
         verify(valueOperations).set(eq("otp:test@example.com"), anyString(), eq(Duration.ofMinutes(5)));
         verify(redisTemplate).delete("otp_attempts:test@example.com");
         verify(emailService).sendOTP(eq("test@example.com"), anyString());
+    }
+
+    @Test void register_SetsUserStatusToUnverified() {
+        when(redisTemplate.hasKey("otp_lock:test@example.com")).thenReturn(false);
+        when(userRepository.existsByEmail(registerReq.getEmail())).thenReturn(false);
+        when(roleRepository.findByName(RoleName.CUSTOMER.name())).thenReturn(Optional.of(customerRole));
+        when(authMapper.toEntity(registerReq)).thenReturn(testUser);
+        when(passwordEncoder.encode(anyString())).thenReturn("encoded");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(authMapper.toAuthResponse(any(), isNull(), isNull(), eq(0L)))
+                .thenReturn(new AuthResponse(1L, null, null, "Test User", "test@example.com", "CUSTOMER", 0L));
+
+        authService.register(registerReq);
+
+        assertThat(testUser.getStatus()).isEqualTo("UNVERIFIED");
     }
 
     @Test void register_AccountLocked() {
@@ -125,10 +139,8 @@ class AuthServiceTest {
         when(authMapper.toEntity(registerReq)).thenReturn(testUser);
         when(passwordEncoder.encode(anyString())).thenReturn("hashed");
         when(userRepository.save(any())).thenReturn(testUser);
-        when(jwtTokenProvider.generateToken(any())).thenReturn("jwt_token_xyz");
-        when(jwtConfig.getExpiration()).thenReturn(86400000L);
-        when(authMapper.toAuthResponse(any(), anyString(), anyString(), anyLong()))
-                .thenReturn(new AuthResponse(1L, "", "refresh_xyz", "", "", 0L));
+        when(authMapper.toAuthResponse(any(), isNull(), isNull(), eq(0L)))
+                .thenReturn(new AuthResponse(1L, null, null, "", "", 0L));
 
         authService.register(registerReq);
 

@@ -13,19 +13,20 @@ import lombok.*;
 @Builder
 public class RegisterRequest {
 
-    @NotBlank(message = "Full name is required")
-    @Size(min = 2, max = 100, message = "Full name must be 2-100 characters")
+    @NotBlank(message = "Họ và tên không được để trống")
+    @Size(min = 2, max = 50, message = "Họ và tên phải từ 2 đến 50 ký tự")
     private String fullName;
 
-    @NotBlank(message = "Email is required")
-    @Email(message = "Invalid email format")
+    @NotBlank(message = "Email không được để trống")
+    @Email(message = "Định dạng email không hợp lệ")
+    @Size(max = 100, message = "Email không được vượt quá 100 ký tự")
     private String email;
 
-    @NotBlank(message = "Password is required")
-    @Size(min = 6, max = 50, message = "Password must be 6-50 characters")
+    @NotBlank(message = "Mật khẩu không được để trống")
+    @Size(min = 6, max = 64, message = "Mật khẩu phải từ 6 đến 64 ký tự")
     private String password;
 
-    @NotBlank(message = "Phone is required")
-    @Pattern(regexp = "^0\\d{9,10}$", message = "Invalid phone number")
+    @NotBlank(message = "Số điện thoại không được để trống")
+    @Pattern(regexp = "^(0|\\+84)(3|5|7|8|9)[0-9]{8}$", message = "Số điện thoại không hợp lệ (gồm 10 số, bắt đầu bằng 03, 05, 07, 08, 09 hoặc +84)")
     private String phone;
 }

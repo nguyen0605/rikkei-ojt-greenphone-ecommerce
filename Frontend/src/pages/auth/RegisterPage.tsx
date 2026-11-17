@@ -112,11 +112,14 @@ export default function RegisterPage() {
           name="fullName"
           rules={[
             { required: true, message: 'Vui lòng nhập họ tên' },
+            { whitespace: true, message: 'Họ tên không được chỉ chứa khoảng trắng' },
             { min: 2, message: 'Họ tên phải có ít nhất 2 ký tự' },
+            { max: 50, message: 'Họ tên không được vượt quá 50 ký tự' },
           ]}
         >
           <Input
             size="large"
+            maxLength={50}
             prefix={<User className="h-4 w-4 text-gray-400" />}
             placeholder="Nguyễn Văn A"
             className="!h-12 !rounded-xl"
@@ -129,10 +132,12 @@ export default function RegisterPage() {
           rules={[
             { required: true, message: 'Vui lòng nhập email' },
             { type: 'email', message: 'Email không hợp lệ' },
+            { max: 100, message: 'Email không được vượt quá 100 ký tự' },
           ]}
         >
           <Input
             size="large"
+            maxLength={100}
             prefix={<Mail className="h-4 w-4 text-gray-400" />}
             placeholder="example@gmail.com"
             className="!h-12 !rounded-xl"
@@ -146,13 +151,14 @@ export default function RegisterPage() {
           rules={[
             { required: true, message: 'Vui lòng nhập số điện thoại' },
             {
-              pattern: /^(0|\+84)\d{9,10}$/,
-              message: 'Số điện thoại không hợp lệ',
+              pattern: /^(0|\+84)(3|5|7|8|9)[0-9]{8}$/,
+              message: 'Số điện thoại không hợp lệ (10 số, bắt đầu bằng 03, 05, 07, 08, 09 hoặc +84)',
             },
           ]}
         >
           <Input
             size="large"
+            maxLength={12}
             prefix={<Phone className="h-4 w-4 text-gray-400" />}
             placeholder="0901234567"
             className="!h-12 !rounded-xl"
@@ -166,6 +172,7 @@ export default function RegisterPage() {
           rules={[
             { required: true, message: 'Vui lòng nhập mật khẩu' },
             { min: 6, message: 'Mật khẩu phải có ít nhất 6 ký tự' },
+            { max: 64, message: 'Mật khẩu không được vượt quá 64 ký tự' },
           ]}
           extra={
             showStrength ? <PasswordStrength password={password} /> : null
@@ -173,6 +180,7 @@ export default function RegisterPage() {
         >
           <Input
             size="large"
+            maxLength={64}
             prefix={<Lock className="h-4 w-4 text-gray-400" />}
             type={showPassword ? 'text' : 'password'}
             placeholder="Nhập mật khẩu"
@@ -215,6 +223,7 @@ export default function RegisterPage() {
         >
           <Input
             size="large"
+            maxLength={64}
             prefix={<Lock className="h-4 w-4 text-gray-400" />}
             type={showConfirm ? 'text' : 'password'}
             placeholder="Nhập lại mật khẩu"

@@ -79,7 +79,7 @@ public class AuthService {
         User user = authMapper.toEntity(request);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(customerRole);
-        user.setStatus("ACTIVE"); // simplified flow
+        user.setStatus("UNVERIFIED");
 
         User saved = userRepository.save(user);
 
@@ -90,9 +90,8 @@ public class AuthService {
         log.info("[OTP] Generated verification code for {}: {}", saved.getEmail(), otp);
         emailService.sendOTP(saved.getEmail(), otp);
 
-        String token = jwtTokenProvider.generateToken(UserPrincipal.create(saved));
-        String refreshToken = createAndStoreRefreshToken(saved.getId());
-        return authMapper.toAuthResponse(saved, token, refreshToken, jwtConfig.getExpiration());
+        // Do not generate active session tokens until email OTP is verified
+        return authMapper.toAuthResponse(saved, null, null, 0L);
     }
 
     // ===== LOGIN =====
