@@ -12,6 +12,7 @@ import com.re.greenphone.mapper.ReviewMapper;
 import com.re.greenphone.repository.OrderDetailRepository;
 import com.re.greenphone.repository.OrderRepository;
 import com.re.greenphone.repository.PhoneRepository;
+import com.re.greenphone.repository.ReviewImageRepository;
 import com.re.greenphone.repository.ReviewRepository;
 import com.re.greenphone.repository.UserRepository;
 import com.re.greenphone.security.SecurityUtils;
@@ -42,11 +43,13 @@ class ReviewServiceTest {
 
     @Mock private OrderDetailRepository orderDetailRepository;
     @Mock private ReviewRepository reviewRepository;
+    @Mock private ReviewImageRepository reviewImageRepository;
     @Mock private PhoneRepository phoneRepository;
     @Mock private UserRepository userRepository;
     @Mock private OrderRepository orderRepository;
     @Mock private OrderMapper orderMapper;
     @Mock private ReviewMapper reviewMapper;
+    @Mock private R2StorageService r2StorageService;
 
     @InjectMocks
     private ReviewService reviewService;
@@ -377,5 +380,93 @@ class ReviewServiceTest {
         assertThat(distribution.get(3)).isEqualTo(0L);
         assertThat(distribution.get(4)).isEqualTo(0L);
         assertThat(distribution.get(5)).isEqualTo(0L);
+    }
+
+    @Test
+    void createReview_Success_WithImages() {
+        try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
+            mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+            when(orderDetailRepository.findById(30L)).thenReturn(Optional.of(testOrderDetail));
+            when(reviewRepository.existsByOrderDetailId(30L)).thenReturn(false);
+            when(reviewRepository.existsByOrderIdAndPhoneId(100L, 10L)).thenReturn(false);
+
+            validReviewReq.setImages(List.of("https://pub-r2.dev/img1.webp", "https://pub-r2.dev/img2.webp"));
+
+            when(reviewRepository.save(any(Review.class))).thenAnswer(invocation -> {
+                Review saved = invocation.getArgument(0);
+                saved.setId(40L);
+                return saved;
+            });
+
+            ReviewDTO dto = new ReviewDTO();
+            dto.setId(40L);
+            dto.setImages(List.of("https://pub-r2.dev/img1.webp", "https://pub-r2.dev/img2.webp"));
+            when(reviewMapper.toDto(any(Review.class))).thenReturn(dto);
+
+            ReviewDTO result = reviewService.createReview(validReviewReq);
+
+            assertThat(result).isNotNull();
+            assertThat(result.getImages()).hasSize(2);
+            verify(reviewRepository).save(argThat(r -> r.getImages().size() == 2 &&
+                    r.getImages().get(0).getImageUrl().equals("https://pub-r2.dev/img1.webp") &&
+                    r.getImages().get(0).getSortOrder() == 0 &&
+                    r.getImages().get(1).getImageUrl().equals("https://pub-r2.dev/img2.webp") &&
+                    r.getImages().get(1).getSortOrder() == 1));
+        }
+    }
+
+    @Test
+    void createReview_ExceedMaxImages_ThrowsBadRequest() {
+        try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
+            mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+            when(orderDetailRepository.findById(30L)).thenReturn(Optional.of(testOrderDetail));
+            when(reviewRepository.existsByOrderDetailId(30L)).thenReturn(false);
+            when(reviewRepository.existsByOrderIdAndPhoneId(100L, 10L)).thenReturn(false);
+
+            validReviewReq.setImages(List.of(
+                    "https://r2.dev/1.jpg",
+                    "https://r2.dev/2.jpg",
+                    "https://r2.dev/3.jpg",
+                    "https://r2.dev/4.jpg",
+                    "https://r2.dev/5.jpg",
+                    "https://r2.dev/6.jpg"
+            ));
+
+            assertThatThrownBy(() -> reviewService.createReview(validReviewReq))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("tối đa 5 hình ảnh");
+
+            verify(reviewRepository, never()).save(any());
+        }
+    }
+
+    @Test
+    void deleteReview_DeletesR2Images_Success() {
+        try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
+            mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+
+            Review reviewWithImages = Review.builder()
+                    .user(testUser)
+                    .phone(testPhone)
+                    .rating(5)
+                    .content("Phone with images")
+                    .build();
+            reviewWithImages.setId(40L);
+
+            ReviewImage img1 = ReviewImage.builder().imageUrl("https://r2.dev/pic1.webp").review(reviewWithImages).sortOrder(0).build();
+            ReviewImage img2 = ReviewImage.builder().imageUrl("https://r2.dev/pic2.webp").review(reviewWithImages).sortOrder(1).build();
+            reviewWithImages.addImage(img1);
+            reviewWithImages.addImage(img2);
+
+            when(reviewRepository.findById(40L)).thenReturn(Optional.of(reviewWithImages));
+
+            reviewService.deleteReview(40L);
+
+            verify(r2StorageService).deleteImage("https://r2.dev/pic1.webp");
+            verify(r2StorageService).deleteImage("https://r2.dev/pic2.webp");
+            verify(reviewRepository).delete(reviewWithImages);
+        }
     }
 }

@@ -11,12 +11,14 @@ import com.re.greenphone.entity.Order;
 import com.re.greenphone.entity.OrderDetail;
 import com.re.greenphone.entity.Phone;
 import com.re.greenphone.entity.Review;
+import com.re.greenphone.entity.ReviewImage;
 import com.re.greenphone.entity.User;
 import com.re.greenphone.mapper.OrderMapper;
 import com.re.greenphone.mapper.ReviewMapper;
 import com.re.greenphone.repository.OrderDetailRepository;
 import com.re.greenphone.repository.OrderRepository;
 import com.re.greenphone.repository.PhoneRepository;
+import com.re.greenphone.repository.ReviewImageRepository;
 import com.re.greenphone.repository.ReviewRepository;
 import com.re.greenphone.repository.UserRepository;
 import com.re.greenphone.security.SecurityUtils;
@@ -42,11 +44,13 @@ public class ReviewService {
 
     private final OrderDetailRepository orderDetailRepository;
     private final ReviewRepository reviewRepository;
+    private final ReviewImageRepository reviewImageRepository;
     private final PhoneRepository phoneRepository;
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
     private final OrderMapper orderMapper;
     private final ReviewMapper reviewMapper;
+    private final R2StorageService r2StorageService;
 
     public PageResponse<ReviewDTO> getReviewsByPhoneId(Long phoneId, PageRequest pageRequest) {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(
@@ -157,6 +161,10 @@ public class ReviewService {
             throw new BadRequestException("Đơn hàng này đã được đánh giá cho sản phẩm này.");
         }
 
+        if (request.getImages() != null && request.getImages().size() > 5) {
+            throw new BadRequestException("Chỉ được tải lên tối đa 5 hình ảnh cho mỗi đánh giá.");
+        }
+
         Review review = Review.builder()
                 .user(user)
                 .phone(phone)
@@ -164,7 +172,22 @@ public class ReviewService {
                 .rating(request.getRating())
                 .content(request.getContent())
                 .status("APPROVED")
+                .images(new java.util.ArrayList<>())
                 .build();
+
+        if (request.getImages() != null && !request.getImages().isEmpty()) {
+            int sortOrder = 0;
+            for (String imgUrl : request.getImages()) {
+                if (imgUrl != null && !imgUrl.trim().isEmpty()) {
+                    ReviewImage reviewImage = ReviewImage.builder()
+                            .review(review)
+                            .imageUrl(imgUrl.trim())
+                            .sortOrder(sortOrder++)
+                            .build();
+                    review.addImage(reviewImage);
+                }
+            }
+        }
 
         review = reviewRepository.save(review);
         reviewRepository.flush();
@@ -183,6 +206,28 @@ public class ReviewService {
 
         review.setRating(request.getRating());
         review.setContent(request.getContent());
+        if (request.getImages() != null) {
+            if (request.getImages().size() > 5) {
+                throw new BadRequestException("Chỉ được tải lên tối đa 5 hình ảnh cho mỗi đánh giá.");
+            }
+
+            if (review.getImages() != null) {
+                review.getImages().clear();
+            } else {
+                review.setImages(new java.util.ArrayList<>());
+            }
+            int sortOrder = 0;
+            for (String imgUrl : request.getImages()) {
+                if (imgUrl != null && !imgUrl.trim().isEmpty()) {
+                    ReviewImage reviewImage = ReviewImage.builder()
+                            .review(review)
+                            .imageUrl(imgUrl.trim())
+                            .sortOrder(sortOrder++)
+                            .build();
+                    review.addImage(reviewImage);
+                }
+            }
+        }
         review = reviewRepository.save(review);
         return reviewMapper.toDto(review);
     }
@@ -196,13 +241,27 @@ public class ReviewService {
             throw new BadRequestException("Cannot delete another user's review");
         }
 
+        // Xóa các file ảnh trên Cloudflare R2
+        if (review.getImages() != null && !review.getImages().isEmpty()) {
+            for (ReviewImage img : review.getImages()) {
+                if (img.getImageUrl() != null && !img.getImageUrl().isBlank()) {
+                    try {
+                        r2StorageService.deleteImage(img.getImageUrl());
+                    } catch (Exception e) {
+                        log.warn("Không thể xóa ảnh R2: {}", img.getImageUrl(), e);
+                    }
+                }
+            }
+        }
+
         reviewRepository.delete(review);
     }
 
     public PageResponse<ReviewDTO> getMyReviews(PageRequest pageRequest) {
         Long userId = SecurityUtils.getCurrentUserId();
         Pageable pageable = org.springframework.data.domain.PageRequest.of(
-                pageRequest.getPage(), pageRequest.getSize());
+                pageRequest.getPage(), pageRequest.getSize(),
+                Sort.by(Sort.Direction.DESC, "createdAt"));
 
         Page<Review> page = reviewRepository.findByUserId(userId, pageable);
         List<ReviewDTO> dtos = reviewMapper.toDtoList(page.getContent());

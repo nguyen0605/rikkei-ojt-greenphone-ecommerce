@@ -15,9 +15,12 @@ public class ReviewDTO {
     private Long userId;
     private String userName;
     private Long phoneId;
+    private String phoneName;
+    private String phoneImage;
     private Long orderDetailId;
     private Integer rating;
     private String content;
     private String status;
     private LocalDateTime createdAt;
+    private java.util.List<String> images;
 }
