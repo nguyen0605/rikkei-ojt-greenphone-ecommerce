@@ -206,7 +206,7 @@ export default function CheckoutDeliveryMap({
     const { lat, lng, displayName } = selectedLocation;
     const popupContent = `
       <div style="font-family: inherit; font-size: 12px; line-height: 1.4; min-width: 140px;">
-        <div style="font-weight: 600; color: #15803d; margin-bottom: 2px;">📍 Vị trí nhận hàng</div>
+        <div style="font-weight: 600; color: #15803d; margin-bottom: 2px;">Vị trí nhận hàng</div>
         <div style="color: #4b5563; font-size: 11px;">${displayName || `${lat.toFixed(4)}, ${lng.toFixed(4)}`}</div>
         <div style="color: #9ca3af; font-size: 10px; margin-top: 4px;">Kéo ghim hoặc bấm bản đồ để đổi vị trí</div>
       </div>

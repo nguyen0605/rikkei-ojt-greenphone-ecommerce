@@ -195,6 +195,58 @@ describe('checkoutGeocodingService', () => {
       });
       expect(res).toBeNull();
     });
+
+    it('rejects result from a different province (e.g. Dong Nai when target is TP. Ho Chi Minh)', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          features: [
+            {
+              geometry: { coordinates: [106.8796, 10.7868] },
+              properties: {
+                street: 'Xã Long An',
+                district: 'Long Thành',
+                city: 'Đồng Nai',
+                country: 'Việt Nam',
+              },
+            },
+          ],
+        }),
+      } as any);
+
+      const res = await geocodeInitialAddress('long an cau giay, TP. Hồ Chí Minh', {
+        streetAddress: 'long an cau giay',
+        district: 'Thủ Đức',
+        province: 'TP. Hồ Chí Minh',
+      });
+      expect(res).toBeNull();
+    });
+
+    it('rejects multi-word street mismatch where only a single token matches', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          features: [
+            {
+              geometry: { coordinates: [106.7537, 10.8494] },
+              properties: {
+                street: 'Đường Thăng Long',
+                district: 'Thủ Đức',
+                city: 'TP. Hồ Chí Minh',
+                country: 'Việt Nam',
+              },
+            },
+          ],
+        }),
+      } as any);
+
+      const res = await geocodeInitialAddress('long an cau giay, Thủ Đức, TP. Hồ Chí Minh', {
+        streetAddress: 'long an cau giay',
+        district: 'Thủ Đức',
+        province: 'TP. Hồ Chí Minh',
+      });
+      expect(res).toBeNull();
+    });
   });
 
   describe('KNOWN_VN_LOCATIONS integrity', () => {

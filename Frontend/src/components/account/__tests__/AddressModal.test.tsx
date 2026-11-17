@@ -153,8 +153,8 @@ describe('AddressModal', () => {
 
     await user.type(screen.getByPlaceholderText('Nguyễn Văn A'), 'Phạm Thị D');
     await user.type(screen.getByPlaceholderText('0912345678'), '0912345678');
-    await user.type(screen.getAllByPlaceholderText('Quận / Huyện')[0], 'Cầu Giấy');
-    await user.type(screen.getAllByPlaceholderText('Phường / Xã')[0], 'Dịch Vọng');
+    await user.type(screen.getAllByPlaceholderText(/Quận \/ Huyện/i)[0], 'Cầu Giấy');
+    await user.type(screen.getAllByPlaceholderText(/Phường \/ Xã/i)[0], 'Dịch Vọng');
     await user.type(
       screen.getByPlaceholderText(/Số 123 Đường Cầu Giấy/i),
       'Số 50 Đường Cầu Giấy'
@@ -192,8 +192,8 @@ describe('AddressModal', () => {
 
     await user.type(screen.getByPlaceholderText('Nguyễn Văn A'), 'Trần Văn C');
     await user.type(screen.getByPlaceholderText('0912345678'), '0988776655');
-    await user.type(screen.getAllByPlaceholderText('Quận / Huyện')[0], 'Ba Đình');
-    await user.type(screen.getAllByPlaceholderText('Phường / Xã')[0], 'Kim Mã');
+    await user.type(screen.getAllByPlaceholderText(/Quận \/ Huyện/i)[0], 'Ba Đình');
+    await user.type(screen.getAllByPlaceholderText(/Phường \/ Xã/i)[0], 'Kim Mã');
     await user.type(
       screen.getByPlaceholderText(/Số 123 Đường Cầu Giấy/i),
       'Tòa nhà Capital Tower, 109 Trần Hưng Đạo'
@@ -222,8 +222,8 @@ describe('AddressModal', () => {
 
     await user.type(screen.getByPlaceholderText('Nguyễn Văn A'), 'Người Dùng Test');
     await user.type(screen.getByPlaceholderText('0912345678'), '0912345678');
-    await user.type(screen.getAllByPlaceholderText('Quận / Huyện')[0], 'Cầu Giấy');
-    await user.type(screen.getAllByPlaceholderText('Phường / Xã')[0], 'Dịch Vọng');
+    await user.type(screen.getAllByPlaceholderText(/Quận \/ Huyện/i)[0], 'Cầu Giấy');
+    await user.type(screen.getAllByPlaceholderText(/Phường \/ Xã/i)[0], 'Dịch Vọng');
     await user.type(
       screen.getByPlaceholderText(/Số 123 Đường Cầu Giấy/i),
       'dâdadada địa chỉ không tồn tại'
@@ -234,7 +234,7 @@ describe('AddressModal', () => {
 
     await waitFor(() => {
       expect(
-        screen.getAllByText('Địa chỉ không tồn tại trên bản đồ. Vui lòng kiểm tra lại địa chỉ hoặc chọn vị trí trên bản đồ.').length
+        screen.getAllByText('Địa chỉ không tồn tại trên bản đồ hoặc không thuộc khu vực đã chọn. Vui lòng kiểm tra lại địa chỉ hoặc chọn vị trí trên bản đồ.').length
       ).toBeGreaterThan(0);
     });
 
@@ -248,8 +248,8 @@ describe('AddressModal', () => {
 
     render(<AddressModal open={true} onCancel={vi.fn()} onSubmit={vi.fn()} />);
 
-    await user.type(screen.getAllByPlaceholderText('Quận / Huyện')[0], 'Cầu Giấy');
-    await user.type(screen.getAllByPlaceholderText('Phường / Xã')[0], 'Dịch Vọng');
+    await user.type(screen.getAllByPlaceholderText(/Quận \/ Huyện/i)[0], 'Cầu Giấy');
+    await user.type(screen.getAllByPlaceholderText(/Phường \/ Xã/i)[0], 'Dịch Vọng');
     await user.type(
       screen.getByPlaceholderText(/Số 123 Đường Cầu Giấy/i),
       'dâdadada địa chỉ ảo'
@@ -293,5 +293,28 @@ describe('AddressModal', () => {
       expect(screen.getByDisplayValue('Cầu Giấy')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Dịch Vọng')).toBeInTheDocument();
     });
+  });
+
+  it('blocks submission and shows error if district does not belong to selected province', async () => {
+    const user = userEvent.setup();
+    const handleSubmit = vi.fn().mockResolvedValue(undefined);
+
+    render(<AddressModal open={true} onCancel={vi.fn()} onSubmit={handleSubmit} />);
+
+    // Default province is Hà Nội
+    await user.type(screen.getByPlaceholderText('Nguyễn Văn A'), 'Test User');
+    await user.type(screen.getByPlaceholderText('0912345678'), '0912345678');
+    // Type a district that belongs to TP.HCM, not Hà Nội
+    await user.type(screen.getAllByPlaceholderText(/Quận \/ Huyện/i)[0], 'Quận 1');
+    await user.type(screen.getAllByPlaceholderText(/Phường \/ Xã/i)[0], 'Bến Nghé');
+    await user.type(screen.getByPlaceholderText(/Số 123 Đường Cầu Giấy/i), '123 Đường Lê Lợi');
+
+    const submitBtn = screen.getByRole('button', { name: 'Thêm địa chỉ' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/"Quận 1" không thuộc Hà Nội/i)).toBeInTheDocument();
+    });
+    expect(handleSubmit).not.toHaveBeenCalled();
   });
 });

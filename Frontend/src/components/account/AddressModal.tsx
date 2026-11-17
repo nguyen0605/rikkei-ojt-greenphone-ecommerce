@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback, useRef, lazy, Suspense } from 'react';
-import { Modal, Form, Input, Select, Checkbox, Button, Radio, Tag, message } from 'antd';
+import { useEffect, useState, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
+import { Modal, Form, Input, Select, AutoComplete, Checkbox, Button, Radio, Tag, message } from 'antd';
 import {
   UserOutlined,
   PhoneOutlined,
@@ -11,6 +11,12 @@ import {
 } from '@ant-design/icons';
 import { Sparkles, MapPin, Home, Building2, Users, Navigation } from 'lucide-react';
 import { VIETNAM_PROVINCES, findMatchingProvince, parseAddressComponents } from '@/utils/provinces';
+import {
+  getDistrictsForProvince,
+  getWardsForDistrict,
+  isDistrictInProvince,
+  normalizeAdminName,
+} from '@/utils/vietnamAdministrative';
 import type { LocationCoords } from '@/components/checkout/CheckoutDeliveryMap';
 
 const CheckoutDeliveryMap = lazy(() => import('@/components/checkout/CheckoutDeliveryMap'));
@@ -44,6 +50,7 @@ export default function AddressModal({
 }: AddressModalProps) {
   const [form] = Form.useForm<AddressRequest>();
   const watchedProvince = Form.useWatch('province', form);
+  const watchedDistrict = Form.useWatch('district', form);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
   const [mapValidationError, setMapValidationError] = useState<string | null>(null);
   const [selectedCoords, setSelectedCoords] = useState<LocationCoords | null>(null);
@@ -51,6 +58,34 @@ export default function AddressModal({
   const [isLocatingCurrentGps, setIsLocatingCurrentGps] = useState(false);
   const [isEstimateLocation, setIsEstimateLocation] = useState(false);
   const hasUserOverriddenCoords = useRef(false);
+
+  // Danh sách gợi ý Quận/Huyện tương ứng với Tỉnh/Thành phố đang chọn
+  const districtOptions = useMemo(() => {
+    const list = getDistrictsForProvince(watchedProvince);
+    return list.map((d) => ({ value: d, label: d }));
+  }, [watchedProvince]);
+
+  // Danh sách gợi ý Phường/Xã tương ứng với Quận/Huyện đang chọn
+  const wardOptions = useMemo(() => {
+    const list = getWardsForDistrict(watchedProvince, watchedDistrict);
+    return list.map((w) => ({ value: w, label: w }));
+  }, [watchedProvince, watchedDistrict]);
+
+  // Khi người dùng đổi Tỉnh/Thành, nếu Quận/Huyện cũ không thuộc tỉnh mới thì reset
+  const prevProvinceRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (prevProvinceRef.current && prevProvinceRef.current !== watchedProvince) {
+      const currentDist = form.getFieldValue('district');
+      if (currentDist && !isDistrictInProvince(currentDist, watchedProvince)) {
+        form.setFieldsValue({ district: '', ward: '' });
+      }
+      if (!hasUserOverriddenCoords.current) {
+        setSelectedCoords(null);
+        form.setFieldsValue({ latitude: undefined, longitude: undefined });
+      }
+    }
+    prevProvinceRef.current = watchedProvince;
+  }, [watchedProvince, form]);
 
   // Trạng thái autocomplete cho ô nhập số nhà, tên đường
   const [streetSuggestions, setStreetSuggestions] = useState<AddressSuggestion[]>([]);
@@ -74,8 +109,30 @@ export default function AddressModal({
       if (!trimmedStreet) {
         const emptyMsg = 'Vui lòng nhập số nhà, tên đường hoặc địa chỉ cụ thể trước khi định vị.';
         setMapValidationError(emptyMsg);
+        setSelectedCoords(null);
         if (showToast) {
           message.warning(emptyMsg);
+        }
+        return;
+      }
+
+      // Kiểm tra tính nhất quán giữa Quận/Huyện và Tỉnh/Thành
+      if (
+        district &&
+        province &&
+        getDistrictsForProvince(province).length > 0 &&
+        !isDistrictInProvince(district, province)
+      ) {
+        const errorDistMsg = `Quận/Huyện "${district}" không thuộc ${province}. Vui lòng chọn quận/huyện hợp lệ.`;
+        setMapValidationError(errorDistMsg);
+        setSelectedCoords(null);
+        hasUserOverriddenCoords.current = false;
+        form.setFieldsValue({
+          latitude: undefined,
+          longitude: undefined,
+        });
+        if (showToast) {
+          message.error(errorDistMsg);
         }
         return;
       }
@@ -97,10 +154,31 @@ export default function AddressModal({
           province,
         });
 
-        // QUY TẮC BẮT BUỘC: Nếu địa chỉ nhập vào không có trên bản đồ:
+        // QUY TẮC BẮT BUỘC: Nếu địa chỉ nhập vào không có trên bản đồ hoặc không thuộc khu vực đã chọn:
         // - Tuyệt đối KHÔNG trỏ marker bừa bãi hay fallback về trung tâm quận/tỉnh.
         // - Xóa ghim và hiển thị thông báo lỗi để người dùng kiểm tra hoặc ghim tay.
         if (result && isValidCoordinate(result.lat, result.lng)) {
+          // Xác thực lần nữa: kết quả không được nằm ở tỉnh khác
+          const detected =
+            findMatchingProvince(result.displayName) ||
+            (result.components?.province ? findMatchingProvince(result.components.province) : undefined);
+          if (detected && province && detected !== findMatchingProvince(province)) {
+            setSelectedCoords(null);
+            setIsEstimateLocation(false);
+            hasUserOverriddenCoords.current = false;
+            form.setFieldsValue({
+              latitude: undefined,
+              longitude: undefined,
+            });
+            const errorMsg =
+              'Địa chỉ không tồn tại trên bản đồ hoặc không thuộc khu vực đã chọn. Vui lòng kiểm tra lại!';
+            setMapValidationError(errorMsg);
+            if (showToast) {
+              message.error(errorMsg);
+            }
+            return;
+          }
+
           const coords: LocationCoords = {
             lat: result.lat,
             lng: result.lng,
@@ -115,9 +193,6 @@ export default function AddressModal({
           });
 
           // Tự động kiểm tra và đồng bộ lại Tỉnh/Thành nếu phát hiện không khớp
-          const detected =
-            findMatchingProvince(result.displayName) ||
-            (result.components?.province ? findMatchingProvince(result.components.province) : undefined);
           if (detected && form.getFieldValue('province') !== detected) {
             form.setFieldsValue({ province: detected });
           }
@@ -142,7 +217,7 @@ export default function AddressModal({
             message.success('Đã xác định vị trí và ghim thành công trên bản đồ!');
           }
         } else {
-          // Địa chỉ không có trên bản đồ -> Không trỏ tới chỗ đó
+          // Địa chỉ không có trên bản đồ -> Không trỏ tới chỗ đó, con trỏ ở yên
           setSelectedCoords(null);
           setIsEstimateLocation(false);
           hasUserOverriddenCoords.current = false;
@@ -151,7 +226,7 @@ export default function AddressModal({
             longitude: undefined,
           });
           const errorMsg =
-            'Địa chỉ không tồn tại trên bản đồ. Vui lòng kiểm tra lại số nhà, tên đường hoặc ghim vị trí trên bản đồ.';
+            'Địa chỉ không tồn tại trên bản đồ hoặc không thuộc khu vực đã chọn. Vui lòng kiểm tra lại số nhà, tên đường hoặc ghim vị trí trên bản đồ.';
           setMapValidationError(errorMsg);
           if (showToast) {
             message.error(errorMsg);
@@ -501,7 +576,7 @@ export default function AddressModal({
     // QUY TẮC BẮT BUỘC: Nếu địa chỉ không tồn tại trên bản đồ (không lấy được tọa độ hợp lệ), CHẶN KHÔNG CHO THÊM
     if (typeof lat !== 'number' || typeof lng !== 'number' || !isValidCoordinate(lat, lng)) {
       const errorMsg =
-        'Địa chỉ không tồn tại trên bản đồ. Vui lòng kiểm tra lại địa chỉ hoặc chọn vị trí trên bản đồ.';
+        'Địa chỉ không tồn tại trên bản đồ hoặc không thuộc khu vực đã chọn. Vui lòng kiểm tra lại địa chỉ hoặc chọn vị trí trên bản đồ.';
       setMapValidationError(errorMsg);
       message.error(errorMsg);
       return; // Dừng lại, không thêm được!
@@ -677,17 +752,35 @@ export default function AddressModal({
                   const street = form.getFieldValue('streetAddress') || '';
                   const parsed = parseAddressComponents(street);
                   if ((!val || !val.trim()) && !parsed.district) {
-                    return Promise.reject(new Error('Vui lòng nhập Quận/Huyện'));
+                    return Promise.reject(new Error('Vui lòng chọn hoặc nhập Quận/Huyện'));
                   }
-                  if (val && val.trim().length > 0 && val.trim().length < 2) {
-                    return Promise.reject(new Error('Quận/Huyện tối thiểu 2 ký tự'));
+                  if (val && val.trim().length > 0) {
+                    if (val.trim().length < 2) {
+                      return Promise.reject(new Error('Quận/Huyện tối thiểu 2 ký tự'));
+                    }
+                    const currentProv = form.getFieldValue('province');
+                    const validDistricts = getDistrictsForProvince(currentProv);
+                    if (validDistricts.length > 0 && !isDistrictInProvince(val, currentProv)) {
+                      return Promise.reject(
+                        new Error(`"${val}" không thuộc ${currentProv}. Vui lòng chọn quận/huyện hợp lệ.`)
+                      );
+                    }
                   }
                   return Promise.resolve();
                 },
               },
             ]}
           >
-            <Input size="large" placeholder="Quận / Huyện" className="!rounded-xl" />
+            <AutoComplete
+              className="w-full"
+              options={districtOptions}
+              filterOption={(inputValue, option) =>
+                normalizeAdminName(option?.value).includes(normalizeAdminName(inputValue)) ||
+                (option?.value ?? '').toLowerCase().includes(inputValue.toLowerCase())
+              }
+            >
+              <Input size="large" placeholder="Quận / Huyện" className="!rounded-xl" />
+            </AutoComplete>
           </Form.Item>
 
           {/* Ward */}
@@ -700,7 +793,7 @@ export default function AddressModal({
                   const street = form.getFieldValue('streetAddress') || '';
                   const parsed = parseAddressComponents(street);
                   if ((!val || !val.trim()) && !parsed.ward) {
-                    return Promise.reject(new Error('Vui lòng nhập Phường/Xã'));
+                    return Promise.reject(new Error('Vui lòng chọn hoặc nhập Phường/Xã'));
                   }
                   if (val && val.trim().length > 0 && val.trim().length < 2) {
                     return Promise.reject(new Error('Phường/Xã tối thiểu 2 ký tự'));
@@ -710,7 +803,16 @@ export default function AddressModal({
               },
             ]}
           >
-            <Input size="large" placeholder="Phường / Xã" className="!rounded-xl" />
+            <AutoComplete
+              className="w-full"
+              options={wardOptions}
+              filterOption={(inputValue, option) =>
+                normalizeAdminName(option?.value).includes(normalizeAdminName(inputValue)) ||
+                (option?.value ?? '').toLowerCase().includes(inputValue.toLowerCase())
+              }
+            >
+              <Input size="large" placeholder="Phường / Xã" className="!rounded-xl" />
+            </AutoComplete>
           </Form.Item>
         </div>
 

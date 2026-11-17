@@ -4,6 +4,8 @@
  * Không phụ thuộc Mapbox token, tuân thủ chính sách sử dụng, không bị chặn mạng tại VN.
  */
 
+import { findMatchingProvince } from '@/utils/provinces';
+
 export interface AddressSuggestion {
   id: string;
   place_name: string;
@@ -507,24 +509,33 @@ function extractGeocodeCandidates(
       : '';
 
     if (cleanStreet) {
-      if (ward && district && province) {
-        candidates.push([cleanStreet, ward, district, province].filter(Boolean).join(', '));
-      }
-      if (district && province) {
-        candidates.push([cleanStreet, district, province].filter(Boolean).join(', '));
-      }
-      if (district) {
-        candidates.push([cleanStreet, district].filter(Boolean).join(', '));
-      }
       if (province) {
-        candidates.push([cleanStreet, province].filter(Boolean).join(', '));
-      }
-      candidates.push(cleanStreet);
-      if (streetAddress && streetAddress !== cleanStreet) {
-        if (district) {
-          candidates.push([streetAddress.replace(/[•|]/g, ' ').replace(/\s+/g, ' ').trim(), district].join(', '));
+        if (ward && district) {
+          candidates.push([cleanStreet, ward, district, province].filter(Boolean).join(', '));
         }
-        candidates.push(streetAddress.replace(/[•|]/g, ' ').replace(/\s+/g, ' ').trim());
+        if (district) {
+          candidates.push([cleanStreet, district, province].filter(Boolean).join(', '));
+        }
+        if (ward) {
+          candidates.push([cleanStreet, ward, province].filter(Boolean).join(', '));
+        }
+        candidates.push([cleanStreet, province].filter(Boolean).join(', '));
+      } else {
+        if (ward && district) {
+          candidates.push([cleanStreet, ward, district].filter(Boolean).join(', '));
+        }
+        if (district) {
+          candidates.push([cleanStreet, district].filter(Boolean).join(', '));
+        }
+        candidates.push(cleanStreet);
+      }
+      if (streetAddress && streetAddress !== cleanStreet) {
+        const fullClean = streetAddress.replace(/[•|]/g, ' ').replace(/\s+/g, ' ').trim();
+        if (province) {
+          candidates.push([fullClean, district, province].filter(Boolean).join(', '));
+        } else {
+          candidates.push(fullClean);
+        }
       }
     } else {
       // Chỉ khi người dùng KHÔNG nhập số nhà, tên đường thì mới tìm theo khu vực
@@ -548,11 +559,18 @@ function extractGeocodeCandidates(
     const dist = rawParts.length >= 3 ? rawParts[rawParts.length - 2] : '';
     if (mainStreet) {
       candidates.push([mainStreet, dist, city].filter(Boolean).join(', '));
-      candidates.push(mainStreet);
+      if (!components?.province) {
+        candidates.push(mainStreet);
+      }
     }
   }
 
-  candidates.push(address.replace(/[•|]/g, ' ').replace(/\s+/g, ' ').trim());
+  const cleanRaw = address.replace(/[•|]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (components?.province && !cleanRaw.toLowerCase().includes(components.province.toLowerCase())) {
+    candidates.push(`${cleanRaw}, ${components.province}`);
+  } else {
+    candidates.push(cleanRaw);
+  }
 
   // Deduplicate and filter out empty / too short
   return Array.from(new Set(candidates.filter((c) => c && c.length >= 2)));
@@ -560,7 +578,7 @@ function extractGeocodeCandidates(
 
 /**
  * Kiểm tra xem kết quả geocoding có thực sự tìm thấy tuyến đường / số nhà mà người dùng nhập hay không.
- * Tránh trường hợp dịch vụ bản đồ (như Photon) bỏ qua tên đường rác/không tồn tại và chỉ trả về trung tâm quận/huyện.
+ * Tránh trường hợp dịch vụ bản đồ (như Photon) bỏ qua tên đường không tồn tại và chỉ trả về trung tâm quận/huyện.
  */
 export function isStreetMatched(inputStreet: string, suggestion: AddressSuggestion): boolean {
   if (!inputStreet || !inputStreet.trim()) return true;
@@ -592,13 +610,18 @@ export function isStreetMatched(inputStreet: string, suggestion: AddressSuggesti
   // 3. Kiểm tra các từ khóa đặc trưng của tên đường
   const inputTokens = cleanInput
     .split(/\s+/)
-    .filter((w) => w.length >= 3 && !['duong', 'pho', 'quan', 'huyen', 'phuong'].includes(w));
+    .filter((w) => w.length >= 2 && !['duong', 'pho', 'quan', 'huyen', 'phuong', 'xa', 'thi', 'tran'].includes(w));
 
   if (inputTokens.length > 0) {
-    const hasAnyStreetToken = inputTokens.some((token) => combinedResult.includes(token));
-    if (hasAnyStreetToken) {
-      return true;
+    const matchedTokens = inputTokens.filter((token) => combinedResult.includes(token));
+    if (inputTokens.length === 1) {
+      return inputTokens[0].length >= 3 && matchedTokens.length === 1;
     }
+    // Đối với tên đường nhiều từ khóa (ví dụ "long an cầu giấy" gồm 4 từ khóa)
+    // Bắt buộc phải khớp tối thiểu 75% số từ khóa VÀ tối thiểu 2 từ khóa
+    // Tuyệt đối không chấp nhận chỉ khớp 1 từ đơn lẻ (như từ 'long' trong 'long an cầu giấy')
+    const ratio = matchedTokens.length / inputTokens.length;
+    return ratio >= 0.75 && matchedTokens.length >= 2;
   }
 
   return false;
@@ -619,22 +642,56 @@ export async function geocodeInitialAddress(
   const trimmed = address.trim();
   if (!trimmed || trimmed.length < 2) return null;
 
+  const expectedProv = components?.province ? findMatchingProvince(components.province) : undefined;
   const candidates = extractGeocodeCandidates(trimmed, components);
+
+  // Helper kiểm tra tính hợp lệ và nhất quán của suggestion đối với các thành phần địa chỉ
+  const isSuggestionConsistent = (s: AddressSuggestion): boolean => {
+    if (s.id.startsWith('prompt-')) return false;
+
+    // 1. KIỂM TRA TỈNH/THÀNH PHỐ (Province Consistency Check):
+    if (expectedProv) {
+      const resultProv =
+        findMatchingProvince(s.components?.province) ||
+        findMatchingProvince(s.place_name) ||
+        findMatchingProvince(s.subtitle);
+
+      // Nếu kết quả trả về thuộc một tỉnh/thành phố khác với expectedProv, CHẮC CHẮN LOẠI BỎ!
+      if (resultProv && resultProv !== expectedProv) {
+        return false;
+      }
+
+      // Xác minh thêm: địa chỉ hiển thị hoặc phụ đề phải chứa thông tin tỉnh đã chọn nếu không có resultProv
+      const normExpected = normalizeVietnamese(expectedProv);
+      const normPlace = normalizeVietnamese(s.place_name || '');
+      const normSub = normalizeVietnamese(s.subtitle || '');
+      if (
+        !normPlace.includes(normExpected) &&
+        !normSub.includes(normExpected) &&
+        resultProv !== expectedProv
+      ) {
+        return false;
+      }
+    }
+
+    // 2. KIỂM TRA ĐỊA CHỈ ĐƯỜNG (Street Match):
+    if (components?.streetAddress && !isStreetMatched(components.streetAddress, s)) {
+      return false;
+    }
+
+    return true;
+  };
 
   // 1. Thử tìm kiếm chi tiết qua Photon Autocomplete cho từng ứng viên (từ chi tiết đến tổng quát)
   for (const q of candidates) {
     try {
-      const suggestions = await searchAddressSuggestions(q);
-      const valid = suggestions.find((s) => {
-        if (s.id.startsWith('prompt-')) return false;
-
-        // Nếu người dùng có nhập số nhà/tên đường cụ thể:
-        // Kết quả geocoding bắt buộc phải khớp với streetAddress đó, không được rơi về trung tâm quận/huyện
-        if (components?.streetAddress && !isStreetMatched(components.streetAddress, s)) {
-          return false;
-        }
-        return true;
-      });
+      const focusCoords = expectedProv ? getProvinceCoords(expectedProv) : undefined;
+      const suggestions = await searchAddressSuggestions(
+        q,
+        undefined,
+        focusCoords ? { lat: focusCoords[0], lng: focusCoords[1] } : undefined
+      );
+      const valid = suggestions.find(isSuggestionConsistent);
       if (valid) {
         return {
           lat: valid.lat,
@@ -650,17 +707,14 @@ export async function geocodeInitialAddress(
 
   // 2. Fallback: Nếu mạng lỗi hoặc không tìm thấy qua Photon, quét từ điển địa phương
   for (const q of candidates) {
-    const localMatches = searchLocalDictionary(q, 1);
-    if (localMatches.length > 0) {
-      const match = localMatches[0];
-      if (components?.streetAddress && !isStreetMatched(components.streetAddress, match)) {
-        continue;
-      }
+    const localMatches = searchLocalDictionary(q, 3);
+    const validLocal = localMatches.find(isSuggestionConsistent);
+    if (validLocal) {
       return {
-        lat: match.lat,
-        lng: match.lng,
-        displayName: match.place_name,
-        components: match.components,
+        lat: validLocal.lat,
+        lng: validLocal.lng,
+        displayName: validLocal.place_name,
+        components: validLocal.components,
       };
     }
   }
