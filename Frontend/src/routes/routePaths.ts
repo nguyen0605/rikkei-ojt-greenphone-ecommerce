@@ -23,6 +23,7 @@ export const ROUTES = {
   LOGIN: '/dang-nhap',
   REGISTER: '/dang-ky',
   FORGOT_PASSWORD: '/quen-mat-khau',
+  RESET_PASSWORD: '/dat-lai-mat-khau',
   VERIFY_OTP: '/xac-thuc-otp',
   ADMIN_LOGIN: '/admin/dang-nhap',
   // Customer account

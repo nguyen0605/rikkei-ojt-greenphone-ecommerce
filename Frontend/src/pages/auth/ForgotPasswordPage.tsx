@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   RefreshCw,
 } from 'lucide-react';
+import { ROUTES } from '@/routes/routePaths';
 import authHeroImg from '@/assets/auth_img.jpg';
 import { post } from '@/services/api';
 import { useAuthLayout } from './AuthLayout';
@@ -47,6 +48,7 @@ export default function ForgotPasswordPage() {
       setSentTo(values.email);
       setSubmitted(true);
       message.success('Đã gửi mã OTP đến email của bạn');
+      navigate(`${ROUTES.RESET_PASSWORD}?email=${encodeURIComponent(values.email)}`);
     } catch {
       setError('Không thể gửi yêu cầu. Vui lòng kiểm tra lại email.');
     } finally {
@@ -103,7 +105,7 @@ export default function ForgotPasswordPage() {
               loading={loading}
               className="!h-12 !rounded-full !bg-green-600 !font-semibold hover:!bg-green-700"
             >
-              Gửi link đặt lại
+              Gửi mã xác thực
             </Button>
           </Form>
 
@@ -134,9 +136,9 @@ export default function ForgotPasswordPage() {
               block
               size="large"
               className="!h-12 !rounded-full !bg-green-600 !font-semibold hover:!bg-green-700"
-              onClick={() => navigate('/xac-thuc-otp?email=' + encodeURIComponent(sentTo))}
+              onClick={() => navigate(`${ROUTES.RESET_PASSWORD}?email=${encodeURIComponent(sentTo)}`)}
             >
-              Đi đến xác thực OTP
+              Đi đến đặt lại mật khẩu
             </Button>
             <button
               type="button"
