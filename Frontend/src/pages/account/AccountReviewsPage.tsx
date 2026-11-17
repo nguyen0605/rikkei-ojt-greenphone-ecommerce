@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Rate, Button, Modal, Form, Input, message, Spin, Tag, Tabs } from 'antd';
 import type { UploadFile } from 'antd';
 import { StarOutlined, ShoppingOutlined } from '@ant-design/icons';
+import { Smartphone } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { reviewService } from '@/services';
 import { ReviewImageUpload, ReviewImageLightbox } from '@/components/product/detail';
@@ -205,8 +206,11 @@ export default function AccountReviewsPage() {
       qc.invalidateQueries({ queryKey: ['reviews-eligible'] });
       qc.invalidateQueries({ queryKey: ['my-reviews'] });
       setActiveTab('MY_REVIEWS');
-    } catch {
-      message.error('Không thể gửi đánh giá. Vui lòng thử lại.');
+    } catch (err: unknown) {
+      const errorMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Không thể gửi đánh giá. Vui lòng thử lại.';
+      message.error(errorMsg);
       // Giữ nguyên form, fileList và uploadCacheRef để retry không phải upload lại
     } finally {
       setIsSubmitting(false);
@@ -351,7 +355,7 @@ export default function AccountReviewsPage() {
                           />
                         ) : (
                           <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-50 text-gray-400 border border-gray-100 shrink-0">
-                            📱
+                            <Smartphone className="h-5 w-5 text-gray-400" />
                           </div>
                         )}
                         <div>
@@ -432,7 +436,7 @@ export default function AccountReviewsPage() {
         {target?.detail && (
           <div className="mb-4 mt-2 flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/80 p-3.5">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-sm font-bold text-emerald-700">
-              📱
+              <Smartphone className="h-5 w-5 text-emerald-700" />
             </div>
             <div className="min-w-0 flex-1">
               <h4 className="truncate text-sm font-semibold text-gray-900">
