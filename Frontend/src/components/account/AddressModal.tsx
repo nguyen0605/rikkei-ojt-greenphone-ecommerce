@@ -9,7 +9,7 @@ import {
   CheckCircleOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
-import { Sparkles, MapPin } from 'lucide-react';
+import { Sparkles, MapPin, Home, Building2, Users } from 'lucide-react';
 import { VIETNAM_PROVINCES, findMatchingProvince, parseAddressComponents } from '@/utils/provinces';
 import type { LocationCoords } from '@/components/checkout/CheckoutDeliveryMap';
 
@@ -18,7 +18,7 @@ import {
   geocodeInitialAddress,
   reverseGeocode,
   searchAddressSuggestions,
-  searchLocalDictionary,
+  isValidCoordinate,
   type AddressSuggestion,
 } from '@/components/checkout/checkoutGeocodingService';
 import type { AddressItem, AddressRequest, AddressLabel } from '@/types/api';
@@ -43,6 +43,7 @@ export default function AddressModal({
 }: AddressModalProps) {
   const [form] = Form.useForm<AddressRequest>();
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
+  const [mapValidationError, setMapValidationError] = useState<string | null>(null);
   const [selectedCoords, setSelectedCoords] = useState<LocationCoords | null>(null);
   const [isLocatingAddress, setIsLocatingAddress] = useState(false);
   const [isEstimateLocation, setIsEstimateLocation] = useState(false);
@@ -72,33 +73,28 @@ export default function AddressModal({
       if (queryParts.length === 0) return;
 
       setIsLocatingAddress(true);
+      setMapValidationError(null);
       try {
         const fullQuery = queryParts.join(', ');
-        let result = await geocodeInitialAddress(fullQuery, {
+        const result = await geocodeInitialAddress(fullQuery, {
           streetAddress,
           ward,
           district,
           province,
         });
 
-        // Nếu tìm theo toàn bộ địa chỉ không ra, fallback tìm theo quận/huyện + tỉnh
-        if (!result && (district || province)) {
-          const areaQuery = [district, province].filter(Boolean).join(', ');
-          result = await geocodeInitialAddress(areaQuery);
-          if (result) {
-            setIsEstimateLocation(true);
-          }
-        } else {
-          setIsEstimateLocation(false);
-        }
-
-        if (result) {
+        // QUY TẮC BẮT BUỘC: Nếu địa chỉ nhập vào không có trên bản đồ:
+        // - Tuyệt đối KHÔNG trỏ marker bừa bãi hay fallback về trung tâm quận/tỉnh.
+        // - Xóa ghim và hiển thị thông báo lỗi để người dùng kiểm tra hoặc ghim tay.
+        if (result && isValidCoordinate(result.lat, result.lng)) {
           const coords: LocationCoords = {
             lat: result.lat,
             lng: result.lng,
             displayName: result.displayName,
           };
           setSelectedCoords(coords);
+          setIsEstimateLocation(false);
+          setMapValidationError(null);
           form.setFieldsValue({
             latitude: result.lat,
             longitude: result.lng,
@@ -131,10 +127,21 @@ export default function AddressModal({
           if (showToast) {
             message.success('Đã xác định vị trí và ghim thành công trên bản đồ!');
           }
-        } else if (showToast) {
-          message.warning(
-            'Không tìm thấy tọa độ phù hợp. Bạn có thể bấm trực tiếp trên bản đồ để ghim vị trí.'
-          );
+        } else {
+          // Địa chỉ không có trên bản đồ -> Không trỏ tới chỗ đó
+          setSelectedCoords(null);
+          setIsEstimateLocation(false);
+          hasUserOverriddenCoords.current = false;
+          form.setFieldsValue({
+            latitude: undefined,
+            longitude: undefined,
+          });
+          const errorMsg =
+            'Địa chỉ không tồn tại trên bản đồ. Vui lòng kiểm tra lại số nhà, tên đường hoặc ghim vị trí trên bản đồ.';
+          setMapValidationError(errorMsg);
+          if (showToast) {
+            message.error(errorMsg);
+          }
         }
       } finally {
         setIsLocatingAddress(false);
@@ -146,6 +153,7 @@ export default function AddressModal({
   useEffect(() => {
     if (open) {
       setDuplicateError(null);
+      setMapValidationError(null);
       hasUserOverriddenCoords.current = false;
       queueMicrotask(() => {
         setStreetSuggestions([]);
@@ -232,6 +240,15 @@ export default function AddressModal({
   const handleStreetChange = (query: string) => {
     form.setFieldsValue({ streetAddress: query });
     setFocusedIndex(-1);
+    setMapValidationError(null);
+
+    // Khi người dùng gõ / sửa địa chỉ cụ thể, reset ghim cũ để tránh trỏ sai vị trí
+    hasUserOverriddenCoords.current = false;
+    setSelectedCoords(null);
+    form.setFieldsValue({
+      latitude: undefined,
+      longitude: undefined,
+    });
 
     if (query.trim().length < 2) {
       setStreetSuggestions([]);
@@ -294,7 +311,9 @@ export default function AddressModal({
       lng: s.lng,
       displayName: s.place_name,
     });
+    hasUserOverriddenCoords.current = true;
     setIsEstimateLocation(false);
+    setMapValidationError(null);
     setShowStreetSuggestions(false);
     setStreetSuggestions([]);
     setFocusedIndex(-1);
@@ -327,6 +346,7 @@ export default function AddressModal({
       hasUserOverriddenCoords.current = true;
       setSelectedCoords(coords);
       setIsEstimateLocation(false);
+      setMapValidationError(null);
 
       form.setFieldsValue({
         latitude: coords.lat,
@@ -352,7 +372,7 @@ export default function AddressModal({
     let lng = selectedCoords?.lng ?? values.longitude;
 
     // Nếu vẫn chưa có tọa độ ghim, tự động geocode lần cuối để validate và ghim trước khi lưu
-    if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+    if (typeof lat !== 'number' || typeof lng !== 'number' || !isValidCoordinate(lat, lng)) {
       const fullQuery = [values.streetAddress, values.ward, values.district, values.province]
         .filter(Boolean)
         .join(', ');
@@ -364,24 +384,31 @@ export default function AddressModal({
           province: values.province,
         });
 
-        if (autoGeocode) {
+        if (autoGeocode && isValidCoordinate(autoGeocode.lat, autoGeocode.lng)) {
           lat = autoGeocode.lat;
           lng = autoGeocode.lng;
+          setSelectedCoords({
+            lat: autoGeocode.lat,
+            lng: autoGeocode.lng,
+            displayName: autoGeocode.displayName,
+          });
           const detected = findMatchingProvince(autoGeocode.displayName);
           if (detected && detected !== values.province) {
             values.province = detected;
-          }
-        } else {
-          // Fallback về tọa độ từ điển theo tỉnh/thành
-          const fallback = searchLocalDictionary(values.province || 'Hồ Chí Minh', 1);
-          if (fallback.length > 0) {
-            lat = fallback[0].lat;
-            lng = fallback[0].lng;
           }
         }
       } catch {
         // ignore
       }
+    }
+
+    // QUY TẮC BẮT BUỘC: Nếu địa chỉ không tồn tại trên bản đồ (không lấy được tọa độ hợp lệ), CHẶN KHÔNG CHO THÊM
+    if (typeof lat !== 'number' || typeof lng !== 'number' || !isValidCoordinate(lat, lng)) {
+      const errorMsg =
+        'Địa chỉ không tồn tại trên bản đồ. Vui lòng kiểm tra lại địa chỉ hoặc chọn vị trí trên bản đồ.';
+      setMapValidationError(errorMsg);
+      message.error(errorMsg);
+      return; // Dừng lại, không thêm được!
     }
 
     const parsedFallback = parseAddressComponents(values.streetAddress);
@@ -459,6 +486,15 @@ export default function AddressModal({
           >
             <InfoCircleOutlined className="text-red-500" />
             <span>{duplicateError}</span>
+          </div>
+        )}
+        {mapValidationError && (
+          <div
+            role="alert"
+            className="mb-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50/80 p-3 text-sm font-medium text-red-700"
+          >
+            <InfoCircleOutlined className="text-red-500" />
+            <span>{mapValidationError}</span>
           </div>
         )}
 
@@ -678,16 +714,16 @@ export default function AddressModal({
         >
           <Radio.Group buttonStyle="solid" className="w-full">
             <Radio.Button value="HOME" className="!rounded-l-xl">
-              🏠 Nhà riêng
+              <span className="inline-flex items-center gap-1.5"><Home className="w-3.5 h-3.5" /> Nhà riêng</span>
             </Radio.Button>
             <Radio.Button value="OFFICE">
-              🏢 Văn phòng
+              <span className="inline-flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5" /> Văn phòng</span>
             </Radio.Button>
             <Radio.Button value="FAMILY">
-              👨‍👩‍👧 Người thân
+              <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Người thân</span>
             </Radio.Button>
             <Radio.Button value="OTHER" className="!rounded-r-xl">
-              📍 Khác
+              <span className="inline-flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> Khác</span>
             </Radio.Button>
           </Radio.Group>
         </Form.Item>
@@ -711,7 +747,17 @@ export default function AddressModal({
           </div>
 
           {/* Trạng thái định vị */}
-          {selectedCoords ? (
+          {mapValidationError ? (
+            <div className="mb-2 flex items-center justify-between rounded-lg bg-red-50 px-2.5 py-1.5 text-xs text-red-800 border border-red-200">
+              <div className="flex items-center gap-1.5 truncate">
+                <InfoCircleOutlined className="text-red-600 shrink-0" />
+                <span className="truncate">{mapValidationError}</span>
+              </div>
+              <Tag color="error" className="!mr-0 shrink-0 font-medium">
+                Chưa có trên bản đồ
+              </Tag>
+            </div>
+          ) : selectedCoords ? (
             <div className="mb-2 flex items-center justify-between rounded-lg bg-green-50 px-2.5 py-1.5 text-xs text-green-800 border border-green-200">
               <div className="flex items-center gap-1.5 truncate">
                 <CheckCircleOutlined className="text-green-600 shrink-0" />

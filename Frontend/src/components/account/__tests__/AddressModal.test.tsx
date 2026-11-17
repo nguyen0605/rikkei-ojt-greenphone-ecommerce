@@ -16,6 +16,18 @@ vi.mock('@/components/checkout/checkoutGeocodingService', () => ({
   }),
   searchAddressSuggestions: vi.fn().mockResolvedValue([]),
   reverseGeocode: vi.fn().mockResolvedValue('Cầu Giấy, Hà Nội'),
+  isValidCoordinate: vi.fn().mockImplementation((lat, lng) => {
+    return (
+      typeof lat === 'number' &&
+      typeof lng === 'number' &&
+      Number.isFinite(lat) &&
+      Number.isFinite(lng) &&
+      lat >= -90 &&
+      lat <= 90 &&
+      lng >= -180 &&
+      lng <= 180
+    );
+  }),
   searchLocalDictionary: vi.fn().mockReturnValue([
     {
       id: 'dict-1',
@@ -168,6 +180,57 @@ describe('AddressModal', () => {
           receiverName: 'Trần Văn C',
         })
       );
+    });
+  });
+
+  it('blocks submission and shows error when address does not exist on map', async () => {
+    const user = userEvent.setup();
+    const handleSubmit = vi.fn().mockResolvedValue(undefined);
+    const { geocodeInitialAddress } = await import('@/components/checkout/checkoutGeocodingService');
+    vi.mocked(geocodeInitialAddress).mockResolvedValueOnce(null);
+
+    render(<AddressModal open={true} onCancel={vi.fn()} onSubmit={handleSubmit} />);
+
+    await user.type(screen.getByPlaceholderText('Nguyễn Văn A'), 'Người Dùng Test');
+    await user.type(screen.getByPlaceholderText('0912345678'), '0912345678');
+    await user.type(screen.getAllByPlaceholderText('Quận / Huyện')[0], 'Cầu Giấy');
+    await user.type(screen.getAllByPlaceholderText('Phường / Xã')[0], 'Dịch Vọng');
+    await user.type(
+      screen.getByPlaceholderText(/Số 123 Đường Cầu Giấy/i),
+      'dâdadada địa chỉ không tồn tại'
+    );
+
+    const submitBtn = screen.getByRole('button', { name: 'Thêm địa chỉ' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByText('Địa chỉ không tồn tại trên bản đồ. Vui lòng kiểm tra lại địa chỉ hoặc chọn vị trí trên bản đồ.').length
+      ).toBeGreaterThan(0);
+    });
+
+    expect(handleSubmit).not.toHaveBeenCalled();
+  });
+
+  it('shows error and unpins location when manual locate button finds no address on map', async () => {
+    const user = userEvent.setup();
+    const { geocodeInitialAddress } = await import('@/components/checkout/checkoutGeocodingService');
+    vi.mocked(geocodeInitialAddress).mockResolvedValueOnce(null);
+
+    render(<AddressModal open={true} onCancel={vi.fn()} onSubmit={vi.fn()} />);
+
+    await user.type(screen.getAllByPlaceholderText('Quận / Huyện')[0], 'Cầu Giấy');
+    await user.type(screen.getAllByPlaceholderText('Phường / Xã')[0], 'Dịch Vọng');
+    await user.type(
+      screen.getByPlaceholderText(/Số 123 Đường Cầu Giấy/i),
+      'dâdadada địa chỉ ảo'
+    );
+
+    const locateBtn = screen.getByRole('button', { name: /Định vị từ địa chỉ đã nhập/i });
+    await user.click(locateBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Chưa có trên bản đồ')).toBeInTheDocument();
     });
   });
 });

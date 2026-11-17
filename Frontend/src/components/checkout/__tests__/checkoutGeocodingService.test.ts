@@ -162,10 +162,38 @@ describe('checkoutGeocodingService', () => {
       expect(await geocodeInitialAddress('   ')).toBeNull();
     });
 
-    it('finds initial coords from local dictionary', async () => {
-      const res = await geocodeInitialAddress('Số 45 Cầu Giấy, Hà Nội');
+    it('finds initial coords from local dictionary or Photon when no street components are given', async () => {
+      const res = await geocodeInitialAddress('Quận Cầu Giấy, Hà Nội');
       expect(res).not.toBeNull();
-      expect(res?.lat).toBeCloseTo(21.0362, 2);
+      expect(res?.lat).toBeGreaterThan(20.9);
+      expect(res?.lat).toBeLessThan(21.2);
+    });
+
+    it('returns null when a specific street does not exist on map and does not match dictionary', async () => {
+      // Mock Photon returning only district-level features without the non-existent street
+      vi.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          features: [
+            {
+              geometry: { coordinates: [105.7906, 21.0362] },
+              properties: {
+                district: 'Cầu Giấy',
+                city: 'Hà Nội',
+                country: 'Việt Nam',
+              },
+            },
+          ],
+        }),
+      } as any);
+
+      const res = await geocodeInitialAddress('dâdadada, Phường Dịch Vọng, Quận Cầu Giấy, Hà Nội', {
+        streetAddress: 'dâdadada',
+        ward: 'Dịch Vọng',
+        district: 'Cầu Giấy',
+        province: 'Hà Nội',
+      });
+      expect(res).toBeNull();
     });
   });
 

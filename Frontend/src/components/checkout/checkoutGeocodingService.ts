@@ -168,10 +168,11 @@ export function searchLocalDictionary(query: string, maxResults = 5): AddressSug
   const matches: AddressSuggestion[] = [];
 
   for (const item of KNOWN_VN_LOCATIONS) {
-    const nameMatch = normalizeVietnamese(item.name).includes(normalized);
+    const normName = normalizeVietnamese(item.name);
+    const nameMatch = normName.includes(normalized);
     const keywordMatch = item.keywords.some((kw) => {
       const normKw = normalizeVietnamese(kw);
-      return normKw.includes(normalized) || normalized.includes(normKw);
+      return normKw.includes(normalized);
     });
 
     if (nameMatch || keywordMatch) {
@@ -447,6 +448,9 @@ function extractGeocodeCandidates(
       : '';
 
     if (cleanStreet) {
+      if (ward && district && province) {
+        candidates.push([cleanStreet, ward, district, province].filter(Boolean).join(', '));
+      }
       if (district && province) {
         candidates.push([cleanStreet, district, province].filter(Boolean).join(', '));
       }
@@ -457,18 +461,23 @@ function extractGeocodeCandidates(
         candidates.push([cleanStreet, province].filter(Boolean).join(', '));
       }
       candidates.push(cleanStreet);
-    }
-
-    if (streetAddress && district && streetAddress !== cleanStreet) {
-      candidates.push([streetAddress.replace(/[•|]/g, ' ').replace(/\s+/g, ' ').trim(), district].join(', '));
-    }
-
-    if (ward && district) {
-      candidates.push([ward, district, province].filter(Boolean).join(', '));
-    }
-
-    if (district) {
-      candidates.push([district, province].filter(Boolean).join(', '));
+      if (streetAddress && streetAddress !== cleanStreet) {
+        if (district) {
+          candidates.push([streetAddress.replace(/[•|]/g, ' ').replace(/\s+/g, ' ').trim(), district].join(', '));
+        }
+        candidates.push(streetAddress.replace(/[•|]/g, ' ').replace(/\s+/g, ' ').trim());
+      }
+    } else {
+      // Chỉ khi người dùng KHÔNG nhập số nhà, tên đường thì mới tìm theo khu vực
+      if (ward && district) {
+        candidates.push([ward, district, province].filter(Boolean).join(', '));
+      }
+      if (district) {
+        candidates.push([district, province].filter(Boolean).join(', '));
+      }
+      if (province) {
+        candidates.push(province);
+      }
     }
   }
 
@@ -482,15 +491,58 @@ function extractGeocodeCandidates(
       candidates.push([mainStreet, dist, city].filter(Boolean).join(', '));
       candidates.push(mainStreet);
     }
-    if (dist) {
-      candidates.push([dist, city].filter(Boolean).join(', '));
-    }
   }
 
   candidates.push(address.replace(/[•|]/g, ' ').replace(/\s+/g, ' ').trim());
 
   // Deduplicate and filter out empty / too short
   return Array.from(new Set(candidates.filter((c) => c && c.length >= 2)));
+}
+
+/**
+ * Kiểm tra xem kết quả geocoding có thực sự tìm thấy tuyến đường / số nhà mà người dùng nhập hay không.
+ * Tránh trường hợp dịch vụ bản đồ (như Photon) bỏ qua tên đường rác/không tồn tại và chỉ trả về trung tâm quận/huyện.
+ */
+export function isStreetMatched(inputStreet: string, suggestion: AddressSuggestion): boolean {
+  if (!inputStreet || !inputStreet.trim()) return true;
+
+  const normInput = normalizeVietnamese(inputStreet);
+  if (!normInput) return true;
+
+  const normPlace = normalizeVietnamese(suggestion.place_name || '');
+  const normTitle = normalizeVietnamese(suggestion.title || '');
+  const normStreet = normalizeVietnamese(suggestion.components?.streetAddress || '');
+  const combinedResult = `${normPlace} ${normTitle} ${normStreet}`;
+
+  // 1. Toàn bộ chuỗi người dùng nằm trong kết quả
+  if (combinedResult.includes(normInput)) {
+    return true;
+  }
+
+  // 2. Bỏ qua các tiền tố như số nhà, 'so', 'duong', 'pho', 'ngo', 'hem', 'ngach'
+  const cleanInput = normInput
+    .replace(/^(so|nha|toa|can|so nha)\s+/g, '')
+    .replace(/^[\d\w\/-]+\s+/, '')
+    .replace(/^(duong|pho|ngo|hem|ngach|khu do thi|kdt|ap|thon)\s+/g, '')
+    .trim();
+
+  if (cleanInput.length >= 2 && combinedResult.includes(cleanInput)) {
+    return true;
+  }
+
+  // 3. Kiểm tra các từ khóa đặc trưng của tên đường
+  const inputTokens = cleanInput
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !['duong', 'pho', 'quan', 'huyen', 'phuong'].includes(w));
+
+  if (inputTokens.length > 0) {
+    const hasAnyStreetToken = inputTokens.some((token) => combinedResult.includes(token));
+    if (hasAnyStreetToken) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -514,7 +566,16 @@ export async function geocodeInitialAddress(
   for (const q of candidates) {
     try {
       const suggestions = await searchAddressSuggestions(q);
-      const valid = suggestions.find((s) => !s.id.startsWith('prompt-'));
+      const valid = suggestions.find((s) => {
+        if (s.id.startsWith('prompt-')) return false;
+
+        // Nếu người dùng có nhập số nhà/tên đường cụ thể:
+        // Kết quả geocoding bắt buộc phải khớp với streetAddress đó, không được rơi về trung tâm quận/huyện
+        if (components?.streetAddress && !isStreetMatched(components.streetAddress, s)) {
+          return false;
+        }
+        return true;
+      });
       if (valid) {
         return {
           lat: valid.lat,
@@ -532,11 +593,15 @@ export async function geocodeInitialAddress(
   for (const q of candidates) {
     const localMatches = searchLocalDictionary(q, 1);
     if (localMatches.length > 0) {
+      const match = localMatches[0];
+      if (components?.streetAddress && !isStreetMatched(components.streetAddress, match)) {
+        continue;
+      }
       return {
-        lat: localMatches[0].lat,
-        lng: localMatches[0].lng,
-        displayName: localMatches[0].place_name,
-        components: localMatches[0].components,
+        lat: match.lat,
+        lng: match.lng,
+        displayName: match.place_name,
+        components: match.components,
       };
     }
   }
