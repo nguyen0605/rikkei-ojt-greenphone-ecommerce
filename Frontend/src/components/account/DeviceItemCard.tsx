@@ -7,6 +7,7 @@ import {
   GlobalOutlined,
   ClockCircleOutlined,
   LogoutOutlined,
+  EnvironmentOutlined,
 } from '@ant-design/icons';
 import type { DeviceSessionDTO } from '@/types/api';
 import dayjs from 'dayjs';
@@ -20,12 +21,14 @@ interface DeviceItemCardProps {
   device: DeviceSessionDTO;
   onRevoke: (device: DeviceSessionDTO) => void;
   isRevoking?: boolean;
+  location?: string | null;
 }
 
 export const DeviceItemCard: React.FC<DeviceItemCardProps> = ({
   device,
   onRevoke,
   isRevoking = false,
+  location,
 }) => {
   const getDeviceIcon = () => {
     const osLower = (device.os || '').toLowerCase();
@@ -99,6 +102,13 @@ export const DeviceItemCard: React.FC<DeviceItemCardProps> = ({
                 <span className="flex items-center gap-1">
                   <GlobalOutlined className="text-gray-400" />
                   <span>IP: {device.ipAddress}</span>
+                </span>
+              )}
+
+              {isCurrent && location && (
+                <span className="flex items-center gap-1 text-emerald-700 font-medium bg-emerald-100/60 px-2 py-0.5 rounded-md">
+                  <EnvironmentOutlined className="text-emerald-600" />
+                  <span>{location}</span>
                 </span>
               )}
 

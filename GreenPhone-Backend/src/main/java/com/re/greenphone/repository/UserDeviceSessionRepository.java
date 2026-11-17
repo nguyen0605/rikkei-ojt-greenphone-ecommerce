@@ -16,6 +16,9 @@ public interface UserDeviceSessionRepository extends JpaRepository<UserDeviceSes
 
     Optional<UserDeviceSession> findByRefreshTokenHash(String refreshTokenHash);
 
+    @Query("SELECT s.isRevoked FROM UserDeviceSession s WHERE s.id = :sessionId")
+    Optional<Boolean> findIsRevokedById(@Param("sessionId") Long sessionId);
+
     @Query("SELECT s FROM UserDeviceSession s WHERE s.user.id = :userId AND s.isRevoked = false AND (s.expiresAt IS NULL OR s.expiresAt > :now) ORDER BY s.lastActiveAt DESC")
     List<UserDeviceSession> findActiveSessionsByUserId(@Param("userId") Long userId, @Param("now") LocalDateTime now);
 
