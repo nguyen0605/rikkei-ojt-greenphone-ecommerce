@@ -7,7 +7,8 @@ export const authService = {
   logout: () => post<void>('/auth/logout'),
   me: () => get<UserDTO>('/auth/me'),
   forgotPassword: (email: string) => post<void>('/auth/forgot-password', { email }),
-  resetPassword: (email: string, otp: string, newPassword: string) => post<void>('/auth/reset-password', { email, otp, newPassword }),
+  resendOTP: (email: string) => post<void>('/auth/resend-otp', { email }),
+  resetPassword: (email: string, otp: string, newPassword: string) => post<AuthResponse>('/auth/reset-password', { email, otp, newPassword }),
   verifyOTP: (email: string, otp: string) => post<AuthResponse>('/auth/verify-otp', { email, otp }),
 };
 

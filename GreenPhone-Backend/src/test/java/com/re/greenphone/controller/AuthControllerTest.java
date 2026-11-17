@@ -100,10 +100,14 @@ class AuthControllerTest {
                 .otp("654321")
                 .newPassword("newSecr3t")
                 .build();
+        var mockAuth = AuthResponse.builder().token("jwt_token").build();
+        when(authService.resetPassword("user@example.com", "654321", "newSecr3t")).thenReturn(mockAuth);
 
-        ResponseEntity<ApiResponse<String>> response = controller.resetPassword(req);
+        ResponseEntity<ApiResponse<AuthResponse>> response = controller.resetPassword(req);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getData().getToken()).isEqualTo("jwt_token");
         verify(authService).resetPassword("user@example.com", "654321", "newSecr3t");
     }
 

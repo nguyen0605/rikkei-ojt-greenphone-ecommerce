@@ -22,12 +22,14 @@ interface DeviceItemCardProps {
   device: DeviceSessionDTO;
   onRevoke: (device: DeviceSessionDTO) => void;
   isRevoking?: boolean;
+  location?: string | null;
 }
 
 export const DeviceItemCard: React.FC<DeviceItemCardProps> = ({
   device,
   onRevoke,
   isRevoking = false,
+  location,
 }) => {
   // Tự động ước tính vị trí theo IP (không cần người dùng bật GPS)
   const [estimatedLocation, setEstimatedLocation] = useState<string | null>(null);
@@ -120,10 +122,10 @@ export const DeviceItemCard: React.FC<DeviceItemCardProps> = ({
                 </span>
               )}
 
-              {estimatedLocation && (
-                <span className="flex items-center gap-1 text-emerald-600">
-                  <EnvironmentOutlined className="text-emerald-500" />
-                  <span>{estimatedLocation}</span>
+              {(location || estimatedLocation) && (
+                <span className="flex items-center gap-1 text-emerald-700 font-medium bg-emerald-100/60 px-2 py-0.5 rounded-md">
+                  <EnvironmentOutlined className="text-emerald-600" />
+                  <span>{location || estimatedLocation}</span>
                 </span>
               )}
 

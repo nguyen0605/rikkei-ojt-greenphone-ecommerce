@@ -22,6 +22,28 @@ export const AccountDevicesPage: React.FC = () => {
   const [isRevokeAll, setIsRevokeAll] = useState<boolean>(false);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
+  // Geolocation state
+  const [currentLocation, setCurrentLocation] = useState<string | null>(null);
+  const [locPermissionAsked, setLocPermissionAsked] = useState<boolean>(false);
+
+  // Yêu cầu quyền vị trí từ trình duyệt
+  useEffect(() => {
+    if ('geolocation' in navigator && !locPermissionAsked) {
+      setLocPermissionAsked(true);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude.toFixed(2);
+          const lng = position.coords.longitude.toFixed(2);
+          setCurrentLocation(`Vị trí: ${lat}°, ${lng}°`);
+        },
+        () => {
+          // Từ chối cấp quyền hoặc timeout: Giữ nguyên currentLocation là null, không log console
+        },
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+      );
+    }
+  }, [locPermissionAsked]);
+
   const fetchDevices = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true);
     else setRefreshing(true);
@@ -97,12 +119,15 @@ export const AccountDevicesPage: React.FC = () => {
       {/* Header section */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-100 pb-5">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-bold text-gray-900">Thiết bị đăng nhập</h2>
             <SafetyCertificateOutlined className="text-emerald-600 text-lg" />
+            <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200">
+              Đang hoạt động: {devices.length}/5
+            </span>
           </div>
           <p className="mt-1 text-sm text-gray-500">
-            Theo dõi các phiên làm việc và quản lý quyền truy cập tài khoản từ xa
+            Theo dõi các phiên làm việc và quản lý quyền truy cập tài khoản từ xa (tối đa 5 thiết bị)
           </p>
         </div>
 
@@ -160,6 +185,7 @@ export const AccountDevicesPage: React.FC = () => {
                 device={currentDevice}
                 onRevoke={handleOpenRevokeSingle}
                 isRevoking={actionLoading}
+                location={currentLocation}
               />
             </div>
           )}

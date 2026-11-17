@@ -97,6 +97,16 @@ const authSlice = createSlice({
       localStorage.removeItem('greenphone.token');
       localStorage.removeItem('greenphone.user');
     },
+    setCredentials(state, action: PayloadAction<{ user: { id: number; email: string; fullName: string; role: string }; token: string }>) {
+      state.loading = false;
+      state.error = null;
+      state.errorCode = null;
+      state.user = action.payload.user;
+      state.token = action.payload.token;
+      state.isAuthenticated = true;
+      localStorage.setItem('greenphone.token', action.payload.token);
+      localStorage.setItem('greenphone.user', JSON.stringify(state.user));
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -151,5 +161,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError, logout, updateUserProfile } = authSlice.actions;
+export const { clearError, logout, updateUserProfile, setCredentials } = authSlice.actions;
 export default authSlice.reducer;
