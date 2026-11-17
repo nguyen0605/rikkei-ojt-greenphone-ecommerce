@@ -59,6 +59,7 @@ export default function AddressModal({
   const [isLocatingAddress, setIsLocatingAddress] = useState(false);
   const [isLocatingCurrentGps, setIsLocatingCurrentGps] = useState(false);
   const [isEstimateLocation, setIsEstimateLocation] = useState(false);
+  const [showPermissionGuideModal, setShowPermissionGuideModal] = useState(false);
   const hasUserOverriddenCoords = useRef(false);
 
   // Danh sách gợi ý Quận/Huyện tương ứng với Tỉnh/Thành phố đang chọn
@@ -443,6 +444,7 @@ export default function AddressModal({
       try {
         const permStatus = await navigator.permissions.query({ name: 'geolocation' });
         if (permStatus.state === 'denied') {
+          setShowPermissionGuideModal(true);
           message.warning('Vui lòng bật quyền truy cập vị trí trên trình duyệt (ở biểu tượng ổ khóa bên trái thanh URL) để tự động điền địa chỉ.');
           return;
         }
@@ -525,6 +527,7 @@ export default function AddressModal({
       (err) => {
         setIsLocatingCurrentGps(false);
         if (err.code === 1 || err.code === (window.GeolocationPositionError?.PERMISSION_DENIED ?? 1)) {
+          setShowPermissionGuideModal(true);
           message.warning('Vui lòng bật quyền truy cập vị trí trên trình duyệt (ở biểu tượng ổ khóa bên trái thanh URL) để tự động điền địa chỉ.');
         } else if (err.code === 3 || err.code === (window.GeolocationPositionError?.TIMEOUT ?? 3)) {
           message.warning('Hết thời gian chờ định vị GPS. Vui lòng thử lại.');
@@ -550,6 +553,7 @@ export default function AddressModal({
         permObj = status;
         const handlePermChange = () => {
           if (status.state === 'granted') {
+            setShowPermissionGuideModal(false);
             handleUseCurrentLocation();
           }
         };
@@ -712,7 +716,8 @@ export default function AddressModal({
   };
 
   return (
-    <Modal
+    <>
+      <Modal
         title={
           <div className="flex items-center gap-2 text-lg font-bold text-gray-900 border-b border-gray-100 pb-3">
             <EnvironmentOutlined className="text-green-600" />
@@ -1031,15 +1036,26 @@ export default function AddressModal({
               <EnvironmentOutlined className="text-green-600" />
               <span>Xác nhận vị trí giao hàng trên bản đồ</span>
             </div>
-            <Button
-              size="small"
-              icon={<SearchOutlined />}
-              onClick={() => handleLocateFromFields(true)}
-              loading={isLocatingAddress}
-              className="!rounded-lg !text-xs !border-green-600 !text-green-600 hover:!bg-green-50 self-start sm:self-auto"
-            >
-              Định vị từ địa chỉ đã nhập
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="small"
+                icon={<Navigation className="w-3.5 h-3.5 text-blue-600" />}
+                onClick={handleUseCurrentLocation}
+                loading={isLocatingCurrentGps}
+                className="!rounded-lg !text-xs !border-blue-500 !text-blue-600 hover:!bg-blue-50 font-medium"
+              >
+                Định vị GPS hiện tại
+              </Button>
+              <Button
+                size="small"
+                icon={<SearchOutlined />}
+                onClick={() => handleLocateFromFields(true)}
+                loading={isLocatingAddress}
+                className="!rounded-lg !text-xs !border-green-600 !text-green-600 hover:!bg-green-50 self-start sm:self-auto"
+              >
+                Định vị từ địa chỉ đã nhập
+              </Button>
+            </div>
           </div>
 
           {/* Trạng thái định vị */}
@@ -1146,5 +1162,89 @@ export default function AddressModal({
         </div>
       </Form>
     </Modal>
-  );
+
+    {/* Modal huong dan vi tri can bam khi trinh duyet chan quyen vi tri */}
+    <Modal
+      open={showPermissionGuideModal}
+      onCancel={() => setShowPermissionGuideModal(false)}
+      footer={null}
+      centered
+      width={460}
+      title={
+        <div className="flex items-center gap-2 text-base font-bold text-gray-900 border-b border-gray-100 pb-3">
+          <EnvironmentOutlined className="text-blue-600" />
+          <span>Hướng dẫn bật quyền vị trí trên trình duyệt</span>
+        </div>
+      }
+    >
+      <div className="py-2 space-y-3.5">
+        <p className="text-xs text-gray-600 leading-relaxed">
+          Trình duyệt đang chặn định vị GPS. Bạn chỉ cần thực hiện 2 bước đơn giản để bật:
+        </p>
+
+        {/* Buoc 1: Mo phong thanh dia chi trinh duyet */}
+        <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3 space-y-1.5">
+          <div className="flex items-center gap-2 text-xs font-bold text-blue-900">
+            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-white text-[10px]">1</span>
+            <span>Nhìn lên góc trên bên trái thanh địa chỉ trình duyệt:</span>
+          </div>
+          <div className="rounded-lg bg-gray-900 px-3 py-2 text-xs text-white font-mono flex items-center justify-between shadow-inner">
+            <div className="flex items-center gap-2">
+              <span className="rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white animate-pulse">
+                Nhấp vào đây
+              </span>
+              <span className="text-gray-300">
+                (i) {typeof window !== 'undefined' ? window.location.host : 'localhost:5173'}
+              </span>
+            </div>
+            <span className="text-gray-500 text-[10px]">Thanh URL</span>
+          </div>
+          <p className="text-[11px] text-gray-600 pl-6">
+            Nhấp chuột vào biểu tượng <strong>(i)</strong> hoặc biểu tượng <strong>Ổ khóa</strong> ở bên trái địa chỉ web.
+          </p>
+        </div>
+
+        {/* Buoc 2: Bam Reset permission hoac gat BAT Location */}
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-1.5">
+          <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
+            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-gray-700 text-white text-[10px]">2</span>
+            <span>Trong bảng cài đặt mở ra:</span>
+          </div>
+          <div className="rounded-lg bg-white border border-gray-200 p-2.5 text-xs space-y-2 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <span className="text-gray-700 font-medium">Bấm vào nút:</span>
+              <span className="rounded-full border border-blue-500 text-blue-600 font-bold px-2.5 py-0.5 text-[11px]">
+                Reset permission
+              </span>
+            </div>
+            <div className="flex items-center justify-between border-t border-gray-100 pt-1.5 text-gray-500">
+              <span>Hoặc gạt mục Vị trí (Location):</span>
+              <span className="rounded bg-green-100 text-green-800 font-bold px-2 py-0.5 text-[11px]">
+                Gạt sang BẬT
+              </span>
+            </div>
+          </div>
+          <p className="text-[11px] text-gray-600 pl-6">
+            Sau khi bấm, hệ thống sẽ <strong>tự động nhận diện và điền địa chỉ tức thì</strong> mà không cần tải lại trang.
+          </p>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex items-center justify-end gap-2 pt-1 border-t border-gray-100">
+          <Button onClick={() => setShowPermissionGuideModal(false)} className="!rounded-xl text-xs">
+            Đóng
+          </Button>
+          <Button
+            type="primary"
+            loading={isLocatingCurrentGps}
+            onClick={() => handleUseCurrentLocation()}
+            className="!rounded-xl !bg-blue-600 hover:!bg-blue-700 text-xs font-semibold"
+          >
+            Tôi đã bật, định vị ngay
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  </>
+);
 }
