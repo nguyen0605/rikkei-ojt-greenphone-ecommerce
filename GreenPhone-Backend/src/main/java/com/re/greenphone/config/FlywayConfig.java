@@ -363,6 +363,95 @@ public class FlywayConfig {
                     log.info("Da tu dong dong bo version 20 vao flyway_schema_history de tranh loi duplicate column.");
                 }
             }
+
+            // 5. Dong bo V25 (order cost snapshot) neu cot unit_cost da ton tai trong bang order_detail
+            if (columnExists(metaData, catalog, "order_detail", "unit_cost")) {
+                stmt.executeUpdate("DELETE FROM `flyway_schema_history` WHERE `version` = '25'");
+                boolean hasVersion25 = false;
+                try (ResultSet rs = stmt.executeQuery("SELECT 1 FROM `flyway_schema_history` WHERE `version` = '25' AND `success` = 1")) {
+                    if (rs.next()) {
+                        hasVersion25 = true;
+                    }
+                }
+                if (!hasVersion25) {
+                    int nextRank = 30;
+                    try (ResultSet rs = stmt.executeQuery("SELECT COALESCE(MAX(installed_rank), 29) + 1 FROM `flyway_schema_history`")) {
+                        if (rs.next()) {
+                            nextRank = rs.getInt(1);
+                        }
+                    }
+                    stmt.execute(String.format(
+                        "INSERT INTO `flyway_schema_history` " +
+                        "(`installed_rank`, `version`, `description`, `type`, `script`, `checksum`, `installed_by`, `execution_time`, `success`) " +
+                        "VALUES (%d, '25', 'order cost snapshot and statistics indexes', 'SQL', 'V25__order_cost_snapshot_and_statistics_indexes.sql', NULL, 'AUTO_SYNC', 1, 1)",
+                        nextRank
+                    ));
+                    log.info("Da tu dong dong bo version 25 vao flyway_schema_history de tranh loi duplicate column unit_cost.");
+                }
+                try {
+                    stmt.execute("CREATE INDEX idx_orders_payment_created ON orders(payment_status, created_at)");
+                } catch (Exception ignored) {}
+                try {
+                    stmt.execute("CREATE INDEX idx_refund_status_refunded ON refund(status, refunded_at)");
+                } catch (Exception ignored) {}
+            }
+
+            // 6. Dong bo V26 (vat invoice) neu cot COMPANY_NAME da ton tai trong bang orders
+            if (columnExists(metaData, catalog, "orders", "COMPANY_NAME")) {
+                stmt.executeUpdate("DELETE FROM `flyway_schema_history` WHERE `version` = '26'");
+                boolean hasVersion26 = false;
+                try (ResultSet rs = stmt.executeQuery("SELECT 1 FROM `flyway_schema_history` WHERE `version` = '26' AND `success` = 1")) {
+                    if (rs.next()) {
+                        hasVersion26 = true;
+                    }
+                }
+                if (!hasVersion26) {
+                    int nextRank = 31;
+                    try (ResultSet rs = stmt.executeQuery("SELECT COALESCE(MAX(installed_rank), 30) + 1 FROM `flyway_schema_history`")) {
+                        if (rs.next()) {
+                            nextRank = rs.getInt(1);
+                        }
+                    }
+                    stmt.execute(String.format(
+                        "INSERT INTO `flyway_schema_history` " +
+                        "(`installed_rank`, `version`, `description`, `type`, `script`, `checksum`, `installed_by`, `execution_time`, `success`) " +
+                        "VALUES (%d, '26', 'add vat invoice to orders', 'SQL', 'V26__add_vat_invoice_to_orders.sql', NULL, 'AUTO_SYNC', 1, 1)",
+                        nextRank
+                    ));
+                    log.info("Da tu dong dong bo version 26 vao flyway_schema_history de tranh loi duplicate column COMPANY_NAME.");
+                }
+            }
+
+            // 7. Dam bao bang review_image luon ton tai (V28) de Hibernate Schema Validation pass
+            try {
+                stmt.execute(
+                    "CREATE TABLE IF NOT EXISTS `review_image` (" +
+                    "  `id` BIGINT NOT NULL AUTO_INCREMENT," +
+                    "  `review_id` BIGINT NOT NULL," +
+                    "  `image_url` VARCHAR(1000) NOT NULL," +
+                    "  `sort_order` INT NOT NULL DEFAULT 0," +
+                    "  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP," +
+                    "  PRIMARY KEY (`id`)," +
+                    "  KEY `fk_review_image_review` (`review_id`)," +
+                    "  CONSTRAINT `fk_review_image_review` FOREIGN KEY (`review_id`) REFERENCES `review` (`ID`) ON DELETE CASCADE" +
+                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+                );
+                log.info("Da dam bao bang review_image ton tai cho Hibernate validation.");
+            } catch (Exception ex) {
+                log.warn("Kiem tra/tao bang review_image: {}", ex.getMessage());
+            }
+
+            // 8. Kiem tra xem du lieu V29 da vao database chua (nha cung cap SUP-PETRO-SET)
+            boolean hasPetroSet = false;
+            try (ResultSet rs = stmt.executeQuery("SELECT 1 FROM `supplier` WHERE `code` = 'SUP-PETRO-SET' LIMIT 1")) {
+                if (rs.next()) {
+                    hasPetroSet = true;
+                }
+            } catch (Exception ignored) {}
+            if (!hasPetroSet) {
+                stmt.executeUpdate("DELETE FROM `flyway_schema_history` WHERE `version` = '29'");
+                log.info("Da xoa version 29 khoi flyway_schema_history de dam bao Flyway seed du lieu day du cho thang 10 va thang 11.");
+            }
         } catch (Exception ex) {
             log.warn("Reconcile migration history: {}", ex.getMessage());
         }
@@ -378,7 +467,16 @@ public class FlywayConfig {
 
     private boolean columnExists(DatabaseMetaData metaData, String catalog, String tableName, String columnName) {
         try (ResultSet rs = metaData.getColumns(catalog, null, tableName, columnName)) {
-            return rs.next();
+            if (rs.next()) return true;
+        } catch (Exception ignored) {}
+        try (Connection conn = metaData.getConnection();
+             java.sql.PreparedStatement ps = conn.prepareStatement(
+                "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = LOWER(?) AND LOWER(COLUMN_NAME) = LOWER(?) LIMIT 1")) {
+            ps.setString(1, tableName);
+            ps.setString(2, columnName);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
         } catch (Exception e) {
             return false;
         }
