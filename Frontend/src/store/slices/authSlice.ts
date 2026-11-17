@@ -2,7 +2,7 @@ import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/tool
 import { authService } from '@/services/authService';
 import { post } from '@/services/api';
 import { isTokenValid } from '@/utils/jwt';
-import type { LoginRequest, RegisterRequest } from '@/types/api';
+import type { AuthResponse, LoginRequest, RegisterRequest } from '@/types/api';
 
 interface AuthState {
   user: { id: number; email: string; fullName: string; role: string; avatar?: string; phone?: string; address?: string } | null;
@@ -52,9 +52,19 @@ export const loginThunk = createAsyncThunk('auth/login', async (data: LoginReque
   return { ...res, remember: data.remember };
 });
 
-export const registerThunk = createAsyncThunk('auth/register', async (data: RegisterRequest) => {
-  await authService.register(data);
-  return { email: data.email };
+export const registerThunk = createAsyncThunk<
+  AuthResponse,
+  RegisterRequest,
+  { rejectValue: { message: string; errorCode?: string } }
+>('auth/register', async (data: RegisterRequest, { rejectWithValue }) => {
+  try {
+    const res = await authService.register(data);
+    return res;
+  } catch (err: any) {
+    const message = err.response?.data?.message || err.message || 'Register failed';
+    const errorCode = err.response?.data?.errorCode || err.errorCode;
+    return rejectWithValue({ message, errorCode });
+  }
 });
 
 export const logoutThunk = createAsyncThunk('auth/logout', async () => {
@@ -114,9 +124,37 @@ const authSlice = createSlice({
         }
       })
       .addCase(loginThunk.rejected, (state, action) => { state.loading = false; state.error = action.error.message || 'Login failed'; })
-      .addCase(registerThunk.pending, (state) => { state.loading = true; state.error = null; })
-      .addCase(registerThunk.fulfilled, (state) => { state.loading = false; })
-      .addCase(registerThunk.rejected, (state, action) => { state.loading = false; state.error = action.error.message || 'Register failed'; })
+      .addCase(registerThunk.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.errorCode = null;
+      })
+      .addCase(registerThunk.fulfilled, (state, action) => {
+        state.loading = false;
+        state.errorCode = null;
+        if (action.payload && action.payload.token) {
+          state.user = {
+            id: action.payload.userId,
+            email: action.payload.email,
+            fullName: action.payload.fullName,
+            role: action.payload.role,
+          };
+          state.token = action.payload.token;
+          state.isAuthenticated = true;
+          localStorage.setItem('greenphone.token', action.payload.token);
+          localStorage.setItem('greenphone.user', JSON.stringify(state.user));
+        }
+      })
+      .addCase(registerThunk.rejected, (state, action) => {
+        state.loading = false;
+        if (action.payload) {
+          state.error = action.payload.message;
+          state.errorCode = action.payload.errorCode || null;
+        } else {
+          state.error = action.error.message || 'Register failed';
+          state.errorCode = null;
+        }
+      })
       .addCase(verifyOTPThunk.pending, (state) => {
         state.loading = true;
         state.error = null;

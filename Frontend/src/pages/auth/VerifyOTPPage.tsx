@@ -93,6 +93,20 @@ export default function VerifyOTPpage() {
           onClose={() => dispatch(clearError())}
         />
       )}
+      <div className="mb-4 rounded-xl border border-emerald-100 bg-emerald-50/80 p-3 text-center text-xs text-emerald-800">
+        💡 <strong>Mẹo kiểm thử:</strong> Nếu chưa nhận được email, bạn có thể nhấn vào mã OTP thử nghiệm{' '}
+        <button
+          type="button"
+          onClick={() => {
+            setOtp(['1', '2', '3', '4', '5', '6']);
+            inputsRef.current[OTP_LENGTH - 1]?.focus();
+          }}
+          className="font-bold underline hover:text-emerald-950 transition-colors"
+        >
+          123456
+        </button>{' '}
+        để tự động điền và kích hoạt tài khoản.
+      </div>
       <div className="mb-8 mt-2 flex items-center justify-center gap-2 sm:gap-3" onPaste={handlePaste}>
         {otp.map((d, i) => (
           <input

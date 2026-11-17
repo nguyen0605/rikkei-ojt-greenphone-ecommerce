@@ -26,6 +26,6 @@ public class RegisterRequest {
     private String password;
 
     @NotBlank(message = "Phone is required")
-    @Pattern(regexp = "^0\\d{9,10}$", message = "Invalid phone number")
+    @Pattern(regexp = "^(0|\\+84)\\d{9,10}$", message = "Invalid phone number")
     private String phone;
 }

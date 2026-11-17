@@ -58,16 +58,20 @@ export default function RegisterPage() {
 
   const handleSubmit = async (values: RegisterFormValues) => {
     try {
-      const result = await dispatch(
+      const normalizedPhone = values.phone.startsWith('+84')
+        ? '0' + values.phone.slice(3)
+        : values.phone;
+
+      await dispatch(
         registerThunk({
-          fullName: values.fullName,
-          email: values.email,
-          phone: values.phone,
+          fullName: values.fullName.trim(),
+          email: values.email.trim(),
+          phone: normalizedPhone.trim(),
           password: values.password,
         }),
       ).unwrap();
-      message.success('Mã OTP đã được gửi đến email của bạn');
-      navigate(ROUTES.VERIFY_OTP + '?email=' + encodeURIComponent(values.email), { replace: true });
+      message.success('Đăng ký tài khoản thành công! Vui lòng kiểm tra mã xác thực OTP.');
+      navigate(ROUTES.VERIFY_OTP + '?email=' + encodeURIComponent(values.email.trim()), { replace: true });
     } catch {
       // Error handled by Redux state — show Alert via `error` selector
     }
@@ -91,7 +95,7 @@ export default function RegisterPage() {
 
       {error && (
         <Alert
-          title={error}
+          message={error}
           type="error"
           showIcon
           closable

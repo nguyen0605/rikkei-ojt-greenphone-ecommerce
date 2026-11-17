@@ -61,6 +61,13 @@ public class AuthService {
     private static final Duration LOCK_TTL = Duration.ofMinutes(15);
     private static final int MAX_ATTEMPTS = 5;
 
+    // In-memory fallback if Redis is unavailable or unconfigured in local dev
+    private static final java.util.concurrent.ConcurrentHashMap<String, OtpData> LOCAL_OTP_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.concurrent.ConcurrentHashMap<String, Long> LOCAL_OTP_ATTEMPTS = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.concurrent.ConcurrentHashMap<String, Long> LOCAL_OTP_LOCK = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private record OtpData(String otp, long expiresAtMillis) {}
+
     private static final SecureRandom RANDOM = new SecureRandom();
 
     // ===== REGISTER =====
@@ -85,10 +92,20 @@ public class AuthService {
 
         // Generate 6-digit OTP and cache in Redis with 5-minute TTL
         String otp = generateOTP();
-        redisTemplate.opsForValue().set(OTP_PREFIX + saved.getEmail(), otp, OTP_TTL);
-        redisTemplate.delete(OTP_ATTEMPTS_PREFIX + saved.getEmail());
+        try {
+            redisTemplate.opsForValue().set(OTP_PREFIX + saved.getEmail(), otp, OTP_TTL);
+            redisTemplate.delete(OTP_ATTEMPTS_PREFIX + saved.getEmail());
+        } catch (Exception e) {
+            log.warn("Redis unavailable during register OTP caching, using in-memory fallback: {}", e.getMessage());
+        }
+        LOCAL_OTP_CACHE.put(saved.getEmail(), new OtpData(otp, System.currentTimeMillis() + OTP_TTL.toMillis()));
+        LOCAL_OTP_ATTEMPTS.remove(saved.getEmail());
         log.info("[OTP] Generated verification code for {}: {}", saved.getEmail(), otp);
-        emailService.sendOTP(saved.getEmail(), otp);
+        try {
+            emailService.sendOTP(saved.getEmail(), otp);
+        } catch (Exception e) {
+            log.warn("EmailService failed to send OTP to {}: {}", saved.getEmail(), e.getMessage());
+        }
 
         String token = jwtTokenProvider.generateToken(UserPrincipal.create(saved));
         String refreshToken = createAndStoreRefreshToken(saved.getId());
@@ -295,10 +312,20 @@ public class AuthService {
         // Don't reveal whether email exists — silently accept
         userRepository.findByEmail(email).ifPresent(user -> {
             String otp = generateOTP();
-            redisTemplate.opsForValue().set(OTP_PREFIX + email, otp, OTP_TTL);
-            redisTemplate.delete(OTP_ATTEMPTS_PREFIX + email);
+            try {
+                redisTemplate.opsForValue().set(OTP_PREFIX + email, otp, OTP_TTL);
+                redisTemplate.delete(OTP_ATTEMPTS_PREFIX + email);
+            } catch (Exception e) {
+                log.warn("Redis unavailable during forgotPassword: {}", e.getMessage());
+            }
+            LOCAL_OTP_CACHE.put(email, new OtpData(otp, System.currentTimeMillis() + OTP_TTL.toMillis()));
+            LOCAL_OTP_ATTEMPTS.remove(email);
             log.info("[OTP] Forgot password code for {}: {}", email, otp);
-            emailService.sendOTP(email, otp);
+            try {
+                emailService.sendOTP(email, otp);
+            } catch (Exception e) {
+                log.warn("EmailService failed to send forgotPassword OTP to {}: {}", email, e.getMessage());
+            }
         });
     }
 
@@ -317,26 +344,53 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         String otp = generateOTP();
-        redisTemplate.opsForValue().set(OTP_PREFIX + email, otp, OTP_TTL);
-        redisTemplate.delete(OTP_ATTEMPTS_PREFIX + email);
+        try {
+            redisTemplate.opsForValue().set(OTP_PREFIX + email, otp, OTP_TTL);
+            redisTemplate.delete(OTP_ATTEMPTS_PREFIX + email);
+        } catch (Exception e) {
+            log.warn("Redis unavailable during resendOTP: {}", e.getMessage());
+        }
+        LOCAL_OTP_CACHE.put(email, new OtpData(otp, System.currentTimeMillis() + OTP_TTL.toMillis()));
+        LOCAL_OTP_ATTEMPTS.remove(email);
         log.info("[OTP] Resent verification code for {}: {}", email, otp);
-        emailService.sendOTP(email, otp);
+        try {
+            emailService.sendOTP(email, otp);
+        } catch (Exception e) {
+            log.warn("EmailService failed to send resendOTP to {}: {}", email, e.getMessage());
+        }
     }
 
     // ===== HELPERS =====
 
     private void checkAccountLocked(String email) {
-        if (email != null && Boolean.TRUE.equals(redisTemplate.hasKey(OTP_LOCK_PREFIX + email))) {
-            Long ttlSeconds = redisTemplate.getExpire(OTP_LOCK_PREFIX + email, TimeUnit.SECONDS);
-            String waitTime = "15 phút";
-            if (ttlSeconds != null && ttlSeconds > 0) {
-                long minutes = (ttlSeconds + 59) / 60;
-                waitTime = minutes > 1 ? minutes + " phút" : ttlSeconds + " giây";
+        if (email == null) return;
+        try {
+            if (Boolean.TRUE.equals(redisTemplate.hasKey(OTP_LOCK_PREFIX + email))) {
+                Long ttlSeconds = redisTemplate.getExpire(OTP_LOCK_PREFIX + email, TimeUnit.SECONDS);
+                String waitTime = "15 phút";
+                if (ttlSeconds != null && ttlSeconds > 0) {
+                    long minutes = (ttlSeconds + 59) / 60;
+                    waitTime = minutes > 1 ? minutes + " phút" : ttlSeconds + " giây";
+                }
+                throw new BadRequestException(
+                        "Bạn đã nhập sai quá số lần quy định. Tài khoản đang tạm khóa bảo mật, vui lòng yêu cầu mã mới sau "
+                                + waitTime + ".",
+                        ERROR_CODE_ACCOUNT_LOCKED);
             }
-            throw new BadRequestException(
-                    "Bạn đã nhập sai quá số lần quy định. Tài khoản đang tạm khóa bảo mật, vui lòng yêu cầu mã mới sau "
-                            + waitTime + ".",
-                    ERROR_CODE_ACCOUNT_LOCKED);
+        } catch (BadRequestException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Redis unavailable during checkAccountLocked for {}, checking local lock: {}", email, e.getMessage());
+            Long lockUntil = LOCAL_OTP_LOCK.get(email);
+            if (lockUntil != null && lockUntil > System.currentTimeMillis()) {
+                long remainingSec = (lockUntil - System.currentTimeMillis()) / 1000;
+                long minutes = (remainingSec + 59) / 60;
+                String waitTime = minutes > 1 ? minutes + " phút" : remainingSec + " giây";
+                throw new BadRequestException(
+                        "Bạn đã nhập sai quá số lần quy định. Tài khoản đang tạm khóa bảo mật, vui lòng yêu cầu mã mới sau "
+                                + waitTime + ".",
+                        ERROR_CODE_ACCOUNT_LOCKED);
+            }
         }
     }
 
@@ -347,22 +401,51 @@ public class AuthService {
 
         checkAccountLocked(email);
 
-        String storedOTP = redisTemplate.opsForValue().get(OTP_PREFIX + email);
+        String trimmedOtp = otp.trim();
+
+        String storedOTP = null;
+        try {
+            storedOTP = redisTemplate.opsForValue().get(OTP_PREFIX + email);
+        } catch (Exception e) {
+            log.warn("Redis unavailable during OTP retrieval, checking local cache: {}", e.getMessage());
+        }
+
+        if (storedOTP == null) {
+            OtpData localData = LOCAL_OTP_CACHE.get(email);
+            if (localData != null) {
+                if (System.currentTimeMillis() <= localData.expiresAtMillis()) {
+                    storedOTP = localData.otp();
+                } else {
+                    LOCAL_OTP_CACHE.remove(email);
+                }
+            }
+        }
+
         if (storedOTP == null) {
             throw new BadRequestException("Mã OTP không hợp lệ hoặc đã hết hạn");
         }
 
-        if (!storedOTP.equals(otp.trim())) {
-            Long attempts = redisTemplate.opsForValue().increment(OTP_ATTEMPTS_PREFIX + email);
-            long currentAttempts = attempts != null ? attempts : 1L;
-            if (currentAttempts == 1L) {
-                redisTemplate.expire(OTP_ATTEMPTS_PREFIX + email, LOCK_TTL);
+        if (!storedOTP.equals(trimmedOtp)) {
+            long currentAttempts = 1L;
+            try {
+                Long attempts = redisTemplate.opsForValue().increment(OTP_ATTEMPTS_PREFIX + email);
+                currentAttempts = attempts != null ? attempts : 1L;
+                if (currentAttempts == 1L) {
+                    redisTemplate.expire(OTP_ATTEMPTS_PREFIX + email, LOCK_TTL);
+                }
+            } catch (Exception e) {
+                currentAttempts = LOCAL_OTP_ATTEMPTS.compute(email, (k, v) -> v == null ? 1L : v + 1L);
             }
 
             if (currentAttempts >= MAX_ATTEMPTS) {
-                redisTemplate.delete(OTP_PREFIX + email);
-                redisTemplate.delete(OTP_ATTEMPTS_PREFIX + email);
-                redisTemplate.opsForValue().set(OTP_LOCK_PREFIX + email, "LOCKED", LOCK_TTL);
+                try {
+                    redisTemplate.delete(OTP_PREFIX + email);
+                    redisTemplate.delete(OTP_ATTEMPTS_PREFIX + email);
+                    redisTemplate.opsForValue().set(OTP_LOCK_PREFIX + email, "LOCKED", LOCK_TTL);
+                } catch (Exception ignored) {}
+                LOCAL_OTP_CACHE.remove(email);
+                LOCAL_OTP_ATTEMPTS.remove(email);
+                LOCAL_OTP_LOCK.put(email, System.currentTimeMillis() + LOCK_TTL.toMillis());
                 log.warn("Tài khoản {} đã nhập sai OTP quá {} lần. Mã OTP đã bị hủy và khóa 15 phút.", email,
                         MAX_ATTEMPTS);
                 throw new BadRequestException(
@@ -375,8 +458,12 @@ public class AuthService {
         }
 
         // Xác thực thành công: dọn dẹp key OTP và attempts
-        redisTemplate.delete(OTP_PREFIX + email);
-        redisTemplate.delete(OTP_ATTEMPTS_PREFIX + email);
+        try {
+            redisTemplate.delete(OTP_PREFIX + email);
+            redisTemplate.delete(OTP_ATTEMPTS_PREFIX + email);
+        } catch (Exception ignored) {}
+        LOCAL_OTP_CACHE.remove(email);
+        LOCAL_OTP_ATTEMPTS.remove(email);
     }
 
     private String generateOTP() {
