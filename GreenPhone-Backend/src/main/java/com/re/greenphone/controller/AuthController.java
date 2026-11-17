@@ -30,8 +30,8 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<?>> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(ApiResponse.success(authService.login(request)));
+    public ResponseEntity<ApiResponse<?>> login(@Valid @RequestBody LoginRequest request, jakarta.servlet.http.HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(ApiResponse.success(authService.login(request, httpRequest)));
     }
 
     @GetMapping("/me")

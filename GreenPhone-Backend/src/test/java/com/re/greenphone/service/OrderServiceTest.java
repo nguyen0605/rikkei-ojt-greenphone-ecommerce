@@ -9,6 +9,7 @@ import com.re.greenphone.dto.response.OrderCreationResult;
 import com.re.greenphone.dto.response.OrderDTO;
 import com.re.greenphone.entity.*;
 import com.re.greenphone.entity.Order;
+import com.re.greenphone.event.OrderCreatedEvent;
 import com.re.greenphone.mapper.OrderMapper;
 import com.re.greenphone.repository.*;
 import com.re.greenphone.security.SecurityUtils;
@@ -32,6 +33,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
+    @org.mockito.Mock com.re.greenphone.service.OrderCostService orderCostService;
+
 
     @Mock private OrderRepository orderRepository;
     @Mock private com.re.greenphone.repository.OrderHistoryRepository orderHistoryRepository;
@@ -113,12 +116,15 @@ class OrderServiceTest {
         when(orderMapper.toDto(any())).thenReturn(new OrderDTO());
         when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
+        when(orderCostService.snapshot(100L)).thenReturn(new BigDecimal("750"));
         orderService.createOrder(req);
 
         assertEquals(8, v.getStockQuantity());
         verify(inventoryStockHistoryService).recordAtWarehouse(eq(v), eq(10), eq(-2), eq("EXPORT"), anyString(), eq(1L));
-        verify(orderRepository).save(any());
-        verify(emailService).sendOrderConfirmation(eq(USER_EMAIL), anyString());
+        ArgumentCaptor<Order> saved = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(saved.capture());
+        assertEquals(new BigDecimal("750"), saved.getValue().getOrderDetails().get(0).getUnitCost());
+        verify(eventPublisher).publishEvent(argThat((Object e) -> e instanceof OrderCreatedEvent oce && USER_EMAIL.equals(oce.getToEmail())));
     }
 
     @Test void createOrder_BankTransfer_NoConfirmationEmail() {
@@ -135,7 +141,7 @@ class OrderServiceTest {
         orderService.createOrder(req);
 
         // VIETQR orders are emailed only once payment is confirmed (SepayService)
-        verify(emailService, never()).sendOrderConfirmation(anyString(), anyString());
+        verify(eventPublisher, never()).publishEvent(any(OrderCreatedEvent.class));
     }
 
     @Test void createOrder_VariantNotFound() {
@@ -573,5 +579,138 @@ class OrderServiceTest {
 
         assertEquals("CANCELLED", result.getOrderStatus());
         verify(warehouseTransferService).cancelTransfersForOrder(eq(888L), eq("Khách đổi ý"));
+    }
+
+    @Test
+    @DisplayName("VAT: Đặt hàng kèm thông tin hóa đơn VAT doanh nghiệp được lưu trữ chính xác")
+    void createOrder_WithVatInvoice_StoresAndMapsVatDetails() {
+        stubUser();
+
+        PhoneVariant v = createVariant(100L, new BigDecimal("1000.00"), null, 10);
+        when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(v));
+
+        OrderRequest req = createOrderReq(List.of(createItemReq(100L, 2)), null);
+        req.setRequestInvoice(true);
+        req.setCompanyName("CÔNG TY CỔ PHẦN CÔNG NGHỆ GREEN TECH");
+        req.setTaxCode("0101234567");
+        req.setCompanyAddress("123 Phố Duy Tân, Cầu Giấy, Hà Nội");
+        req.setInvoiceEmail("ketoan@greentech.vn");
+
+        when(orderRepository.save(any())).thenAnswer(inv -> {
+            Order o = inv.getArgument(0);
+            o.setId(101L);
+            return o;
+        });
+
+        when(orderMapper.toDto(any())).thenAnswer(inv -> {
+            Order o = inv.getArgument(0);
+            return OrderDTO.builder()
+                    .id(o.getId())
+                    .companyName(o.getCompanyName())
+                    .taxCode(o.getTaxCode())
+                    .companyAddress(o.getCompanyAddress())
+                    .invoiceEmail(o.getInvoiceEmail())
+                    .hasInvoice(o.getCompanyName() != null)
+                    .build();
+        });
+
+        OrderDTO result = orderService.createOrder(req);
+
+        assertNotNull(result);
+        assertTrue(result.getHasInvoice());
+        assertEquals("CÔNG TY CỔ PHẦN CÔNG NGHỆ GREEN TECH", result.getCompanyName());
+        assertEquals("0101234567", result.getTaxCode());
+        assertEquals("123 Phố Duy Tân, Cầu Giấy, Hà Nội", result.getCompanyAddress());
+        assertEquals("ketoan@greentech.vn", result.getInvoiceEmail());
+
+        verify(orderRepository).save(argThat(o ->
+                "CÔNG TY CỔ PHẦN CÔNG NGHỆ GREEN TECH".equals(o.getCompanyName())
+                        && "0101234567".equals(o.getTaxCode())
+                        && "123 Phố Duy Tân, Cầu Giấy, Hà Nội".equals(o.getCompanyAddress())
+                        && "ketoan@greentech.vn".equals(o.getInvoiceEmail())
+        ));
+    }
+
+    @Test
+    void createOrder_WithVatInvoice_InvalidTaxCode_ThrowsBadRequest() {
+        stubUser();
+
+        OrderRequest req = createOrderReq(List.of(createItemReq(100L, 2)), null);
+        req.setRequestInvoice(true);
+        req.setCompanyName("CÔNG TY CỔ PHẦN CÔNG NGHỆ GREEN TECH");
+        req.setTaxCode("123"); // invalid MST
+        req.setCompanyAddress("123 Phố Duy Tân, Cầu Giấy, Hà Nội");
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> orderService.createOrder(req));
+        assertTrue(ex.getMessage().contains("Mã số thuế"));
+    }
+
+    @Test
+    void createOrder_WithVatInvoice_MissingCompanyName_ThrowsBadRequest() {
+        stubUser();
+
+        OrderRequest req = createOrderReq(List.of(createItemReq(100L, 2)), null);
+        req.setRequestInvoice(true);
+        req.setCompanyName("   "); // blank
+        req.setTaxCode("0101234567");
+        req.setCompanyAddress("123 Phố Duy Tân, Cầu Giấy, Hà Nội");
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> orderService.createOrder(req));
+        assertTrue(ex.getMessage().contains("Tên công ty"));
+    }
+
+    @Test
+    void getPublicInvoiceByToken_Success_MasksPhoneAndStripsInternalTags() {
+        String token = "uuid-secret-token-12345";
+        Order order = Order.builder()
+                .receiverName("Trần Văn A")
+                .receiverPhone("0912345678")
+                .orderStatus("CONFIRMED")
+                .paymentStatus("PAID")
+                .note("Giao sáng [KÈM_HÓA_ĐƠN_GIẤY] [VAT_INVOICE: test]")
+                .invoiceToken(token)
+                .build();
+        order.setId(282L);
+
+        when(orderRepository.findByInvoiceTokenWithDetails(token)).thenReturn(Optional.of(order));
+        when(orderMapper.toDto(order)).thenReturn(OrderDTO.builder()
+                .id(282L)
+                .receiverName("Trần Văn A")
+                .receiverPhone("0912345678")
+                .orderStatus("CONFIRMED")
+                .paymentStatus("PAID")
+                .note("Giao sáng [KÈM_HÓA_ĐƠN_GIẤY] [VAT_INVOICE: test]")
+                .invoiceToken(token)
+                .build());
+
+        OrderDTO result = orderService.getPublicInvoiceByToken(token);
+
+        assertNotNull(result);
+        assertEquals(282L, result.getId());
+        assertEquals("091****678", result.getReceiverPhone()); // PII masked!
+        assertEquals("Giao sáng", result.getNote()); // Internal tags cleaned!
+    }
+
+    @Test
+    void getPublicInvoiceByToken_UnapprovedPendingOrder_ThrowsBadRequest() {
+        String token = "uuid-pending-token-999";
+        Order order = Order.builder()
+                .orderStatus("PENDING")
+                .paymentStatus("UNPAID")
+                .invoiceToken(token)
+                .build();
+
+        when(orderRepository.findByInvoiceTokenWithDetails(token)).thenReturn(Optional.of(order));
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> orderService.getPublicInvoiceByToken(token));
+        assertTrue(ex.getMessage().contains("chờ kế toán kiểm duyệt"));
+    }
+
+    @Test
+    void getPublicInvoiceByToken_NotFound_ThrowsResourceNotFound() {
+        String token = "unknown-token";
+        when(orderRepository.findByInvoiceTokenWithDetails(token)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> orderService.getPublicInvoiceByToken(token));
     }
 }

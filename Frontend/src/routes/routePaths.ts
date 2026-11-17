@@ -15,6 +15,7 @@ export const ROUTES = {
   WISHLIST: '/yeu-thich',
   WARRANTY_CHECK: '/tra-cuu-bao-hanh',
   PHONE_COMPARE: '/so-sanh',
+  PUBLIC_INVOICE: (token: number | string = ':token') => `/hoa-don/${token}`,
   // Legal
   DIEU_KHOAN: '/dieu-khoan',
   CHINH_SACH_BAO_MAT: '/chinh-sach-bao-mat',
@@ -32,6 +33,7 @@ export const ROUTES = {
   ACCOUNT_NOTIFICATIONS: '/tai-khoan/thong-bao',
   ACCOUNT_REVIEWS: '/tai-khoan/danh-gia',
   ACCOUNT_WISHLIST: '/tai-khoan/yeu-thich',
+  ACCOUNT_DEVICES: '/tai-khoan/thiet-bi',
   ACCOUNT_CHANGE_PASSWORD: '/tai-khoan/doi-mat-khau',
   ACCOUNT_RETURN_REQUEST: '/tai-khoan/doi-tra',
   // Admin
@@ -73,6 +75,7 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   '/quen-mat-khau': 'Quên mật khẩu',
   '/tai-khoan': 'Tài khoản',
   '/tai-khoan/thong-bao': 'Thông báo',
+  '/tai-khoan/thiet-bi': 'Thiết bị đăng nhập',
   '/yeu-thich': 'Sản phẩm yêu thích',
   '/tai-khoan/yeu-thich': 'Sản phẩm yêu thích',
   '/tra-cuu-bao-hanh': 'Tra cứu bảo hành',

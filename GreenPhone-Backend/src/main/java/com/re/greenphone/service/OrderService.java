@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import com.re.greenphone.event.NotificationEvent;
+import com.re.greenphone.event.OrderCreatedEvent;
 import com.re.greenphone.enums.NotificationType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -28,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -40,6 +42,7 @@ import java.util.concurrent.TimeUnit;
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final OrderCostService orderCostService;
     private final com.re.greenphone.repository.OrderHistoryRepository orderHistoryRepository;
     private final UserRepository userRepository;
     private final PhoneVariantRepository phoneVariantRepository;
@@ -47,7 +50,6 @@ public class OrderService {
     private final PromotionRepository promotionRepository;
     private final CartRepository cartRepository;
     private final OrderMapper orderMapper;
-    private final EmailService emailService;
     private final SettingsService settingsService;
     private final InventoryStockHistoryService inventoryStockHistoryService;
     private final WarehouseRoutingService warehouseRoutingService;
@@ -56,6 +58,7 @@ public class OrderService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final ApplicationEventPublisher eventPublisher;
 
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public OrderCreationResult createOrderWithIdempotency(OrderRequest request, String idempotencyKey) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             OrderDTO order = executeCreateOrder(request);
@@ -104,6 +107,7 @@ public class OrderService {
         }
     }
 
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public OrderDTO createOrder(OrderRequest request) {
         return createOrderWithIdempotency(request, null).getOrder();
     }
@@ -115,13 +119,46 @@ public class OrderService {
 
         // Calculate total
         BigDecimal total = BigDecimal.ZERO;
+        String companyName = request.getCompanyName() != null ? request.getCompanyName().trim() : null;
+        String taxCode = request.getTaxCode() != null ? request.getTaxCode().trim() : null;
+        String companyAddress = request.getCompanyAddress() != null ? request.getCompanyAddress().trim() : null;
+        String invoiceEmail = request.getInvoiceEmail() != null ? request.getInvoiceEmail().trim() : null;
+
+        String note = request.getNote();
+        if (Boolean.TRUE.equals(request.getIncludePaperInvoice())) {
+            if (note == null || !note.contains("[KÈM_HÓA_ĐƠN_GIẤY]")) {
+                note = (note != null && !note.isBlank()) ? note + " [KÈM_HÓA_ĐƠN_GIẤY]" : "[KÈM_HÓA_ĐƠN_GIẤY]";
+            }
+        }
+
+        // Validate corporate VAT invoice information if requested
+        if (Boolean.TRUE.equals(request.getRequestInvoice()) || (companyName != null && !companyName.isBlank())) {
+            if (companyName == null || companyName.isBlank()) {
+                throw new BadRequestException("Tên công ty xuất hóa đơn VAT không được để trống");
+            }
+            if (taxCode == null || !taxCode.matches("^(\\d{10}|\\d{13}|\\d{10}-\\d{3})$")) {
+                throw new BadRequestException("Mã số thuế không hợp lệ (phải gồm 10 hoặc 13 chữ số)");
+            }
+            if (companyAddress == null || companyAddress.isBlank()) {
+                throw new BadRequestException("Địa chỉ công ty xuất hóa đơn VAT không được để trống");
+            }
+            if (invoiceEmail != null && !invoiceEmail.isBlank() && !invoiceEmail.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+                throw new BadRequestException("Email nhận hóa đơn không đúng định dạng");
+            }
+        }
+
         Order order = Order.builder()
                 .user(user)
                 .receiverName(request.getReceiverName())
                 .receiverPhone(request.getReceiverPhone())
                 .shippingAddress(request.getShippingAddress())
                 .paymentMethod(request.getPaymentMethod())
-                .note(request.getNote())
+                .note(note)
+                .companyName(companyName)
+                .taxCode(taxCode)
+                .companyAddress(companyAddress)
+                .invoiceEmail(invoiceEmail)
+                .invoiceToken(UUID.randomUUID().toString())
                 .orderStatus("PENDING")
                 .paymentStatus("UNPAID")
                 .discountAmount(BigDecimal.ZERO)
@@ -211,6 +248,7 @@ public class OrderService {
                     .storage(storageVal)
                     .color(colorVal)
                     .quantity(itemReq.getQuantity())
+                    .unitCost(orderCostService.snapshot(variant.getId()))
                     .unitPrice(price)
                     .subtotal(subtotal)
                     .build();
@@ -300,11 +338,14 @@ public class OrderService {
         }
 
         // Confirmation email:
-        // - COD: confirmed at creation.
+        // - COD: confirmed at creation via OrderCreatedEvent (sent after transaction commit).
         // - Bank transfer (VIETQR): only when the payment is confirmed via the
         //   Sepay webhook — sending it here would reach the user before they pay.
-        if (!"VIETQR".equalsIgnoreCase(request.getPaymentMethod())) {
-            emailService.sendOrderConfirmation(user.getEmail(), String.valueOf(order.getId()));
+        if (!"VIETQR".equalsIgnoreCase(request.getPaymentMethod()) && eventPublisher != null) {
+            eventPublisher.publishEvent(OrderCreatedEvent.builder()
+                    .orderId(order.getId())
+                    .toEmail(user.getEmail())
+                    .build());
         }
 
         // Bắn sự kiện thông báo in-app bất đồng bộ
@@ -394,6 +435,59 @@ public class OrderService {
         }
 
         return orderMapper.toDto(order);
+    }
+
+    /**
+     * Tra cứu hóa đơn điện tử công khai qua invoiceToken bí mật (UUID v4)
+     * Ngăn chặn triệt để lỗ hổng IDOR & rò rỉ dữ liệu PII
+     */
+    @Transactional(readOnly = true)
+    public OrderDTO getPublicInvoiceByToken(String invoiceToken) {
+        if (invoiceToken == null || invoiceToken.isBlank()) {
+            throw new BadRequestException("Mã tra cứu hóa đơn không hợp lệ");
+        }
+        Order order = orderRepository.findByInvoiceTokenWithDetails(invoiceToken)
+                .orElseThrow(() -> new ResourceNotFoundException("Hóa đơn", "invoiceToken", invoiceToken));
+
+        // Kiểm tra điều kiện xuất hóa đơn: Đơn hàng phải đã thanh toán (PAID) hoặc đã được duyệt/đang giao/đã giao
+        boolean isInvoiceEligible = "PAID".equalsIgnoreCase(order.getPaymentStatus()) ||
+                java.util.Set.of("CONFIRMED", "PROCESSING", "SHIPPING", "DELIVERED", "COMPLETED")
+                        .contains(order.getOrderStatus());
+        if (!isInvoiceEligible) {
+            throw new BadRequestException("Hóa đơn đang chờ kế toán kiểm duyệt và phát hành");
+        }
+
+        OrderDTO dto = orderMapper.toDto(order);
+
+        // Bảo vệ thông tin cá nhân (PII Masking)
+        if (dto.getReceiverPhone() != null && dto.getReceiverPhone().length() >= 7) {
+            String phone = dto.getReceiverPhone();
+            String maskedPhone = phone.substring(0, 3) + "****" + phone.substring(phone.length() - 3);
+            dto.setReceiverPhone(maskedPhone);
+        }
+
+        // Loại bỏ các thẻ kỹ thuật nội bộ trong ghi chú
+        if (dto.getNote() != null) {
+            String cleanNote = dto.getNote()
+                    .replaceAll("\\[Lý do hủy:.*?\\]", "")
+                    .replaceAll("\\[(?:Hóa đơn VAT|VAT_INVOICE|VAT):.*?\\]", "")
+                    .replaceAll("\\[(?:KÈM_HÓA_ĐƠN_GIẤY|PAPER_INVOICE|YÊU CẦU HÓA ĐƠN GIẤY)\\]", "")
+                    .replaceAll("\\[(?:YÊU CẦU HOÀN TIỀN|REFUND).*?\\]", "")
+                    .trim();
+            dto.setNote(cleanNote.isEmpty() ? null : cleanNote);
+        }
+
+        return dto;
+    }
+
+    /**
+     * Tra cứu hóa đơn theo Order ID (chỉ dành cho internal/test hoặc user đã xác thực)
+     */
+    @Transactional(readOnly = true)
+    public OrderDTO getPublicInvoice(Long orderId) {
+        Order order = orderRepository.findByIdWithDetails(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", orderId));
+        return getPublicInvoiceByToken(order.getInvoiceToken() != null ? order.getInvoiceToken() : String.valueOf(order.getId()));
     }
 
     public OrderDTO cancelOrder(Long orderId) {

@@ -266,6 +266,12 @@ export interface OrderRequest {
   buyNow?: boolean;
   latitude?: number;
   longitude?: number;
+  requestInvoice?: boolean;
+  includePaperInvoice?: boolean;
+  companyName?: string;
+  taxCode?: string;
+  companyAddress?: string;
+  invoiceEmail?: string;
   items: OrderItemRequest[];
 }
 
@@ -297,11 +303,22 @@ export interface OrderDTO {
   paymentStatus: string;
   paymentMethod: string;
   note: string;
+  hasInvoice?: boolean;
+  includePaperInvoice?: boolean;
+  companyName?: string;
+  taxCode?: string;
+  companyAddress?: string;
+  invoiceEmail?: string;
+  invoiceToken?: string;
+  invoiceStatus?: 'PENDING' | 'ISSUED' | string;
+  invoiceIssuedAt?: string;
   promotionCode: string;
   createdAt: string;
   updatedAt?: string;
   orderDetails: OrderDetailDTO[];
 }
+
+export type OrderResponse = OrderDTO;
 
 export interface OrderHistoryDTO {
   id: number;
@@ -480,6 +497,7 @@ export interface RevenueStats {
   period: string;
   startDate: string;
   endDate: string;
+  timeSeriesData: { date: string; revenue: number }[];
 }
 
 export interface OrderStats {
@@ -488,6 +506,8 @@ export interface OrderStats {
   pendingOrders: number;
   cancelledOrders: number;
   deliveredOrders: number;
+  processingOrders: number;
+  shippingOrders: number;
   period: string;
 }
 
@@ -745,3 +765,23 @@ export interface PhoneComparisonResponseDTO {
   differencesKeys: string[];
 }
 
+
+export interface FinancialTimeSeriesPoint { date: string; revenue: number; grossProfit?: number | null }
+export interface PaymentMethodBreakdown { paymentMethod: string; revenue: number }
+export interface FinancialReport {
+  grossRevenue: number; discountAmount: number; shippingFee: number; netRevenue: number;
+  cogs: number | null; grossProfit: number | null; profitMarginPercentage: number | null;
+  refundAmount: number; uncostedQuantity: number; startDate: string; endDate: string;
+  timeSeriesData: FinancialTimeSeriesPoint[]; paymentMethodStats: PaymentMethodBreakdown[];
+}
+
+// User Device Sessions (USR-16)
+export interface DeviceSessionDTO {
+  id: number;
+  deviceName: string;
+  os: string;
+  browser: string;
+  ipAddress: string;
+  isCurrentSession: boolean;
+  lastActiveAt: string;
+}

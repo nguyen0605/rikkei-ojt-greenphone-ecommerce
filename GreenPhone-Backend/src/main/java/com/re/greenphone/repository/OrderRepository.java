@@ -39,6 +39,12 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                                             @Param("status") String status,
                                             Pageable pageable);
 
+    @Query("select function('date', function('convert_tz', o.createdAt, '+00:00', '+07:00')), sum(o.totalAmount), sum(coalesce(o.discountAmount,0)), sum(coalesce(o.shippingFee,0)), count(o) from Order o where o.paymentStatus='PAID' and o.createdAt>=:from and o.createdAt<:to group by function('date', function('convert_tz', o.createdAt, '+00:00', '+07:00'))")
+    List<Object[]> financialDaily(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    @Query("select o.paymentMethod, sum(o.totalAmount-coalesce(o.discountAmount,0)) from Order o where o.paymentStatus='PAID' and o.createdAt>=:from and o.createdAt<:to group by o.paymentMethod")
+    List<Object[]> paymentBreakdown(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
     long countByOrderStatus(String orderStatus);
 
     long countByCreatedAtAfter(LocalDateTime date);
@@ -51,7 +57,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     long countByCreatedAtBetween(LocalDateTime from, LocalDateTime to);
 
-    long countByOrderStatusAndCreatedAtBetween(String orderStatus, LocalDateTime from, LocalDateTime to);
+    @Query("select count(o) from Order o where o.orderStatus=:orderStatus and o.createdAt>=:from and o.createdAt<:to")
+    long countByOrderStatusAndCreatedAtBetween(@Param("orderStatus") String orderStatus, @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
     List<Order> findByOrderStatusAndPaymentStatusAndPaymentMethodInAndCreatedAtBefore(
             String orderStatus, String paymentStatus, List<String> paymentMethods, LocalDateTime dateTime);
@@ -64,4 +71,15 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             "LEFT JOIN FETCH up.promotion " +
             "WHERE o.id = :id")
     Optional<Order> findByIdWithDetails(@Param("id") Long id);
+
+    @Query("SELECT DISTINCT o FROM Order o " +
+            "LEFT JOIN FETCH o.orderDetails od " +
+            "LEFT JOIN FETCH od.phoneVariant pv " +
+            "LEFT JOIN FETCH o.user u " +
+            "LEFT JOIN FETCH o.userPromotion up " +
+            "LEFT JOIN FETCH up.promotion " +
+            "WHERE o.invoiceToken = :token")
+    Optional<Order> findByInvoiceTokenWithDetails(@Param("token") String token);
+
+    Optional<Order> findByInvoiceToken(String invoiceToken);
 }

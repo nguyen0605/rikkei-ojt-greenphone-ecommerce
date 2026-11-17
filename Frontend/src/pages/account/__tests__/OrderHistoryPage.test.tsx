@@ -98,8 +98,8 @@ const mockOrders: OrderDTO[] = [
   },
 ];
 
-function renderWithClient(initialRoute = '/tai-khoan/don-hang') {
-  const queryClient = new QueryClient({
+function renderWithClient(initialRoute = '/tai-khoan/don-hang', customClient?: QueryClient) {
+  const queryClient = customClient || new QueryClient({
     defaultOptions: {
       queries: {
         retry: false,
@@ -252,6 +252,37 @@ describe('OrderHistoryPage', () => {
       expect(screen.getByText(/Không thể tải danh sách đơn hàng/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /thử lại/i })).toBeInTheDocument();
     });
+  });
+
+  it('pre-populates order cache in queryClient on load for seamless detail view', async () => {
+    const testClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          gcTime: 10000,
+        },
+      },
+    });
+
+    vi.mocked(orderService.list).mockResolvedValue({
+      content: mockOrders,
+      totalElements: 3,
+      totalPages: 1,
+      page: 0,
+      size: 10,
+      last: true,
+    });
+
+    renderWithClient('/tai-khoan/don-hang', testClient);
+
+    await waitFor(() => {
+      expect(screen.getByText('#101')).toBeInTheDocument();
+    });
+
+    // Kiểm tra cache đã được đồng bộ cho cả key string và number
+    expect(testClient.getQueryData(['order', '101'])).toEqual(mockOrders[0]);
+    expect(testClient.getQueryData(['order', 101])).toEqual(mockOrders[0]);
+    expect(testClient.getQueryData(['order', '102'])).toEqual(mockOrders[1]);
   });
 });
 

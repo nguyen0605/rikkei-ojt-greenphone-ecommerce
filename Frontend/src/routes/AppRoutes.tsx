@@ -22,6 +22,7 @@ const TermsPage = lazy(() => import('@/pages/terms/TermsPageShell'));
 const PrivacyPage = lazy(() => import('@/pages/terms/PrivacyPage'));
 const WarrantyCheckPage = lazy(() => import('@/pages/warranty/WarrantyCheckPage'));
 const PhoneComparePage = lazy(() => import('@/pages/customer/PhoneComparePage'));
+const PublicInvoicePage = lazy(() => import('@/pages/order/PublicInvoicePage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
 const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage'));
@@ -34,6 +35,7 @@ const AccountOrdersPage = lazy(() => import('@/pages/account/AccountOrdersPage')
 const AccountOrderDetailPage = lazy(() => import('@/pages/account/AccountOrderDetailPage'));
 const ReturnRequestPage = lazy(() => import('@/pages/ReturnRequestPage'));
 const AccountReviewsPage = lazy(() => import('@/pages/account/AccountReviewsPage'));
+const AccountDevicesPage = lazy(() => import('@/pages/account/AccountDevicesPage'));
 const AccountPasswordPage = lazy(() => import('@/pages/account/AccountPasswordPage'));
 const AdminDashboardPage = lazy(() => import('@/pages/admin/AdminDashboardPage'));
 const AdminProductsPage = lazy(() => import('@/pages/admin/AdminProductsPage'));
@@ -78,6 +80,8 @@ export default function AppRoutes() {
         <Route path={ROUTES.CHINH_SACH_BAO_MAT} element={withSuspense(PrivacyPage)} />
         <Route path={ROUTES.WARRANTY_CHECK} element={withSuspense(WarrantyCheckPage)} />
         <Route path={ROUTES.PHONE_COMPARE} element={withSuspense(PhoneComparePage)} />
+        <Route path="/hoa-don/:token" element={withSuspense(PublicInvoicePage)} />
+        <Route path="/hoa-don-dien-tu/:token" element={withSuspense(PublicInvoicePage)} />
         <Route path="*" element={withSuspense(NotFoundPage)} />
       </Route>
 
@@ -107,11 +111,13 @@ export default function AppRoutes() {
         <Route path="/tai-khoan/don-hang/:id" element={withSuspense(AccountOrderDetailPage)} />
         <Route path={ROUTES.ACCOUNT_RETURN_REQUEST} element={withSuspense(ReturnRequestPage)} />
         <Route path={ROUTES.ACCOUNT_REVIEWS} element={withSuspense(AccountReviewsPage)} />
+        <Route path={ROUTES.ACCOUNT_DEVICES} element={withSuspense(AccountDevicesPage)} />
         <Route path={ROUTES.ACCOUNT_WISHLIST} element={withSuspense(WishlistPage)} />
         <Route path={ROUTES.ACCOUNT_CHANGE_PASSWORD} element={withSuspense(AccountPasswordPage)} />
         {/* Aliases for English /account routes */}
         <Route path="/account" element={<Navigate to={ROUTES.ACCOUNT_PROFILE} replace />} />
         <Route path="/account/profile" element={<Navigate to={ROUTES.ACCOUNT_PROFILE} replace />} />
+        <Route path="/account/devices" element={<Navigate to={ROUTES.ACCOUNT_DEVICES} replace />} />
         <Route path="/account/addresses" element={<Navigate to={ROUTES.ACCOUNT_ADDRESSES} replace />} />
         <Route path="/account/orders" element={<Navigate to={ROUTES.ACCOUNT_ORDERS} replace />} />
         <Route path="/account/reviews" element={<Navigate to={ROUTES.ACCOUNT_REVIEWS} replace />} />

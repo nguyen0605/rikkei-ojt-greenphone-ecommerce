@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   MapPin,
@@ -13,16 +13,19 @@ import {
   Clock,
   CheckCircle2,
   ShieldAlert,
+  Printer,
+  FileText,
 } from 'lucide-react';
 import { message, Tooltip } from 'antd';
 import { orderService } from '@/services/orderService';
 import { paymentService } from '@/services';
 import { returnService, type ReturnResponse } from '@/services/returnService';
 import ClaimProgressModal from '@/components/warranty/ClaimProgressModal';
-import type { OrderDetailDTO } from '@/types/api';
+import InvoicePrintModal from '@/components/order/InvoicePrintModal';
+import type { OrderDTO, OrderDetailDTO } from '@/types/api';
 import { formatVND } from '@/utils';
 import { ROUTES } from '@/routes/routePaths';
-import { extractCustomerNote } from '@/utils/orderStateMachine';
+import { extractCustomerNote, extractPaperInvoicePreference } from '@/utils/orderStateMachine';
 import { getStatusBadgeConfig, formatPaymentMethod } from '@/components/order/orderHelpers';
 import OrderTrackingTimeline from '@/components/order/OrderTrackingTimeline';
 import OrderCancelModal from '@/components/order/OrderCancelModal';
@@ -39,8 +42,10 @@ export const OrderDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useAppDispatch();
+  const queryClient = useQueryClient();
   const { resolveItem } = useOrderProductLookup();
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
   const [selectedReturnRequest, setSelectedReturnRequest] = useState<ReturnResponse | null>(null);
   const [progressModalOpen, setProgressModalOpen] = useState(false);
@@ -58,6 +63,26 @@ export const OrderDetailPage: React.FC = () => {
     queryKey: ['order', id],
     queryFn: () => orderService.detail(Number(id)),
     enabled: !!id,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    initialData: () => {
+      if (!id) return undefined;
+      const cached =
+        queryClient.getQueryData<OrderDTO>(['order', id]) ??
+        queryClient.getQueryData<OrderDTO>(['order', Number(id)]);
+      if (cached) return cached;
+
+      const ordersData = queryClient.getQueryData<{ content?: OrderDTO[] } | OrderDTO[]>(['orders']);
+      const list = Array.isArray(ordersData) ? ordersData : ordersData?.content;
+      return list?.find((item) => String(item.id) === String(id));
+    },
+    initialDataUpdatedAt: () => {
+      if (!id) return undefined;
+      return (
+        queryClient.getQueryState(['order', id])?.dataUpdatedAt ??
+        queryClient.getQueryState(['order', Number(id)])?.dataUpdatedAt
+      );
+    },
     refetchInterval: (query) => {
       const o = query.state.data;
       // Tự động polling 5s khi đơn PENDING chờ thanh toán ngân hàng
@@ -95,6 +120,14 @@ export const OrderDetailPage: React.FC = () => {
   const canCancel = order?.orderStatus === 'PENDING' || order?.orderStatus === 'CONFIRMED';
   const canReview = order?.orderStatus === 'DELIVERED';
   const canReorder = order?.orderDetails && order.orderDetails.length > 0;
+  // Điều kiện xem hóa đơn tài chính:
+  // - Nếu đơn hàng có yêu cầu xuất hóa đơn VAT: Bắt buộc đã được kế toán/hệ thống duyệt phát hành (invoiceStatus === 'ISSUED')
+  // - Nếu đơn hàng thông thường: Đã thanh toán (PAID) hoặc đã xác nhận/đang xử lý/đang giao/đã giao/hoàn tất
+  const isVatOrder = Boolean(order?.hasInvoice || order?.companyName);
+  const canViewInvoice = isVatOrder
+    ? order?.invoiceStatus === 'ISSUED'
+    : order?.paymentStatus === 'PAID' ||
+      ['CONFIRMED', 'PROCESSING', 'SHIPPING', 'DELIVERED', 'COMPLETED'].includes(order?.orderStatus || '');
 
   // Tính toán thời gian 7 ngày kể từ khi giao hàng thành công (DELIVERED hoặc COMPLETED)
   const isCompletedOrder = order?.orderStatus === 'COMPLETED' || order?.orderStatus === 'DELIVERED';
@@ -203,6 +236,7 @@ export const OrderDetailPage: React.FC = () => {
 
   const statusConfig = getStatusBadgeConfig(order.orderStatus, order.paymentStatus);
   const customerNote = extractCustomerNote(order.note);
+  const hasPaperInvoice = extractPaperInvoicePreference(order);
 
   return (
     <div className="space-y-6">
@@ -231,6 +265,36 @@ export const OrderDetailPage: React.FC = () => {
 
         {/* Cụm nút hành động trên Header */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Nút Xem hóa đơn điện tử (Dành cho khách hàng) */}
+          <Tooltip
+            title={
+              !canViewInvoice
+                ? isVatOrder
+                  ? 'Hóa đơn GTGT đang chờ kế toán kiểm duyệt và phát hành'
+                  : 'Hóa đơn đang chờ kiểm duyệt và phát hành'
+                : 'Xem và in hóa đơn bán lẻ kiêm phiếu bảo hành chính thức'
+            }
+          >
+            <span>
+              <button
+                type="button"
+                data-testid="view-invoice-btn"
+                disabled={!canViewInvoice}
+                onClick={() => {
+                  if (canViewInvoice) setInvoiceModalOpen(true);
+                }}
+                className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-semibold transition-colors shadow-2xs ${
+                  canViewInvoice
+                    ? 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 cursor-pointer'
+                    : 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
+                }`}
+              >
+                <FileText className={`h-3.5 w-3.5 ${canViewInvoice ? 'text-emerald-600' : 'text-gray-400'}`} />
+                <span>Xem hóa đơn</span>
+              </button>
+            </span>
+          </Tooltip>
+
           {canCancel && (
             <button
               type="button"
@@ -391,6 +455,22 @@ export const OrderDetailPage: React.FC = () => {
                 </span>
               </div>
             )}
+
+            {/* Hình thức hóa đơn */}
+            <div className="flex justify-between items-center pt-2.5 border-t border-gray-100">
+              <span className="text-gray-500">Hình thức hóa đơn:</span>
+              {hasPaperInvoice ? (
+                <span className="font-semibold text-emerald-700 inline-flex items-center gap-1 text-xs">
+                  <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                  Kèm hóa đơn giấy khi giao hàng
+                </span>
+              ) : (
+                <span className="text-gray-600 inline-flex items-center gap-1 text-xs">
+                  <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                  Hóa đơn điện tử trực tuyến
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -566,6 +646,15 @@ export const OrderDetailPage: React.FC = () => {
         onClose={() => setProgressModalOpen(false)}
         returnRequest={selectedReturnRequest}
       />
+
+      {/* Modal In hóa đơn bán lẻ kiêm phiếu bảo hành */}
+      {order && (
+        <InvoicePrintModal
+          open={invoiceModalOpen}
+          onClose={() => setInvoiceModalOpen(false)}
+          order={order}
+        />
+      )}
     </div>
   );
 };

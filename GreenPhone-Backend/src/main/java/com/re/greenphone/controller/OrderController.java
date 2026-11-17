@@ -44,6 +44,11 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success(orderService.getOrderDetail(id)));
     }
 
+    @GetMapping("/invoice/{invoiceToken}")
+    public ResponseEntity<ApiResponse<com.re.greenphone.dto.response.OrderDTO>> getPublicInvoice(@PathVariable String invoiceToken) {
+        return ResponseEntity.ok(ApiResponse.success(orderService.getPublicInvoiceByToken(invoiceToken)));
+    }
+
     @PostMapping
     public ResponseEntity<ApiResponse<?>> create(
             @Valid @RequestBody OrderRequest request,

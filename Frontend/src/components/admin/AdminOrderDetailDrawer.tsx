@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Drawer, Space, Button, Descriptions, Tag, Table, Divider, Popconfirm, message, type TableColumnsType } from 'antd';
 import { Link } from 'react-router-dom';
 import {
@@ -9,16 +10,23 @@ import {
   EnvironmentOutlined,
   FileTextOutlined,
   CreditCardOutlined,
+  PrinterOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminOrderService } from '@/services';
 import type { OrderDTO, OrderDetailDTO, AdminOrderDetailDTO } from '@/types/api';
 import { formatVND, formatDate } from '@/utils';
 import StatusTag from '@/components/admin/StatusTag';
-import { extractCancelReason, extractCustomerNote, isTerminalOrderStatus } from '@/utils/orderStateMachine';
+import {
+  extractCancelReason,
+  extractCustomerNote,
+  extractPaperInvoicePreference,
+  isTerminalOrderStatus,
+} from '@/utils/orderStateMachine';
 import { useOrderProductLookup } from '@/hooks/useOrderProductLookup';
 import OrderItemThumbnail from '@/components/order/OrderItemThumbnail';
 import ShipmentTrackingCard from '@/components/order/ShipmentTrackingCard';
+import InvoicePrintModal from '@/components/order/InvoicePrintModal';
 
 interface AdminOrderDetailDrawerProps {
   open: boolean;
@@ -39,6 +47,7 @@ export default function AdminOrderDetailDrawer({
 }: AdminOrderDetailDrawerProps) {
   const qc = useQueryClient();
   const { resolveItem } = useOrderProductLookup();
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
 
   // Query chi tiết đơn hàng
   const { data: order, isLoading } = useQuery({
@@ -57,6 +66,20 @@ export default function AdminOrderDetailDrawer({
     },
     onError: (err: unknown) => {
       const errMsg = (err as { message?: string })?.message || 'Có lỗi khi cập nhật trạng thái hoàn tiền';
+      message.error(errMsg);
+    },
+  });
+
+  // Mutation duyệt & phát hành hóa đơn điện tử
+  const issueInvoiceMutation = useMutation({
+    mutationFn: (id: number) => adminOrderService.issueInvoice(id),
+    onSuccess: () => {
+      message.success(`Đã duyệt và phát hành hóa đơn điện tử thành công cho đơn hàng #${orderId}`);
+      qc.invalidateQueries({ queryKey: ['admin-order-detail', orderId] });
+      qc.invalidateQueries({ queryKey: ['admin-orders'] });
+    },
+    onError: (err: unknown) => {
+      const errMsg = (err as { message?: string })?.message || 'Có lỗi khi duyệt phát hành hóa đơn';
       message.error(errMsg);
     },
   });
@@ -130,10 +153,12 @@ export default function AdminOrderDetailDrawer({
 
   const cancelReason = extractCancelReason(order?.note);
   const customerNote = extractCustomerNote(order?.note);
+  const hasPaperInvoice = extractPaperInvoicePreference(order);
   const isTerminal = isTerminalOrderStatus(order?.orderStatus);
 
   return (
-    <Drawer
+    <>
+      <Drawer
       title={
         <div className="flex items-center justify-between pr-4">
           <div className="flex items-center gap-2">
@@ -149,16 +174,18 @@ export default function AdminOrderDetailDrawer({
           )}
         </div>
       }
-      width={680}
+      width={800}
       open={open}
       onClose={onClose}
       loading={isLoading}
       footer={
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-ink-3">
-            Mã khách hàng: #{order?.userId} ({order?.userName})
-          </span>
-          <Space>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-1.5 text-xs text-ink-3 shrink-0 whitespace-nowrap">
+            <span>Mã khách hàng:</span>
+            <span className="font-semibold text-ink">#{order?.userId}</span>
+            {order?.userName && <span>({order.userName})</span>}
+          </div>
+          <Space wrap className="justify-end">
             {/* Chỉ cho phép hủy khi đơn chưa ở trạng thái kết thúc (DELIVERED, CANCELLED) */}
             {order && !isTerminal && onOpenCancelModal && (
               <Button
@@ -203,6 +230,44 @@ export default function AdminOrderDetailDrawer({
               </Popconfirm>
             )}
 
+            {/* Xử lý hóa đơn VAT: Nếu đơn hàng có yêu cầu VAT và đang PENDING, hiển thị nút Duyệt & Phát hành; Sau khi duyệt xong (ISSUED) mới hiển thị nút in */}
+            {order && (order.hasInvoice || order.companyName) ? (
+              order.invoiceStatus !== 'ISSUED' ? (
+                <Popconfirm
+                  title="Xác nhận duyệt & phát hành hóa đơn"
+                  description="Bạn đã kiểm tra thông tin công ty, mã số thuế và muốn duyệt phát hành hóa đơn chính thức cho đơn hàng này?"
+                  okText="Duyệt phát hành"
+                  cancelText="Hủy"
+                  onConfirm={() => issueInvoiceMutation.mutate(order.id)}
+                >
+                  <Button
+                    type="primary"
+                    className="!bg-blue-600 hover:!bg-blue-700"
+                    icon={<CheckCircleOutlined />}
+                    loading={issueInvoiceMutation.isPending}
+                  >
+                    Duyệt & Phát hành hóa đơn
+                  </Button>
+                </Popconfirm>
+              ) : (
+                <Button
+                  icon={<PrinterOutlined />}
+                  onClick={() => setInvoiceModalOpen(true)}
+                >
+                  In phiếu xuất kho & Hóa đơn
+                </Button>
+              )
+            ) : (
+              order && (
+                <Button
+                  icon={<PrinterOutlined />}
+                  onClick={() => setInvoiceModalOpen(true)}
+                >
+                  In phiếu xuất kho & Hóa đơn
+                </Button>
+              )
+            )}
+
             <Button onClick={onClose}>Đóng</Button>
           </Space>
         </div>
@@ -217,7 +282,7 @@ export default function AdminOrderDetailDrawer({
                 <div className="space-y-1.5 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold uppercase tracking-wider text-amber-800">
-                      ⚡ Yêu cầu hoàn tiền khách hàng
+                      Yêu cầu hoàn tiền khách hàng
                     </span>
                     <Tag color="volcano" className="!m-0 !font-semibold">
                       CHỜ HOÀN TIỀN
@@ -348,8 +413,59 @@ export default function AdminOrderDetailDrawer({
                   <Tag color="cyan">Mã: {order.promotionCode}</Tag>
                 </Descriptions.Item>
               )}
+              <Descriptions.Item label="Yêu cầu hóa đơn">
+                {hasPaperInvoice ? (
+                  <Tag color="volcano" className="!font-semibold">
+                    <PrinterOutlined className="mr-1" />
+                    Kèm hóa đơn giấy
+                  </Tag>
+                ) : (
+                  <Tag color="green" className="!font-medium">
+                    Hóa đơn điện tử trực tuyến
+                  </Tag>
+                )}
+              </Descriptions.Item>
             </Descriptions>
           </div>
+
+          {/* 3.1. Thông tin xuất Hóa đơn GTGT (Doanh nghiệp) */}
+          {(order.hasInvoice || order.companyName) && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileTextOutlined className="text-blue-600" />
+                  <h4 className="text-sm font-semibold uppercase tracking-wider text-blue-900">
+                    Hóa đơn giá trị gia tăng (VAT)
+                  </h4>
+                </div>
+                <Tag
+                  color={order.invoiceStatus === 'ISSUED' ? 'success' : 'warning'}
+                  className="!m-0 !font-semibold uppercase"
+                >
+                  {order.invoiceStatus === 'ISSUED' ? 'ĐÃ PHÁT HÀNH' : 'CHỜ DUYỆT PHÁT HÀNH'}
+                </Tag>
+              </div>
+              <Descriptions size="small" column={{ xs: 1, sm: 2 }} className="bg-white/80 p-3 rounded-lg border border-blue-100">
+                <Descriptions.Item label="Tên công ty" span={2}>
+                  <strong className="text-ink">{order.companyName}</strong>
+                </Descriptions.Item>
+                <Descriptions.Item label="Mã số thuế">
+                  <span className="font-mono font-semibold text-blue-700">{order.taxCode}</span>
+                </Descriptions.Item>
+                <Descriptions.Item label="Email nhận HĐ">
+                  <span className="text-ink-2">{order.invoiceEmail || 'Chưa cập nhật'}</span>
+                </Descriptions.Item>
+                <Descriptions.Item label="Địa chỉ công ty" span={2}>
+                  <span className="text-ink-2">{order.companyAddress}</span>
+                </Descriptions.Item>
+                {order.invoiceIssuedAt && (
+                  <Descriptions.Item label="Thời điểm phát hành" span={2}>
+                    <span className="text-ink-2">{formatDate(order.invoiceIssuedAt)}</span>
+                  </Descriptions.Item>
+                )}
+              </Descriptions>
+            </div>
+          )}
 
           {/* 3.5. Thông tin Vận chuyển & Kiện hàng */}
           <div>
@@ -437,6 +553,16 @@ export default function AdminOrderDetailDrawer({
         </div>
       )}
     </Drawer>
+
+    {order && (
+      <InvoicePrintModal
+        open={invoiceModalOpen}
+        onClose={() => setInvoiceModalOpen(false)}
+        order={order}
+        isAdminView={true}
+      />
+    )}
+  </>
   );
 }
 

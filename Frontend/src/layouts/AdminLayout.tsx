@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import './admin-layout.css';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   DashboardOutlined, PhoneOutlined, TagOutlined, ShoppingCartOutlined,
@@ -69,6 +70,8 @@ function NavItem({ m, collapsed, onNavigate }: { m: MenuItemConfig; collapsed: b
       key={m.to}
       to={m.to}
       end={m.end}
+      aria-label={m.label}
+      title={collapsed ? m.label : undefined}
       onClick={() => onNavigate(m.to)}
       className={({ isActive }) =>
         'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ' +
@@ -98,7 +101,7 @@ function NavGroup({ title, items, collapsed, onNavigate }: { title: string; item
   return (
     <div className="mb-1">
       {!collapsed && (
-        <div className="px-3 pb-1.5 pt-3 text-[11px] font-semibold uppercase tracking-wider text-ink-2/70">
+        <div className="admin-console-group-title px-3 pb-2 pt-5 font-semibold uppercase">
           {title}
         </div>
       )}
@@ -145,7 +148,7 @@ export default function AdminLayout() {
 
   return (
     <RequireAuth role="ADMIN">
-      <div className="flex min-h-screen bg-bg-soft">
+      <div className="admin-console flex min-h-screen">
         {/* Mobile topbar */}
         <div className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 border-b border-rule bg-white px-4 lg:hidden">
           <button
@@ -167,7 +170,7 @@ export default function AdminLayout() {
         )}
 
         <aside
-          className={`fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-rule bg-white transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:translate-x-0 ${
+          className={`admin-console-sidebar ${collapsed ? 'admin-console-sidebar--collapsed' : ''} fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-rule bg-white transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:translate-x-0 ${
             collapsed ? 'lg:w-[68px]' : 'lg:w-60'
           } ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
         >
@@ -195,7 +198,8 @@ export default function AdminLayout() {
               icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
               onClick={() => setCollapsed(!collapsed)}
               className="!text-ink-2 hover:!text-primary-600"
-              aria-label={collapsed ? 'Mở menu' : 'Thu gọn menu'}
+              aria-label={collapsed ? 'Mở rộng thanh điều hướng' : 'Thu gọn menu'}
+              aria-expanded={!collapsed}
             />
           </div>
 
@@ -212,6 +216,8 @@ export default function AdminLayout() {
           {/* Footer */}
           <div className="border-t border-rule p-3">
             <button
+              aria-label="Đăng xuất"
+              title={collapsed ? 'Đăng xuất' : undefined}
               onClick={() => { handleLogout(); setMobileOpen(false); }}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-2 transition-colors duration-200 hover:bg-red-50 hover:text-red-600"
             >
@@ -223,7 +229,7 @@ export default function AdminLayout() {
 
         {/* Content */}
         <main className="min-w-0 flex-1 pt-14 lg:pt-0">
-          <div className="animate-[slide-up_0.2s_ease-out] p-6 lg:p-8">
+          <div className="p-4 sm:p-6 lg:p-8">
             <Outlet />
           </div>
         </main>

@@ -27,6 +27,13 @@ export const orderService = {
   },
 
   /**
+   * Lấy hóa đơn điện tử công khai qua invoiceToken bí mật (không yêu cầu đăng nhập, bảo vệ IDOR)
+   */
+  getPublicInvoice: (token: number | string) => {
+    return get<OrderDTO>(`/orders/invoice/${token}`);
+  },
+
+  /**
    * Khách hàng yêu cầu hủy đơn hàng (áp dụng cho đơn PENDING/CONFIRMED)
    */
   cancel: (id: number, data?: string | CancelOrderParams) => {
