@@ -5,6 +5,7 @@ import {
   searchAddressSuggestions,
   reverseGeocode,
   geocodeInitialAddress,
+  isStreetMatched,
   KNOWN_VN_LOCATIONS,
 } from '../checkoutGeocodingService';
 
@@ -246,6 +247,37 @@ describe('checkoutGeocodingService', () => {
         province: 'TP. Hồ Chí Minh',
       });
       expect(res).toBeNull();
+    });
+
+    it('successfully geocodes compound street addresses like "Đường Anh Đào 1, Vinhomes Grand Park"', async () => {
+      const res = await geocodeInitialAddress(
+        'Đường Anh Đào 1, Vinhomes Grand Park, Phường Long Bình, Thành phố Thủ Đức, TP. Hồ Chí Minh',
+        {
+          streetAddress: 'Đường Anh Đào 1, Vinhomes Grand Park',
+          ward: 'Phường Long Bình',
+          district: 'Thành phố Thủ Đức',
+          province: 'TP. Hồ Chí Minh',
+        }
+      );
+      expect(res).not.toBeNull();
+      expect(res?.lat).toBeCloseTo(10.8464, 3);
+      expect(res?.lng).toBeCloseTo(106.8365, 3);
+      expect(res?.displayName).toContain('Vinhomes Grand Park');
+    });
+
+    it('matches compound street address in isStreetMatched when suggestion contains a main segment', () => {
+      const suggestion = {
+        id: 'test-1',
+        place_name: 'Đường Anh Đào 1, Vinhomes Grand Park, Phường Long Bình, TP. Thủ Đức, TP. Hồ Chí Minh',
+        title: 'Đường Anh Đào 1',
+        subtitle: 'TP. Thủ Đức, TP. Hồ Chí Minh',
+        lat: 10.8464,
+        lng: 106.8365,
+        source: 'dictionary' as const,
+      };
+      expect(isStreetMatched('Đường Anh Đào 1, Vinhomes Grand Park', suggestion)).toBe(true);
+      expect(isStreetMatched('Đường Anh Đào 1', suggestion)).toBe(true);
+      expect(isStreetMatched('Vinhomes Grand Park', suggestion)).toBe(true);
     });
   });
 

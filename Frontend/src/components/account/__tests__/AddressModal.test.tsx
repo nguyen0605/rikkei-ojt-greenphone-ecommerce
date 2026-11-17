@@ -349,4 +349,32 @@ describe('AddressModal', () => {
       expect(screen.getByDisplayValue('Đường Anh Đào 1, Vinhomes Grand Park')).toBeInTheDocument();
     });
   });
+
+  it('displays location permission guide modal when browser denies geolocation', async () => {
+    const user = userEvent.setup();
+    // Giả lập quyền vị trí bị từ chối (PERMISSION_DENIED = 1)
+    Object.defineProperty(navigator, 'geolocation', {
+      writable: true,
+      value: {
+        getCurrentPosition: vi.fn().mockImplementation((_success, error) => {
+          error({
+            code: 1, // PERMISSION_DENIED
+            message: 'User denied Geolocation',
+          });
+        }),
+      },
+    });
+
+    render(<AddressModal open={true} onCancel={vi.fn()} onSubmit={vi.fn()} />);
+
+    const currentLocationBtn = screen.getByRole('button', { name: /Vị trí hiện tại/i });
+    await user.click(currentLocationBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Cấp quyền truy cập vị trí hiện tại')).toBeInTheDocument();
+      expect(screen.getByText('Vị trí (Location)')).toBeInTheDocument();
+      expect(screen.getByRole('switch')).toBeInTheDocument();
+      expect(screen.getByText(/Nếu công tắc chưa bật được/i)).toBeInTheDocument();
+    });
+  });
 });
