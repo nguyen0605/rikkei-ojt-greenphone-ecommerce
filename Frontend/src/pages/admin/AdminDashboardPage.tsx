@@ -13,7 +13,7 @@ import FinancialKpiCards from '@/components/admin/dashboard/FinancialKpiCards';
 import RevenueLineChart from '@/components/admin/dashboard/RevenueLineChart';
 import PaymentMethodPieChart from '@/components/admin/dashboard/PaymentMethodPieChart';
 import { exportFinancialExcel } from '@/utils/exportFinancialExcel';
-import { exportFinancialPdf } from '@/utils/exportFinancialPdf';
+// Dynamic import cho exportFinancialPdf để giảm kích thước bundle chunk chính (< 500KB)
 
 function KeyboardAccessibleTable(props: ComponentPropsWithRef<'table'>) {
   return <table {...props} tabIndex={0} aria-label="Bảng sản phẩm bán chạy, dùng phím mũi tên để cuộn" />;
@@ -48,11 +48,11 @@ export default function AdminDashboardPage() {
   const loading = orders.isLoading || top.isLoading || (isAdmin && finance.isLoading) || (canViewRevenue && !isAdmin && revenue.isLoading);
   const failed = orders.isError || top.isError || (isAdmin && finance.isError) || (canViewRevenue && !isAdmin && revenue.isError);
 
-  const handleExportExcel = async () => {
+  // [ORD-34] Xuất báo cáo Excel đa sheet theo phân quyền RBAC
+  const handleExportExcel = () => {
     if (isExportingExcel) return;
     try {
       setIsExportingExcel(true);
-      await new Promise((resolve) => setTimeout(resolve, 50)); // Cho UI cập nhật icon loading
       exportFinancialExcel({
         monthStr: month.format('MM-YYYY'),
         userRole: user?.role,
@@ -69,11 +69,13 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // [ORD-34] Xuất báo cáo PDF chuẩn doanh nghiệp (dùng Dynamic Import để tối ưu kích thước bundle < 500KB)
   const handleExportPdf = async () => {
     if (isExportingPdf) return;
     try {
       setIsExportingPdf(true);
-      await new Promise((resolve) => setTimeout(resolve, 50)); // Cho UI cập nhật icon loading
+      // Tải động file PDF và font chữ khi người dùng bấm nút (tránh làm nặng trang ban đầu)
+      const { exportFinancialPdf } = await import('@/utils/exportFinancialPdf');
       exportFinancialPdf({
         monthStr: month.format('MM-YYYY'),
         userRole: user?.role,

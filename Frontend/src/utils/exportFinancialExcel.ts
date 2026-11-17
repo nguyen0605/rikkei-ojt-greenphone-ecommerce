@@ -33,10 +33,8 @@ function calculateColWidths(rows: Record<string, any>[]): { wch: number }[] {
   });
 }
 
-/**
- * Xây dựng và xuất file Excel đa sheet báo cáo kinh doanh & tài chính
- * Đặt tên file chuẩn: bao-cao-thang-MM-YYYY-[role].xlsx
- */
+// [ORD-34] Xuất báo cáo Excel 4 sheet: Tổng quan, Chuỗi thời gian, Thanh toán, Top bán chạy
+// Áp dụng phân quyền RBAC: Chỉ ADMIN mới thấy Giá vốn (COGS) & Lợi nhuận; Ẩn Doanh thu với WAREHOUSE
 export function exportFinancialExcel(data: ExportFinancialData): void {
   const { monthStr, userRole = '', financial, orders, topSelling = [], revenueTotal = 0 } = data;
   const normalizedRole = userRole.replace(/^ROLE_/, '').toUpperCase();
@@ -58,9 +56,12 @@ export function exportFinancialExcel(data: ExportFinancialData): void {
   sheet1Rows.push({ 'Chỉ số': 'Chờ xác nhận', 'Giá trị': orders?.pendingOrders ?? 0 });
   sheet1Rows.push({ 'Chỉ số': 'Đơn hàng đã hủy', 'Giá trị': orders?.cancelledOrders ?? 0 });
 
-  // Doanh thu thuần
-  const netRev = isAdmin && financial ? financial.netRevenue : revenueTotal;
-  sheet1Rows.push({ 'Chỉ số': 'Doanh thu thuần', 'Giá trị': formatVND(netRev) });
+  // Doanh thu thuần: Chỉ thêm khi vai trò có quyền xem doanh thu (ADMIN, SALES, MARKETING). Tuyệt đối ẩn với WAREHOUSE.
+  const canViewRevenue = ['ADMIN', 'SALES', 'MARKETING'].includes(normalizedRole);
+  if (canViewRevenue) {
+    const netRev = isAdmin && financial ? financial.netRevenue : revenueTotal;
+    sheet1Rows.push({ 'Chỉ số': 'Doanh thu thuần', 'Giá trị': formatVND(netRev) });
+  }
 
   if (isAdmin && financial) {
     sheet1Rows.push({ 'Chỉ số': 'Doanh thu gộp', 'Giá trị': formatVND(financial.grossRevenue) });

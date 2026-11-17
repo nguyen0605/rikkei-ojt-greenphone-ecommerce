@@ -26,10 +26,8 @@ function registerVietnameseFont(doc: jsPDF): void {
   doc.setFont('Roboto', 'normal');
 }
 
-/**
- * Xuất file PDF chuẩn hóa ấn phẩm doanh nghiệp với jspdf-autotable
- * Đặt tên file chuẩn: bao-cao-thang-MM-YYYY-[role].pdf
- */
+// [ORD-34] Xuất báo cáo PDF bảng lưới chuẩn doanh nghiệp với jspdf-autotable & nhúng font tiếng Việt
+// Áp dụng phân quyền RBAC: Ẩn Giá vốn & Lợi nhuận với nhân viên; Ẩn Doanh thu với WAREHOUSE
 export function exportFinancialPdf(data: ExportFinancialPdfData): void {
   const { monthStr, userRole = '', financial, orders, topSelling = [], revenueTotal = 0 } = data;
   const normalizedRole = userRole.replace(/^ROLE_/, '').toUpperCase();
@@ -126,9 +124,13 @@ export function exportFinancialPdf(data: ExportFinancialPdfData): void {
   // ==========================================
   // 3. BẢNG 2: CHỈ SỐ TÀI CHÍNH & HIỆU QUẢ KINH DOANH (RBAC)
   // ==========================================
+  const canViewRevenue = ['ADMIN', 'SALES', 'MARKETING'].includes(normalizedRole);
   const financialRows: string[][] = [];
-  const netRev = isAdmin && financial ? financial.netRevenue : revenueTotal;
-  financialRows.push(['Doanh thu thuần (Net Revenue)', formatVND(netRev)]);
+
+  if (canViewRevenue) {
+    const netRev = isAdmin && financial ? financial.netRevenue : revenueTotal;
+    financialRows.push(['Doanh thu thuần (Net Revenue)', formatVND(netRev)]);
+  }
 
   if (isAdmin && financial) {
     financialRows.push(['Doanh thu gộp (Gross Revenue)', formatVND(financial.grossRevenue)]);
@@ -151,34 +153,36 @@ export function exportFinancialPdf(data: ExportFinancialPdfData): void {
 
   const lastTableEnd = (doc as any).lastAutoTable?.finalY ?? 100;
 
-  autoTable(doc, {
-    startY: lastTableEnd + 8,
-    head: [['Chỉ số tài chính', 'Giá trị (VND)']],
-    body: financialRows,
-    theme: 'grid',
-    styles: {
-      font: 'Roboto',
-      fontSize: 9.5,
-      cellPadding: 3,
-      textColor: [30, 41, 59],
-      lineColor: [226, 232, 240],
-      lineWidth: 0.1,
-    },
-    headStyles: {
-      fillColor: [22, 163, 74],
-      textColor: [255, 255, 255],
-      font: 'Roboto',
-      fontStyle: 'bold',
-      halign: 'left',
-    },
-    columnStyles: {
-      0: { cellWidth: 120 },
-      1: { cellWidth: 'auto', halign: 'right' },
-    },
-    alternateRowStyles: {
-      fillColor: [248, 250, 252],
-    },
-  });
+  if (financialRows.length > 0) {
+    autoTable(doc, {
+      startY: lastTableEnd + 8,
+      head: [['Chỉ số tài chính', 'Giá trị (VND)']],
+      body: financialRows,
+      theme: 'grid',
+      styles: {
+        font: 'Roboto',
+        fontSize: 9.5,
+        cellPadding: 3,
+        textColor: [30, 41, 59],
+        lineColor: [226, 232, 240],
+        lineWidth: 0.1,
+      },
+      headStyles: {
+        fillColor: [22, 163, 74],
+        textColor: [255, 255, 255],
+        font: 'Roboto',
+        fontStyle: 'bold',
+        halign: 'left',
+      },
+      columnStyles: {
+        0: { cellWidth: 120 },
+        1: { cellWidth: 'auto', halign: 'right' },
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252],
+      },
+    });
+  }
 
   // ==========================================
   // 4. BẢNG 3: TOP SẢN PHẨM BÁN CHẠY

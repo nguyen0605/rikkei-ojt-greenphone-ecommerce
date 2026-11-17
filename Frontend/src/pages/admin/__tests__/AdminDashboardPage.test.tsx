@@ -7,10 +7,54 @@ import * as XLSX from 'xlsx';
 
 const state = vi.hoisted(() => ({ auth: { user: { id: 1, role: 'ROLE_ADMIN' } } }));
 const pdf = vi.hoisted(() => ({ addImage: vi.fn(), save: vi.fn() }));
-vi.mock('jspdf', () => ({ jsPDF: class { addImage = pdf.addImage; save = pdf.save; } }));
+const fillText = vi.hoisted(() => vi.fn());
+vi.mock('jspdf', () => ({
+  jsPDF: class {
+    addImage = pdf.addImage;
+    save = pdf.save;
+    internal = {
+      pageSize: { getWidth: () => 210, getHeight: () => 297 },
+      getNumberOfPages: () => 1
+    };
+    getNumberOfPages = () => 1;
+    setPage = vi.fn();
+    addFileToVFS = vi.fn();
+    addFont = vi.fn();
+    setFont = vi.fn();
+    setFontSize = vi.fn();
+    setTextColor = vi.fn();
+    setFillColor = vi.fn();
+    rect = vi.fn();
+    roundedRect = vi.fn();
+    text = (content: string | string[]) => {
+      if (Array.isArray(content)) {
+        content.forEach(c => fillText(c));
+      } else {
+        fillText(content);
+      }
+    };
+  }
+}));
+vi.mock('jspdf-autotable', () => ({
+  default: vi.fn((doc, options) => {
+    if (options?.body) {
+      options.body.forEach((row: any[]) => {
+        row.forEach((cell: any) => fillText(String(cell)));
+      });
+    }
+  }),
+}));
 vi.mock('@/store/hooks', () => ({ useAppSelector: (selector: (value: typeof state) => unknown) => selector(state) }));
 vi.mock('@/services/adminStatisticsService', () => ({ adminStatisticsService: { orders: vi.fn(), topSelling: vi.fn(), revenue: vi.fn(), financialReport: vi.fn() } }));
-vi.mock('xlsx', () => ({ utils: { book_new: vi.fn(() => ({})), json_to_sheet: vi.fn((rows) => rows), book_append_sheet: vi.fn() }, writeFile: vi.fn() }));
+vi.mock('xlsx', () => ({
+  utils: {
+    book_new: vi.fn(() => ({})),
+    json_to_sheet: vi.fn((rows) => rows),
+    aoa_to_sheet: vi.fn((rows) => rows),
+    book_append_sheet: vi.fn()
+  },
+  writeFile: vi.fn()
+}));
 vi.mock('@/components/admin/dashboard/RevenueLineChart', () => ({ default: ({ showProfit }: { showProfit: boolean }) => <div>{showProfit ? 'Biểu đồ lợi nhuận' : 'Biểu đồ doanh thu'}</div> }));
 vi.mock('@/components/admin/dashboard/PaymentMethodPieChart', () => ({ default: () => <div>Cơ cấu thanh toán</div> }));
 const report = { grossRevenue: 1000, discountAmount: 100, shippingFee: 30, netRevenue: 900, cogs: 600, grossProfit: 300, profitMarginPercentage: 33.33, refundAmount: 0, uncostedQuantity: 0, startDate: '', endDate: '', timeSeriesData: [], paymentMethodStats: [] };
@@ -45,10 +89,10 @@ describe('Dashboard role security', () => {
   it.each(['ROLE_SALES', 'ROLE_MARKETING', 'ROLE_WAREHOUSE'])('Excel for %s contains only authorized metrics', async (role) => {
     state.auth.user.role = role; mount(); await waitFor(() => expect(screen.getByRole('button', { name: 'Xuất Excel' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Xuất Excel' }));
+    await waitFor(() => expect(XLSX.writeFile).toHaveBeenCalledOnce());
     const exported = JSON.stringify(vi.mocked(XLSX.utils.json_to_sheet).mock.calls);
     expect(exported).not.toMatch(/COGS|Lợi nhuận|Biên lợi nhuận/);
     if (role === 'ROLE_WAREHOUSE') expect(exported).not.toMatch(/Doanh thu|Phí vận chuyển|hoàn trả/);
-    expect(XLSX.writeFile).toHaveBeenCalledOnce();
   });
   it('warns when historical costs are unknown', async () => {
     vi.mocked(api.financialReport).mockResolvedValue({ ...report, cogs: null, grossProfit: null, profitMarginPercentage: null, uncostedQuantity: 3 });
@@ -57,16 +101,14 @@ describe('Dashboard role security', () => {
   });
   it.each(['ROLE_ADMIN', 'ROLE_SALES', 'ROLE_MARKETING', 'ROLE_WAREHOUSE'])('PDF for %s uses authorized data only', async (role) => {
     state.auth.user.role = role;
-    const fillText = vi.fn();
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ fillText, fillRect: vi.fn() } as unknown as CanvasRenderingContext2D);
-    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,demo');
+    fillText.mockClear();
     mount(); await waitFor(() => expect(screen.getByRole('button', { name: 'Xuất PDF' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Xuất PDF' }));
+    await waitFor(() => expect(pdf.save).toHaveBeenCalledOnce());
     const text = JSON.stringify(fillText.mock.calls);
     if (role === 'ROLE_ADMIN') expect(text).toContain('COGS');
     else expect(text).not.toMatch(/COGS|Lợi nhuận|Biên lợi nhuận/);
     if (role === 'ROLE_WAREHOUSE') expect(text).not.toMatch(/Doanh thu|Phí vận chuyển|hoàn trả/);
-    expect(pdf.save).toHaveBeenCalledOnce();
   });
   it('does not render cached admin finances after role changes', async () => {
     const view = mount(); await screen.findByText('Giá vốn hàng bán (COGS)');
