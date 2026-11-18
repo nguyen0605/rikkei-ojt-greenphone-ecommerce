@@ -39,11 +39,25 @@ export default function LoginPage() {
       {error && (
         <Alert
           message={
-            error.includes('Account is not active') || error.includes('not active')
+            error.includes('chưa được kích hoạt')
+              ? 'Tài khoản chưa được kích hoạt. Vui lòng xác thực email của bạn.'
+              : error.includes('Account is not active') || error.includes('not active') || error.includes('đã bị khóa')
               ? 'Tài khoản đã bị khóa. Vui lòng liên hệ với quản trị viên để được hỗ trợ.'
               : error.includes('Invalid email or password')
               ? 'Email hoặc mật khẩu không chính xác.'
               : error
+          }
+          description={
+            error.includes('chưa được kích hoạt') ? (
+              <div className="mt-1">
+                <Link
+                  to={`${ROUTES.VERIFY_OTP}?email=${encodeURIComponent(form.getFieldValue('email') || '')}`}
+                  className="font-medium text-green-700 underline hover:text-green-800"
+                >
+                  Bấm vào đây để nhập mã OTP xác thực
+                </Link>
+              </div>
+            ) : null
           }
           type="error"
           showIcon

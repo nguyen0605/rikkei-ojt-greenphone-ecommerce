@@ -3,6 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Compass, Locate, AlertCircle } from 'lucide-react';
 import { message } from 'antd';
+import { getProvinceCoords } from './checkoutGeocodingService';
 
 export interface LocationCoords {
   lat: number;
@@ -14,6 +15,7 @@ interface CheckoutDeliveryMapProps {
   selectedLocation: LocationCoords | null;
   onLocationSelect: (location: LocationCoords) => void;
   className?: string;
+  focusProvince?: string;
 }
 
 // Tọa độ mặc định: Trung tâm TP. Hồ Chí Minh / Hà Nội
@@ -64,6 +66,7 @@ export default function CheckoutDeliveryMap({
   selectedLocation,
   onLocationSelect,
   className = '',
+  focusProvince,
 }: CheckoutDeliveryMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -85,9 +88,10 @@ export default function CheckoutDeliveryMap({
   useEffect(() => {
     if (!containerRef.current || mapInstanceRef.current) return;
 
+    const provinceCoords = focusProvince ? getProvinceCoords(focusProvince) : null;
     const initialCenter = selectedLocation
       ? ([selectedLocation.lat, selectedLocation.lng] as [number, number])
-      : DEFAULT_CENTER;
+      : (provinceCoords || DEFAULT_CENTER);
     const initialZoom = selectedLocation ? FOCUSED_ZOOM : DEFAULT_ZOOM;
 
     const map = L.map(containerRef.current, {
@@ -202,7 +206,7 @@ export default function CheckoutDeliveryMap({
     const { lat, lng, displayName } = selectedLocation;
     const popupContent = `
       <div style="font-family: inherit; font-size: 12px; line-height: 1.4; min-width: 140px;">
-        <div style="font-weight: 600; color: #15803d; margin-bottom: 2px;">📍 Vị trí nhận hàng</div>
+        <div style="font-weight: 600; color: #15803d; margin-bottom: 2px;">Vị trí nhận hàng</div>
         <div style="color: #4b5563; font-size: 11px;">${displayName || `${lat.toFixed(4)}, ${lng.toFixed(4)}`}</div>
         <div style="color: #9ca3af; font-size: 10px; margin-top: 4px;">Kéo ghim hoặc bấm bản đồ để đổi vị trí</div>
       </div>
@@ -233,6 +237,17 @@ export default function CheckoutDeliveryMap({
       duration: 0.8,
     });
   }, [selectedLocation]);
+
+  // Khi focusProvince thay đổi và chưa có ghim, tự động di chuyển camera tới trung tâm tỉnh/thành
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || selectedLocation || !focusProvince) return;
+
+    const provCoords = getProvinceCoords(focusProvince);
+    if (provCoords) {
+      map.flyTo(provCoords, DEFAULT_ZOOM, { duration: 0.6 });
+    }
+  }, [focusProvince, selectedLocation]);
 
   // Hành động: Đưa camera về lại điểm ghim giao hàng
   const handleRecenter = useCallback(() => {
@@ -278,7 +293,7 @@ export default function CheckoutDeliveryMap({
 
           marker.bindPopup(`
             <div style="font-family: inherit; font-size: 12px; line-height: 1.4;">
-              <div style="font-weight: 600; color: #1d4ed8;">📱 Vị trí thiết bị của bạn</div>
+              <div style="font-weight: 600; color: #1d4ed8;">Vị trí thiết bị của bạn</div>
               <div style="color: #6b7280; font-size: 11px;">Độ chính xác: ±${Math.round(accuracy || 10)}m</div>
             </div>
           `);

@@ -15,18 +15,35 @@ public class MailConfig {
     @Bean
     public JavaMailSender javaMailSender() {
         JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
-        mailSender.setHost(getEnv("MAIL_HOST", "smtp.gmail.com"));
-        mailSender.setPort(Integer.parseInt(getEnv("MAIL_PORT", "587")));
-        mailSender.setUsername(getEnv("MAIL_USERNAME", ""));
-        mailSender.setPassword(getEnv("MAIL_PASSWORD", ""));
+        String host = getEnv("MAIL_HOST", "smtp.gmail.com");
+        int port = Integer.parseInt(getEnv("MAIL_PORT", "587"));
+        String username = getEnv("MAIL_USERNAME", "");
+        String password = getEnv("MAIL_PASSWORD", "");
+
+        mailSender.setHost(host);
+        mailSender.setPort(port);
+        mailSender.setUsername(username);
+        mailSender.setPassword(password);
+        mailSender.setDefaultEncoding("UTF-8");
 
         Properties props = mailSender.getJavaMailProperties();
         props.put("mail.transport.protocol", "smtp");
         props.put("mail.smtp.auth", "true");
-        props.put("mail.smtp.starttls.enable", "true");
-        props.put("mail.smtp.connectiontimeout", "5000");
-        props.put("mail.smtp.timeout", "5000");
-        props.put("mail.smtp.writetimeout", "5000");
+        props.put("mail.smtp.ssl.trust", "*");
+
+        if (port == 465) {
+            props.put("mail.smtp.ssl.enable", "true");
+            props.put("mail.smtp.socketFactory.port", "465");
+            props.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
+            props.put("mail.smtp.socketFactory.fallback", "false");
+        } else {
+            props.put("mail.smtp.starttls.enable", "true");
+            props.put("mail.smtp.starttls.required", "true");
+        }
+
+        props.put("mail.smtp.connectiontimeout", "10000");
+        props.put("mail.smtp.timeout", "10000");
+        props.put("mail.smtp.writetimeout", "10000");
         props.put("mail.debug", "false");
 
         return mailSender;

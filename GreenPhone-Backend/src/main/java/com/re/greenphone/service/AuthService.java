@@ -65,6 +65,24 @@ public class AuthService {
 
     // ===== REGISTER =====
 
+    /**
+     * Chuẩn hóa số điện thoại về định dạng chuẩn 10 chữ số bắt đầu bằng '0'.
+     * Hỗ trợ loại bỏ khoảng trắng, dấu gạch nối, dấu chấm, tiền tố quốc tế +84 hoặc 84.
+     */
+    public static String normalizePhoneNumber(String phone) {
+        if (phone == null) {
+            return null;
+        }
+        String clean = phone.trim().replaceAll("[\\s\\-\\.]", "");
+        if (clean.startsWith("+84")) {
+            return "0" + clean.substring(3);
+        }
+        if (clean.startsWith("84") && clean.length() == 11) {
+            return "0" + clean.substring(2);
+        }
+        return clean;
+    }
+
     public AuthResponse register(RegisterRequest request) {
         checkAccountLocked(request.getEmail());
 
@@ -72,14 +90,20 @@ public class AuthService {
             throw new ConflictException("Email này đã được đăng ký. Vui lòng sử dụng email khác.");
         }
 
+        String normalizedPhone = normalizePhoneNumber(request.getPhone());
+        if (normalizedPhone != null && !normalizedPhone.isBlank() && userRepository.existsByPhone(normalizedPhone)) {
+            throw new ConflictException("Số điện thoại này đã được đăng ký. Vui lòng sử dụng số điện thoại khác.");
+        }
+
         // Customer self-registration is ALWAYS CUSTOMER role
         Role customerRole = roleRepository.findByName(RoleName.CUSTOMER.name())
                 .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + RoleName.CUSTOMER.name()));
 
         User user = authMapper.toEntity(request);
+        user.setPhone(normalizedPhone);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(customerRole);
-        user.setStatus("ACTIVE"); // simplified flow
+        user.setStatus("UNVERIFIED");
 
         User saved = userRepository.save(user);
 
@@ -90,9 +114,8 @@ public class AuthService {
         log.info("[OTP] Generated verification code for {}: {}", saved.getEmail(), otp);
         emailService.sendOTP(saved.getEmail(), otp);
 
-        String token = jwtTokenProvider.generateToken(UserPrincipal.create(saved));
-        String refreshToken = createAndStoreRefreshToken(saved.getId());
-        return authMapper.toAuthResponse(saved, token, refreshToken, jwtConfig.getExpiration());
+        // Do not generate active session tokens until email OTP is verified
+        return authMapper.toAuthResponse(saved, null, null, 0L);
     }
 
     // ===== LOGIN =====

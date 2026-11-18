@@ -87,17 +87,31 @@ class AuthServiceTest {
         when(authMapper.toEntity(registerReq)).thenReturn(testUser);
         when(passwordEncoder.encode(anyString())).thenReturn("encoded");
         when(userRepository.save(any(User.class))).thenReturn(testUser);
-        when(jwtTokenProvider.generateToken(any())).thenReturn("jwt_token_xyz");
-        when(jwtConfig.getExpiration()).thenReturn(86400000L);
-        when(authMapper.toAuthResponse(any(), anyString(), anyString(), anyLong()))
-                .thenReturn(new AuthResponse(1L, "", "refresh_xyz", "Test User", "test@example.com", "CUSTOMER", 86400000L));
+        when(authMapper.toAuthResponse(any(), isNull(), isNull(), eq(0L)))
+                .thenReturn(new AuthResponse(1L, null, null, "Test User", "test@example.com", "CUSTOMER", 0L));
 
         AuthResponse r = authService.register(registerReq);
 
         assertThat(r.getEmail()).isEqualTo("test@example.com");
+        assertThat(testUser.getStatus()).isEqualTo("UNVERIFIED");
         verify(valueOperations).set(eq("otp:test@example.com"), anyString(), eq(Duration.ofMinutes(5)));
         verify(redisTemplate).delete("otp_attempts:test@example.com");
         verify(emailService).sendOTP(eq("test@example.com"), anyString());
+    }
+
+    @Test void register_SetsUserStatusToUnverified() {
+        when(redisTemplate.hasKey("otp_lock:test@example.com")).thenReturn(false);
+        when(userRepository.existsByEmail(registerReq.getEmail())).thenReturn(false);
+        when(roleRepository.findByName(RoleName.CUSTOMER.name())).thenReturn(Optional.of(customerRole));
+        when(authMapper.toEntity(registerReq)).thenReturn(testUser);
+        when(passwordEncoder.encode(anyString())).thenReturn("encoded");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(authMapper.toAuthResponse(any(), isNull(), isNull(), eq(0L)))
+                .thenReturn(new AuthResponse(1L, null, null, "Test User", "test@example.com", "CUSTOMER", 0L));
+
+        authService.register(registerReq);
+
+        assertThat(testUser.getStatus()).isEqualTo("UNVERIFIED");
     }
 
     @Test void register_AccountLocked() {
@@ -118,6 +132,38 @@ class AuthServiceTest {
                 .hasMessageContaining("Email này đã được đăng ký");
     }
 
+    @Test void register_PhoneAlreadyExists() {
+        when(redisTemplate.hasKey("otp_lock:test@example.com")).thenReturn(false);
+        when(userRepository.existsByEmail(registerReq.getEmail())).thenReturn(false);
+        when(userRepository.existsByPhone("0900000001")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.register(registerReq))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("Số điện thoại này đã được đăng ký");
+    }
+
+    @Test void register_PhoneNormalizedWithPlus84_AlreadyExists() {
+        registerReq.setPhone("+84900000001");
+        when(redisTemplate.hasKey("otp_lock:test@example.com")).thenReturn(false);
+        when(userRepository.existsByEmail(registerReq.getEmail())).thenReturn(false);
+        when(userRepository.existsByPhone("0900000001")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.register(registerReq))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("Số điện thoại này đã được đăng ký");
+    }
+
+    @Test void normalizePhoneNumber_VariousFormats() {
+        assertThat(AuthService.normalizePhoneNumber(null)).isNull();
+        assertThat(AuthService.normalizePhoneNumber("")).isEmpty();
+        assertThat(AuthService.normalizePhoneNumber("0912345678")).isEqualTo("0912345678");
+        assertThat(AuthService.normalizePhoneNumber("+84912345678")).isEqualTo("0912345678");
+        assertThat(AuthService.normalizePhoneNumber("84912345678")).isEqualTo("0912345678");
+        assertThat(AuthService.normalizePhoneNumber("  0912 345 678  ")).isEqualTo("0912345678");
+        assertThat(AuthService.normalizePhoneNumber("+84 912-345-678")).isEqualTo("0912345678");
+        assertThat(AuthService.normalizePhoneNumber("0912.345.678")).isEqualTo("0912345678");
+    }
+
     @Test void register_AlwaysCustomerRole() {
         when(redisTemplate.hasKey("otp_lock:test@example.com")).thenReturn(false);
         when(userRepository.existsByEmail(registerReq.getEmail())).thenReturn(false);
@@ -125,10 +171,8 @@ class AuthServiceTest {
         when(authMapper.toEntity(registerReq)).thenReturn(testUser);
         when(passwordEncoder.encode(anyString())).thenReturn("hashed");
         when(userRepository.save(any())).thenReturn(testUser);
-        when(jwtTokenProvider.generateToken(any())).thenReturn("jwt_token_xyz");
-        when(jwtConfig.getExpiration()).thenReturn(86400000L);
-        when(authMapper.toAuthResponse(any(), anyString(), anyString(), anyLong()))
-                .thenReturn(new AuthResponse(1L, "", "refresh_xyz", "", "", 0L));
+        when(authMapper.toAuthResponse(any(), isNull(), isNull(), eq(0L)))
+                .thenReturn(new AuthResponse(1L, null, null, "", "", 0L));
 
         authService.register(registerReq);
 

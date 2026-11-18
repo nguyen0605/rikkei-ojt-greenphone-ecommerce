@@ -136,7 +136,8 @@ describe('branch inventory', () => {
     vi.mocked(warehouseService.get).mockResolvedValue({ ...branch, status: 'INACTIVE' });
     mount();
     await screen.findByText('REDMI-XF');
-    expect(screen.getByRole('button', { name: 'Nhập sản phẩm' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Nhập sản phẩm' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Nhập$/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Xuất' })).toBeDisabled();
   });
 
