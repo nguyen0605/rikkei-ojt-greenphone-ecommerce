@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Select, Spin, Empty, Tag } from 'antd';
 import { MapPin, Phone, Store, Navigation, CheckCircle2, XCircle } from 'lucide-react';
 import { warehouseService, type WarehouseBranchStock } from '@/services/warehouseService';
+import { useAppSelector } from '@/store/hooks';
 
 interface BranchStockAvailabilityProps {
   variantId?: number;
@@ -70,6 +71,19 @@ export const BranchStockAvailability: React.FC<BranchStockAvailabilityProps> = (
     });
     return Array.from(set);
   }, [branchStocks, selectedProvince]);
+
+  const user = useAppSelector((state) => state.auth.user);
+
+  // Tu dong chon Tinh/Thanh pho theo dia chi da luu cua nguoi dung neu chua chon thu cong
+  useEffect(() => {
+    if (selectedProvince === 'ALL' && user?.address && provinces.length > 0) {
+      const lowerAddr = user.address.toLowerCase();
+      const matched = provinces.find((p) => lowerAddr.includes(p.toLowerCase()));
+      if (matched) {
+        setSelectedProvince(matched);
+      }
+    }
+  }, [user?.address, provinces, selectedProvince]);
 
   // Reset quận huyện khi đổi tỉnh thành
   const handleProvinceChange = (value: string) => {

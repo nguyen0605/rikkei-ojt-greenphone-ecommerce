@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import authReducer from '@/store/slices/authSlice';
 import { BranchStockAvailability } from '../BranchStockAvailability';
 import { warehouseService, type WarehouseBranchStock } from '@/services/warehouseService';
 
@@ -60,6 +63,25 @@ const mockBranches: WarehouseBranchStock[] = [
 
 describe('BranchStockAvailability Component (CellphoneS style)', () => {
   let queryClient: QueryClient;
+  const createTestStore = (userAddress?: string) =>
+    configureStore({
+      reducer: {
+        auth: authReducer,
+      },
+      preloadedState: {
+        auth: {
+          user: userAddress
+            ? { id: 1, fullName: 'Test User', email: 'test@example.com', phone: '0912345678', address: userAddress, role: 'ROLE_USER' }
+            : null,
+          token: null,
+          isAuthenticated: !!userAddress,
+          loading: false,
+          error: null,
+          errorCode: null,
+          rememberedEmail: null,
+        },
+      },
+    });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -74,10 +96,13 @@ describe('BranchStockAvailability Component (CellphoneS style)', () => {
   });
 
   it('hien thi dung tieu de va so luong chi nhanh con hang', async () => {
+    const store = createTestStore();
     render(
-      <QueryClientProvider client={queryClient}>
-        <BranchStockAvailability variantId={602} variantName="16GB/512GB — Đen" />
-      </QueryClientProvider>
+      <Provider store={store}>
+        <QueryClientProvider client={queryClient}>
+          <BranchStockAvailability variantId={602} variantName="16GB/512GB — Đen" />
+        </QueryClientProvider>
+      </Provider>
     );
 
     expect(screen.getByText('Xem chi nhánh có hàng')).toBeInTheDocument();
@@ -92,10 +117,13 @@ describe('BranchStockAvailability Component (CellphoneS style)', () => {
   });
 
   it('hien thi thong tin dia chi, hotline, ban do va so luong tung chi nhanh', async () => {
+    const store = createTestStore();
     render(
-      <QueryClientProvider client={queryClient}>
-        <BranchStockAvailability variantId={602} variantName="16GB/512GB — Đen" />
-      </QueryClientProvider>
+      <Provider store={store}>
+        <QueryClientProvider client={queryClient}>
+          <BranchStockAvailability variantId={602} variantName="16GB/512GB — Đen" />
+        </QueryClientProvider>
+      </Provider>
     );
 
     await waitFor(() => {
@@ -114,5 +142,20 @@ describe('BranchStockAvailability Component (CellphoneS style)', () => {
     expect(inStockBadges.length).toBe(2);
 
     expect(screen.getByText('Tạm hết hàng')).toBeInTheDocument();
+  });
+
+  it('tu dong pre-select tinh thanh theo dia chi nguoi dung da luu', async () => {
+    const store = createTestStore('Quận 1, TP. Hồ Chí Minh');
+    render(
+      <Provider store={store}>
+        <QueryClientProvider client={queryClient}>
+          <BranchStockAvailability variantId={602} variantName="16GB/512GB — Đen" />
+        </QueryClientProvider>
+      </Provider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Kho Chi Nhánh TP.HCM')).toBeInTheDocument();
+    });
   });
 });
