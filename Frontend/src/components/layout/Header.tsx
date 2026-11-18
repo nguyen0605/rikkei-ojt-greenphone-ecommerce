@@ -90,12 +90,16 @@ export default function Header() {
           ),
         },
         { type: 'divider' },
-        ...(user?.role === 'ADMIN'
+        ...((['ADMIN', 'SALES', 'WAREHOUSE', 'MARKETING', 'ROLE_ADMIN', 'ROLE_SALES', 'ROLE_WAREHOUSE', 'ROLE_MARKETING'].includes(user?.role || ''))
           ? [
               {
                 key: 'admin',
-                icon: <LayoutDashboard className="h-4 w-4" />,
-                label: <Link to={ROUTES.ADMIN}>Quản trị viên</Link>,
+                icon: <LayoutDashboard className="h-4 w-4 text-emerald-600" />,
+                label: (
+                  <Link to={ROUTES.ADMIN} className="font-semibold text-emerald-700">
+                    {user?.role?.includes('ADMIN') ? 'Trang Quản trị (Admin)' : 'Trang Quản trị & Nghiệp vụ'}
+                  </Link>
+                ),
               },
             ]
           : []),

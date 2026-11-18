@@ -6,7 +6,7 @@ import {
   UserOutlined, StarOutlined, GiftOutlined, PictureOutlined,
   LogoutOutlined, MenuFoldOutlined, MenuUnfoldOutlined, SettingOutlined,
   MenuOutlined, TagsOutlined, DatabaseOutlined, TeamOutlined,
-  SwapOutlined, SafetyCertificateOutlined,
+  SwapOutlined, SafetyCertificateOutlined, GlobalOutlined,
 } from '@ant-design/icons';
 import { Button, Tag } from 'antd';
 import RequireAuth from '@/components/auth/RequireAuth';
@@ -150,18 +150,28 @@ export default function AdminLayout() {
     <RequireAuth role="ADMIN">
       <div className="admin-console flex min-h-screen">
         {/* Mobile topbar */}
-        <div className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 border-b border-rule bg-white px-4 lg:hidden">
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-2 hover:bg-bg-muted"
-            aria-label="Mở menu"
-          >
-            <MenuOutlined className="text-base" />
-          </button>
-          <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="GreenPhone" className="h-8 w-8 rounded-lg object-contain" />
-            <span className="text-sm font-bold text-ink">GreenPhone Admin</span>
+        <div className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-rule bg-white px-4 lg:hidden">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-2 hover:bg-bg-muted"
+              aria-label="Mở menu"
+            >
+              <MenuOutlined className="text-base" />
+            </button>
+            <div className="flex items-center gap-2">
+              <img src="/logo.png" alt="GreenPhone" className="h-8 w-8 rounded-lg object-contain" />
+              <span className="text-sm font-bold text-ink">GreenPhone Admin</span>
+            </div>
           </div>
+          <button
+            onClick={() => navigate('/')}
+            className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+            title="Về trang cửa hàng"
+          >
+            <GlobalOutlined />
+            <span>Cửa hàng</span>
+          </button>
         </div>
 
         {/* Mobile overlay */}
@@ -214,7 +224,16 @@ export default function AdminLayout() {
           </nav>
 
           {/* Footer */}
-          <div className="border-t border-rule p-3">
+          <div className="border-t border-rule p-3 space-y-1">
+            <button
+              aria-label="Về trang người dùng"
+              title={collapsed ? 'Xem trang cửa hàng' : undefined}
+              onClick={() => { navigate('/'); setMobileOpen(false); }}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-emerald-700 bg-emerald-50/70 transition-colors duration-200 hover:bg-emerald-100/80"
+            >
+              <GlobalOutlined className="text-[15px] leading-none text-emerald-600" />
+              {!collapsed && 'Xem trang cửa hàng'}
+            </button>
             <button
               aria-label="Đăng xuất"
               title={collapsed ? 'Đăng xuất' : undefined}
