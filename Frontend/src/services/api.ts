@@ -4,10 +4,33 @@ import type { ApiResponse } from '@/types/api';
 // In production the nginx container proxies /api → backend; in dev Vite proxies too.
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
+/**
+ * Xóa sạch toàn bộ dữ liệu lưu trữ phía client của GreenPhone (Zero-Trace Logout)
+ * Giữ lại duy nhất email ghi nhớ nếu người dùng có chọn ghi nhớ.
+ */
+export function clearClientStorage(): void {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('greenphone.') || key.startsWith('persist:greenphone'))) {
+        if (key !== 'greenphone.rememberedEmail') {
+          keysToRemove.push(key);
+        }
+      }
+    }
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+  }
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    sessionStorage.clear();
+  }
+}
+
 const api: AxiosInstance = axios.create({
   baseURL: BASE_URL,
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
 });
 
 // Request interceptor: attach token
@@ -23,11 +46,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (error) => {
-    // Logout on 401
+    // Logout on 401: Xóa sạch toàn bộ dấu vết PII và phiên trên client
     if (error.response?.status === 401) {
-      localStorage.removeItem('greenphone.token');
-      localStorage.removeItem('greenphone.user');
-      if (window.location.pathname !== '/dang-nhap') {
+      clearClientStorage();
+      if (typeof window !== 'undefined' && window.location.pathname !== '/dang-nhap') {
         window.location.href = '/dang-nhap';
       }
     }

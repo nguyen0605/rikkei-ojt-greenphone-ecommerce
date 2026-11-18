@@ -157,4 +157,49 @@ class AuthControllerTest {
         assertThat(response.getBody().getData()).isEqualTo("Logged out successfully");
         verify(authService).logout("Bearer some_token");
     }
+
+    @Test
+    void login_SetsRefreshTokenHttpOnlyCookie() {
+        var loginReq = new com.re.greenphone.dto.request.LoginRequest();
+        loginReq.setEmail("user@example.com");
+        loginReq.setPassword("password123");
+        var authResponse = new AuthResponse(1L, "jwt_token", "test-refresh-token", "User Name", "user@example.com", "CUSTOMER", 3600L);
+        when(authService.login(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(authResponse);
+
+        org.springframework.mock.web.MockHttpServletResponse httpResponse = new org.springframework.mock.web.MockHttpServletResponse();
+        controller.login(loginReq, null, httpResponse);
+
+        String setCookie = httpResponse.getHeader("Set-Cookie");
+        assertThat(setCookie).isNotNull();
+        assertThat(setCookie).contains("refreshToken=test-refresh-token");
+        assertThat(setCookie).contains("HttpOnly");
+        assertThat(setCookie).contains("SameSite=Lax");
+        assertThat(setCookie).contains("Path=/");
+    }
+
+    @Test
+    void logout_ClearsRefreshTokenCookie() {
+        org.springframework.mock.web.MockHttpServletResponse httpResponse = new org.springframework.mock.web.MockHttpServletResponse();
+        controller.logout("Bearer some_token", httpResponse);
+
+        String setCookie = httpResponse.getHeader("Set-Cookie");
+        assertThat(setCookie).isNotNull();
+        assertThat(setCookie).contains("refreshToken=");
+        assertThat(setCookie).contains("Max-Age=0");
+        verify(authService).logout("Bearer some_token");
+    }
+
+    @Test
+    void refreshToken_WithCookieFallback_Success() {
+        var authResponse = new AuthResponse(1L, "new_jwt", "new_refresh", "User Name", "user@example.com", "CUSTOMER", 1800000L);
+        when(authService.refreshToken("cookie-refresh-token")).thenReturn(authResponse);
+
+        org.springframework.mock.web.MockHttpServletResponse httpResponse = new org.springframework.mock.web.MockHttpServletResponse();
+        ResponseEntity<ApiResponse<AuthResponse>> response = controller.refreshToken(null, "cookie-refresh-token", httpResponse);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getData().getToken()).isEqualTo("new_jwt");
+        assertThat(httpResponse.getHeader("Set-Cookie")).contains("refreshToken=new_refresh");
+    }
 }
