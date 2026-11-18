@@ -156,6 +156,13 @@ export const adminBannerService = {
   create: (data: BannerRequest) => post<BannerDTO>('/admin/banners', data),
   update: (id: number, data: BannerRequest) => put<BannerDTO>('/admin/banners/' + id, data),
   remove: (id: number) => del<void>('/admin/banners/' + id),
+  uploadImage: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return post<string>('/admin/banners/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };
 
 export { adminStatisticsService } from './adminStatisticsService';

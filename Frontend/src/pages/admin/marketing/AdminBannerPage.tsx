@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Table, Button, Input, message, Space, Switch, type TableColumnsType } from 'antd';
+import { Table, Button, Input, message, Space, Switch, Popconfirm, type TableColumnsType } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, PictureOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import adminMarketingService from '@/services/adminMarketingService';
@@ -60,7 +60,10 @@ export default function AdminBannerPage() {
     mutationFn: (id: number) => adminMarketingService.deleteBanner(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-banners'] });
-      message.success('Đã xóa banner');
+      message.success('Đã xóa banner vĩnh viễn thành công');
+    },
+    onError: (err: any) => {
+      message.error(err?.response?.data?.message || 'Có lỗi xảy ra khi xóa banner');
     },
   });
 
@@ -167,14 +170,22 @@ export default function AdminBannerPage() {
             className="!rounded-full hover:!text-primary-600"
             title="Sửa banner"
           />
-          <Button
-            size="small"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => delMut.mutate(r.id)}
-            className="!rounded-full"
-            title="Xóa banner"
-          />
+          <Popconfirm
+            title="Xác nhận xóa banner"
+            description="Bạn có chắc chắn muốn xóa banner này vĩnh viễn không?"
+            onConfirm={() => delMut.mutate(r.id)}
+            okText="Xóa"
+            cancelText="Hủy"
+            okButtonProps={{ danger: true, loading: delMut.isPending }}
+          >
+            <Button
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              className="!rounded-full"
+              title="Xóa banner"
+            />
+          </Popconfirm>
         </Space>
       ),
     },
