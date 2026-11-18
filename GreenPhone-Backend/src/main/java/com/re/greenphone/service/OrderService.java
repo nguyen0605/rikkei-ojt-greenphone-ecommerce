@@ -27,6 +27,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.Map;
+import java.util.LinkedHashMap;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -171,19 +173,26 @@ public class OrderService {
                 .sorted(java.util.Comparator.comparing(com.re.greenphone.dto.request.OrderItemRequest::getPhoneVariantId))
                 .toList();
 
+        // Gom nhóm tổng số lượng đặt theo từng biến thể (xử lý đơn hàng có nhiều item cùng biến thể)
+        Map<Long, Integer> consolidatedQuantities = new java.util.LinkedHashMap<>();
+        for (var itemReq : sortedItems) {
+            consolidatedQuantities.merge(itemReq.getPhoneVariantId(), itemReq.getQuantity(), Integer::sum);
+        }
+
         // [ORD-04] 1. Khóa từng sản phẩm và kiểm tra đủ hàng trong kho
         List<PhoneVariant> lockedVariants = new java.util.ArrayList<>();
-        for (var itemReq : sortedItems) {
-            PhoneVariant variant = phoneVariantRepository.findByIdWithLock(itemReq.getPhoneVariantId())
-                    .orElseThrow(() -> new ResourceNotFoundException("PhoneVariant", "id", itemReq.getPhoneVariantId()));
+        for (Long variantId : consolidatedQuantities.keySet()) {
+            PhoneVariant variant = phoneVariantRepository.findByIdWithLock(variantId)
+                    .orElseThrow(() -> new ResourceNotFoundException("PhoneVariant", "id", variantId));
 
             if ("INACTIVE".equalsIgnoreCase(variant.getStatus())
                     || (variant.getPhone() != null && "INACTIVE".equalsIgnoreCase(variant.getPhone().getStatus()))) {
                 throw new BadRequestException("Sản phẩm #" + variant.getId() + " hiện không còn được bán. Vui lòng xóa khỏi giỏ hàng và thử lại.");
             }
 
+            int totalRequired = consolidatedQuantities.get(variantId);
             // Chặn bán âm ngay trong lock
-            if (variant.getStockQuantity() != null && variant.getStockQuantity() < itemReq.getQuantity()) {
+            if (variant.getStockQuantity() != null && variant.getStockQuantity() < totalRequired) {
                 throw new BadRequestException("Sản phẩm #" + variant.getId() + " không đủ số lượng trong kho (còn " + variant.getStockQuantity() + " sản phẩm).");
             }
             lockedVariants.add(variant);
@@ -192,24 +201,8 @@ public class OrderService {
         // [ORD-04] 2. Định tuyến kho gần nhất (giao trực tiếp hoặc gom hàng liên kho)
         Double lat = request.getLatitude();
         Double lng = request.getLongitude();
-        if ((lat == null || lng == null) && request.getShippingAddress() != null) {
-            String addr = request.getShippingAddress().toLowerCase();
-            if (addr.contains("hồ chí minh") || addr.contains("tp.hcm") || addr.contains("tphcm")
-                    || addr.contains("sài gòn") || addr.contains("thủ đức") || addr.contains("bình dương")
-                    || addr.contains("đồng nai") || addr.contains("long an") || addr.contains("cần thơ")
-                    || addr.contains("tiền giang") || addr.contains("vũng tàu") || addr.contains("bà rịa")
-                    || addr.contains("tây ninh") || addr.contains("lâm đồng") || addr.contains("đà lạt")
-                    || addr.contains("đắk lắk") || addr.contains("an giang") || addr.contains("kiên giang")) {
-                lat = 10.7769; lng = 106.7009;
-            } else if (addr.contains("đà nẵng") || addr.contains("quảng nam") || addr.contains("quảng ngãi")
-                    || addr.contains("bình định") || addr.contains("quy nhơn") || addr.contains("huế")
-                    || addr.contains("khánh hòa") || addr.contains("nha trang") || addr.contains("quảng trị")
-                    || addr.contains("quảng bình") || addr.contains("hà tĩnh") || addr.contains("nghệ an")) {
-                lat = 16.0544; lng = 108.2022;
-            }
-        }
 
-        List<Long> orderVariantIds = sortedItems.stream().map(com.re.greenphone.dto.request.OrderItemRequest::getPhoneVariantId).toList();
+        List<Long> orderVariantIds = new java.util.ArrayList<>(consolidatedQuantities.keySet());
         com.re.greenphone.dto.response.NearestWarehouseStockResponse nearestRes = warehouseRoutingService
                 .findNearestWarehouseStock(lat, lng, request.getShippingAddress(), orderVariantIds);
 
@@ -218,16 +211,23 @@ public class OrderService {
             nearestBranch = warehouseRepository.findById(nearestRes.getWarehouseId()).orElse(null);
         }
 
+        if ((lat == null || lng == null) && nearestBranch != null) {
+            lat = nearestBranch.getLatitudeAsDouble();
+            lng = nearestBranch.getLongitudeAsDouble();
+        }
+
         // Chặn đặt vượt tồn kho tại kho chi nhánh gần nhất
         if (nearestBranch != null) {
-            for (var itemReq : sortedItems) {
+            for (Map.Entry<Long, Integer> entry : consolidatedQuantities.entrySet()) {
+                Long vId = entry.getKey();
+                int requiredQty = entry.getValue();
                 WarehouseStock ws = warehouseStockRepository.findByWarehouseIdAndPhoneVariantIdForUpdate(
-                        nearestBranch.getId(), itemReq.getPhoneVariantId()).orElse(null);
+                        nearestBranch.getId(), vId).orElse(null);
                 int availableAtBranch = ws != null ? ws.getAvailableQuantity() : 0;
-                if (availableAtBranch < itemReq.getQuantity()) {
+                if (availableAtBranch < requiredQty) {
                     PhoneVariant v = lockedVariants.stream()
-                            .filter(lv -> lv.getId().equals(itemReq.getPhoneVariantId())).findFirst().orElse(null);
-                    String pName = v != null && v.getPhone() != null ? v.getPhone().getName() : ("#" + itemReq.getPhoneVariantId());
+                            .filter(lv -> lv.getId().equals(vId)).findFirst().orElse(null);
+                    String pName = v != null && v.getPhone() != null ? v.getPhone().getName() : ("#" + vId);
                     throw new BadRequestException("Sản phẩm " + pName + " tại " + nearestBranch.getName()
                             + (availableAtBranch <= 0 ? " đã hết hàng." : (" không đủ số lượng (chỉ còn " + availableAtBranch + " sản phẩm)."))
                             + " Vui lòng điều chỉnh lại số lượng đặt mua.");
