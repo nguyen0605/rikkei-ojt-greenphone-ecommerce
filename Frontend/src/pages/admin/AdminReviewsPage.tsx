@@ -34,13 +34,31 @@ export default function AdminReviewsPage() {
     { title: 'Người dùng', dataIndex: 'userName', width: 130, render: (v: string) => <span className="font-medium text-ink">{v}</span> },
     { title: 'Nội dung', dataIndex: 'content', ellipsis: true, render: (v: string) => <span className="text-ink-2">{v}</span> },
     { title: 'Đánh giá', dataIndex: 'rating', width: 120, render: (v: number) => <Rate disabled value={v} className="!text-sm" /> },
-    { title: 'Trạng thái', dataIndex: 'status', width: 170, render: (s: string, r) => (
-      <div className="flex items-center gap-2">
-        <StatusTag status={s} />
-        <Select size="small" value={s} style={{ width: 90 }} onChange={(v) => statusMut.mutate({ id: r.id, status: v })} options={['SHOW', 'HIDDEN'].map(o => ({ value: o, label: o === 'SHOW' ? 'SHOW' : 'HIDDEN' }))} />
-      </div>
+    { title: 'Trạng thái', dataIndex: 'status', width: 140, render: (s: string, r) => {
+      const normalizedStatus = s === 'APPROVED' ? 'SHOW' : s;
+      return (
+        <Select
+          size="small"
+          value={normalizedStatus}
+          style={{ width: 110 }}
+          onChange={(v) => statusMut.mutate({ id: r.id, status: v })}
+          options={[
+            { value: 'SHOW', label: 'Hiển thị' },
+            { value: 'HIDDEN', label: 'Ẩn' },
+          ]}
+        />
+      );
+    } },
+    { title: 'Thao tác', width: 90, align: 'center', render: (_, r) => (
+      <Button
+        size="small"
+        danger
+        icon={<DeleteOutlined />}
+        onClick={() => delMut.mutate(r.id)}
+        className="!rounded-full hover:!bg-red-50"
+        title="Xóa đánh giá"
+      />
     ) },
-    { title: '', width: 60, render: (_, r) => <Button size="small" danger icon={<DeleteOutlined />} onClick={() => delMut.mutate(r.id)} className="!rounded-full" /> },
   ];
 
   return (
