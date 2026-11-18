@@ -11,6 +11,7 @@ export const adminMarketingService = {
   createBanner: (data: BannerRequest) => adminBannerService.create(data),
   updateBanner: (id: number, data: BannerRequest) => adminBannerService.update(id, data),
   deleteBanner: (id: number) => adminBannerService.remove(id),
+  uploadBannerImage: (file: File) => adminBannerService.uploadImage(file),
 
   // Vouchers / Promotions
   getVouchers: (params?: Record<string, string>) => adminPromotionService.list(params),
