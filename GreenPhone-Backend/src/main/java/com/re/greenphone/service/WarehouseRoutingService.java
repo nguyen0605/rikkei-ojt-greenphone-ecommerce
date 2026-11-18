@@ -61,5 +61,16 @@ public interface WarehouseRoutingService {
      */
     com.re.greenphone.dto.response.NearestWarehouseStockResponse findNearestWarehouseStock(
             Double lat, Double lng, String province, List<Long> variantIds);
+
+    /**
+     * Lay danh sach cac chi nhanh kho hang va so luong ton kho thuc te cua mot bien the san pham (PDP kieu CellphoneS).
+     *
+     * @param variantId Ma bien the san pham
+     * @param lat Vi do nguoi dung (nullable de tinh khoang cach)
+     * @param lng Kinh do nguoi dung (nullable de tinh khoang cach)
+     * @return Danh sach chi nhanh kem ton kho va thong tin lien he
+     */
+    List<com.re.greenphone.dto.response.WarehouseBranchStockResponse> getBranchStocksForVariant(
+            Long variantId, Double lat, Double lng);
 }
 

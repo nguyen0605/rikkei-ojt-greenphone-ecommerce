@@ -6,6 +6,7 @@ import com.re.greenphone.dto.request.OrderItemRequirement;
 import com.re.greenphone.dto.response.InterWarehouseTransferPlan;
 import com.re.greenphone.dto.response.NearestWarehouseResponse;
 import com.re.greenphone.dto.response.NearestWarehouseStockResponse;
+import com.re.greenphone.dto.response.WarehouseBranchStockResponse;
 import com.re.greenphone.dto.response.TransferPlanItem;
 import com.re.greenphone.entity.PhoneVariant;
 import com.re.greenphone.entity.Warehouse;
@@ -189,6 +190,89 @@ public class WarehouseRoutingServiceImpl implements WarehouseRoutingService {
                 .status(target.getStatus())
                 .stocks(stockMap)
                 .build();
+    }
+
+    @Override
+    public List<WarehouseBranchStockResponse> getBranchStocksForVariant(Long variantId, Double lat, Double lng) {
+        if (variantId == null) {
+            throw new BadRequestException("Mã biến thể không được để trống");
+        }
+
+        List<Warehouse> activeWarehouses = warehouseRepository.findByStatus("ACTIVE");
+        if (activeWarehouses.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Long> warehouseIds = activeWarehouses.stream().map(Warehouse::getId).toList();
+        List<WarehouseStock> stocks = warehouseStockRepository.findByWarehouseIdInAndPhoneVariantIdIn(
+                warehouseIds, List.of(variantId));
+
+        Map<Long, Integer> stockMap = new HashMap<>();
+        for (WarehouseStock s : stocks) {
+            stockMap.put(s.getWarehouse().getId(), s.getAvailableQuantity());
+        }
+
+        List<WarehouseBranchStockResponse> result = new ArrayList<>();
+        for (Warehouse w : activeWarehouses) {
+            int qty = stockMap.getOrDefault(w.getId(), 0);
+            Double dist = null;
+            if (lat != null && lng != null && w.getLatitude() != null && w.getLongitude() != null) {
+                try {
+                    validateCoordinates(lat, lng);
+                    dist = calculateDistance(lat, lng, w.getLatitudeAsDouble(), w.getLongitudeAsDouble());
+                } catch (Exception ignored) {
+                }
+            }
+
+            String province = "Toàn quốc";
+            String district = "";
+            String phone = "1800 2097";
+
+            String code = w.getCode() != null ? w.getCode().toUpperCase() : "";
+            if (code.contains("HN") || (w.getAddress() != null && w.getAddress().contains("Hà Nội"))) {
+                province = "Hà Nội";
+                district = "Cầu Giấy";
+                phone = "024 7106 9999";
+            } else if (code.contains("HCM") || (w.getAddress() != null && (w.getAddress().contains("Hồ Chí Minh") || w.getAddress().contains("TP.HCM")))) {
+                province = "TP. Hồ Chí Minh";
+                district = "Quận 1";
+                phone = "028 7108 9999";
+            } else if (code.contains("DN") || (w.getAddress() != null && w.getAddress().contains("Đà Nẵng"))) {
+                province = "Đà Nẵng";
+                district = "Hải Châu";
+                phone = "0236 7109 999";
+            } else if (w.getAddress() != null) {
+                String[] parts = w.getAddress().split(",");
+                if (parts.length > 0) {
+                    province = parts[parts.length - 1].trim();
+                }
+                if (parts.length > 1) {
+                    district = parts[parts.length - 2].trim();
+                }
+            }
+
+            result.add(WarehouseBranchStockResponse.builder()
+                    .id(w.getId())
+                    .code(w.getCode())
+                    .name(w.getName())
+                    .address(w.getAddress())
+                    .province(province)
+                    .district(district)
+                    .phone(phone)
+                    .latitude(w.getLatitudeAsDouble())
+                    .longitude(w.getLongitudeAsDouble())
+                    .distanceKm(dist)
+                    .quantity(qty)
+                    .inStock(qty > 0)
+                    .status(w.getStatus())
+                    .build());
+        }
+
+        if (lat != null && lng != null) {
+            result.sort(Comparator.comparing(r -> r.getDistanceKm() != null ? r.getDistanceKm() : Double.MAX_VALUE));
+        }
+
+        return result;
     }
 
     private String unaccent(String s) {
