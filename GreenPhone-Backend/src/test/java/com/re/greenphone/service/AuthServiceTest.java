@@ -305,11 +305,13 @@ class AuthServiceTest {
 
     // === FORGOT & RESET PASSWORD ===
 
-    @Test void forgotPassword_SilentlyAcceptsUnknownEmail() {
+    @Test void forgotPassword_ThrowsExceptionForUnknownEmail() {
         when(redisTemplate.hasKey("otp_lock:nobody@example.com")).thenReturn(false);
         when(userRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
 
-        authService.forgotPassword("nobody@example.com");
+        assertThatThrownBy(() -> authService.forgotPassword("nobody@example.com"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Email không tồn tại trong hệ thống.");
 
         verify(emailService, never()).sendOTP(any(), any());
     }

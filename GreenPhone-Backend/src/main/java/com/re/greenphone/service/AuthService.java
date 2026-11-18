@@ -315,14 +315,14 @@ public class AuthService {
 
     public void forgotPassword(String email) {
         checkAccountLocked(email);
-        // Don't reveal whether email exists — silently accept
-        userRepository.findByEmail(email).ifPresent(user -> {
-            String otp = generateOTP();
-            redisTemplate.opsForValue().set(OTP_PREFIX + email, otp, OTP_TTL);
-            redisTemplate.delete(OTP_ATTEMPTS_PREFIX + email);
-            log.info("[OTP] Forgot password code for {}: {}", email, otp);
-            emailService.sendOTP(email, otp);
-        });
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BadRequestException("Email không tồn tại trong hệ thống."));
+
+        String otp = generateOTP();
+        redisTemplate.opsForValue().set(OTP_PREFIX + email, otp, OTP_TTL);
+        redisTemplate.delete(OTP_ATTEMPTS_PREFIX + email);
+        log.info("[OTP] Forgot password code for {}: {}", email, otp);
+        emailService.sendOTP(email, otp);
     }
 
     public AuthResponse resetPassword(String email, String otp, String newPassword) {

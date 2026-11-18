@@ -49,8 +49,9 @@ export default function ForgotPasswordPage() {
       setSubmitted(true);
       message.success('Đã gửi mã OTP đến email của bạn');
       navigate(`${ROUTES.RESET_PASSWORD}?email=${encodeURIComponent(values.email)}`);
-    } catch {
-      setError('Không thể gửi yêu cầu. Vui lòng kiểm tra lại email.');
+    } catch (err: any) {
+      const serverMsg = err?.response?.data?.message || err?.message;
+      setError(serverMsg || 'Email không tồn tại trong hệ thống. Vui lòng kiểm tra lại.');
     } finally {
       setLoading(false);
     }
@@ -71,7 +72,17 @@ export default function ForgotPasswordPage() {
           </div>
 
           {error && (
-            <p className="mb-4 rounded-lg bg-red-50 px-4 py-2.5 text-center text-sm text-red-600">{error}</p>
+            <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600 border border-red-200">
+              <p className="font-medium text-center">{error}</p>
+              {error.includes('không tồn tại') && (
+                <div className="mt-1 text-center text-xs">
+                  Chưa có tài khoản?{' '}
+                  <Link to={ROUTES.REGISTER} className="font-semibold text-green-700 underline hover:text-green-800">
+                    Đăng ký tài khoản mới ngay
+                  </Link>
+                </div>
+              )}
+            </div>
           )}
 
           <Form
