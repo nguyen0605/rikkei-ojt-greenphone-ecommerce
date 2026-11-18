@@ -58,18 +58,30 @@ export default function RegisterPage() {
 
   const handleSubmit = async (values: RegisterFormValues) => {
     try {
-      const result = await dispatch(
+      const cleanPhone = values.phone.trim().replace(/[\s\-\.]/g, '');
+      const normalizedPhone = cleanPhone.startsWith('+84')
+        ? '0' + cleanPhone.substring(3)
+        : cleanPhone.startsWith('84') && cleanPhone.length === 11
+          ? '0' + cleanPhone.substring(2)
+          : cleanPhone;
+
+      await dispatch(
         registerThunk({
-          fullName: values.fullName,
-          email: values.email,
-          phone: values.phone,
+          fullName: values.fullName.trim(),
+          email: values.email.trim(),
+          phone: normalizedPhone,
           password: values.password,
         }),
       ).unwrap();
       message.success('Mã OTP đã được gửi đến email của bạn');
-      navigate(ROUTES.VERIFY_OTP + '?email=' + encodeURIComponent(values.email), { replace: true });
-    } catch {
-      // Error handled by Redux state — show Alert via `error` selector
+      navigate(ROUTES.VERIFY_OTP + '?email=' + encodeURIComponent(values.email.trim()), { replace: true });
+    } catch (err: any) {
+      const errorMsg = err?.message || 'Đăng ký không thành công';
+      if (errorMsg.toLowerCase().includes('số điện thoại')) {
+        form.setFields([{ name: 'phone', errors: [errorMsg] }]);
+      } else if (errorMsg.toLowerCase().includes('email')) {
+        form.setFields([{ name: 'email', errors: [errorMsg] }]);
+      }
     }
   };
 
