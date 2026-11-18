@@ -18,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+// [WAR-04] Controller quản trị phê duyệt hoặc từ chối yêu cầu đổi trả / hoàn tiền dành cho Admin & Thủ kho
 @RestController
 @RequestMapping("/api/admin/returns")
 @PreAuthorize("hasAnyRole('ADMIN', 'SALES', 'WAREHOUSE')")
@@ -27,6 +28,7 @@ public class AdminReturnController {
 
     private final ReturnRequestService returnRequestService;
 
+    // Lấy danh sách yêu cầu đổi trả có phân trang, lọc theo trạng thái và tìm kiếm
     @GetMapping
     @Operation(summary = "Lấy danh sách yêu cầu đổi trả (phân trang, lọc theo trạng thái và từ khóa tìm kiếm)")
     public ResponseEntity<ApiResponse<PageResponse<ReturnResponse>>> getAdminReturnRequests(
@@ -47,6 +49,7 @@ public class AdminReturnController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    // Xem chi tiết yêu cầu đổi trả
     @GetMapping("/{id}")
     @Operation(summary = "Xem chi tiết yêu cầu đổi trả")
     public ResponseEntity<ApiResponse<ReturnResponse>> getReturnDetail(@PathVariable Long id) {
@@ -54,6 +57,7 @@ public class AdminReturnController {
         return ResponseEntity.ok(ApiResponse.success(detail));
     }
 
+    // Phê duyệt yêu cầu: Trừ kho gửi máy mới (EXCHANGE) hoặc kích hoạt hoàn tiền (REFUND)
     @PutMapping("/{id}/approve")
     @Operation(summary = "Phê duyệt yêu cầu: Trừ kho đổi máy mới (EXCHANGE) hoặc tạo hoàn tiền (REFUND)")
     public ResponseEntity<ApiResponse<ReturnResponse>> approveReturn(
@@ -63,6 +67,7 @@ public class AdminReturnController {
         return ResponseEntity.ok(ApiResponse.success(response, "Phê duyệt yêu cầu đổi trả thành công"));
     }
 
+    // Từ chối yêu cầu đổi trả (yêu cầu cung cấp lý do từ chối)
     @PutMapping("/{id}/reject")
     @Operation(summary = "Từ chối yêu cầu đổi trả")
     public ResponseEntity<ApiResponse<ReturnResponse>> rejectReturn(

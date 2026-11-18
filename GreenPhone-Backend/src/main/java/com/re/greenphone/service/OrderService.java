@@ -164,14 +164,12 @@ public class OrderService {
                 .discountAmount(BigDecimal.ZERO)
                 .build();
 
-        // Process items under pessimistic lock per variant — concurrent orders
-        // serialize on the row lock, so stock is never decremented twice and no retry is needed.
-        // Sort items by phoneVariantId to strictly prevent deadlocks when locking multiple rows.
+        // [ORD-04] Khóa bi quan (Pessimistic Lock) chống bán âm và sắp xếp ID chống Deadlock
         var sortedItems = request.getItems().stream()
                 .sorted(java.util.Comparator.comparing(com.re.greenphone.dto.request.OrderItemRequest::getPhoneVariantId))
                 .toList();
 
-        // 1. Lock all variants first in sorted order
+        // [ORD-04] 1. Khóa từng sản phẩm và kiểm tra đủ hàng trong kho
         List<PhoneVariant> lockedVariants = new java.util.ArrayList<>();
         for (var itemReq : sortedItems) {
             PhoneVariant variant = phoneVariantRepository.findByIdWithLock(itemReq.getPhoneVariantId())
@@ -182,13 +180,14 @@ public class OrderService {
                 throw new BadRequestException("Sản phẩm #" + variant.getId() + " hiện không còn được bán. Vui lòng xóa khỏi giỏ hàng và thử lại.");
             }
 
+            // Chặn bán âm ngay trong lock
             if (variant.getStockQuantity() != null && variant.getStockQuantity() < itemReq.getQuantity()) {
                 throw new BadRequestException("Sản phẩm #" + variant.getId() + " không đủ số lượng trong kho (còn " + variant.getStockQuantity() + " sản phẩm).");
             }
             lockedVariants.add(variant);
         }
 
-        // 2. Route inventory: Direct fulfillment (Case 1) or Inter-warehouse transfer plan (Case 2)
+        // [ORD-04] 2. Định tuyến kho gần nhất (giao trực tiếp hoặc gom hàng liên kho)
         List<com.re.greenphone.dto.request.OrderItemRequirement> itemRequirements = sortedItems.stream()
                 .map(item -> new com.re.greenphone.dto.request.OrderItemRequirement(item.getPhoneVariantId(), item.getQuantity()))
                 .toList();
@@ -211,17 +210,14 @@ public class OrderService {
             order.setOrderStatus("WAITING_FOR_TRANSFER");
         }
 
-        // 3. Process items: decrement stock at routed warehouse and build order details
+        // [ORD-04] 3. Trừ tồn kho & [INV-02] Ghi nhật ký biến động kho (Audit Log)
         for (int i = 0; i < sortedItems.size(); i++) {
             var itemReq = sortedItems.get(i);
             PhoneVariant variant = lockedVariants.get(i);
 
-            // Giảm tồn kho:
-            // Case 1 (Direct): Trừ trực tiếp tại kho routedWarehouse
-            // Case 2 (Transfer): Giảm tổng aggregate PhoneVariant.stockQuantity và ghi log xuất hàng chờ gom
             if (variant.getStockQuantity() != null) {
                 int quantityBefore = variant.getStockQuantity();
-                variant.setStockQuantity(quantityBefore - itemReq.getQuantity());
+                variant.setStockQuantity(quantityBefore - itemReq.getQuantity()); // Trừ tồn kho
                 if (isDirect) {
                     inventoryStockHistoryService.recordAtWarehouse(variant, quantityBefore, -itemReq.getQuantity(), "EXPORT", "Đặt hàng", routedWarehouse.getId());
                 } else {
@@ -513,8 +509,7 @@ public class OrderService {
 
         boolean wasWaitingForTransfer = "WAITING_FOR_TRANSFER".equals(order.getOrderStatus());
 
-        // Restore stock (pessimistic lock per variant — no double-restore with concurrent cancels)
-        // Sort details by phoneVariantId to strictly prevent deadlocks.
+        // [ORD-06] Hoàn tồn kho (Pessimistic Lock) & sắp xếp ID chống Deadlock
         var sortedDetails = order.getOrderDetails().stream()
                 .filter(d -> d.getPhoneVariant() != null)
                 .sorted(java.util.Comparator.comparing(d -> d.getPhoneVariant().getId()))
@@ -530,7 +525,9 @@ public class OrderService {
                     locked = phoneVariantRepository.findByIdWithLock(locked.getId()).orElse(locked);
                 }
                 int quantityBefore = locked.getStockQuantity();
-                locked.setStockQuantity(quantityBefore + detail.getQuantity());
+                locked.setStockQuantity(quantityBefore + detail.getQuantity()); // Cộng lại kho
+                
+                // [INV-02] Ghi nhật ký hoàn kho (Audit Log)
                 if (wasWaitingForTransfer) {
                     inventoryStockHistoryService.recordAggregateOnly(locked, quantityBefore, detail.getQuantity(), "IMPORT", "Hủy đơn hàng chờ điều chuyển");
                 } else if (detail.getWarehouseId() == null) {
@@ -547,7 +544,7 @@ public class OrderService {
             warehouseTransferService.cancelTransfersForOrder(order.getId(), cancelReason);
         }
 
-        // Restore the promotion so the voucher can be reused (only if not expired)
+        // [ORD-06] Hoàn lại voucher cho khách nếu còn hạn
         if (order.getUserPromotion() != null) {
             UserPromotion up = order.getUserPromotion();
             Promotion promo = up.getPromotion();

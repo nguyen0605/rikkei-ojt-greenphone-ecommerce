@@ -29,6 +29,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+// [WAR-04] Dịch vụ xử lý nghiệp vụ đổi trả sản phẩm lỗi trong vòng 7 ngày & kích hoạt hoàn tiền
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -45,9 +46,7 @@ public class ReturnRequestService {
     private final InventoryStockHistoryService inventoryStockHistoryService;
     private final ObjectMapper objectMapper;
 
-    /**
-     * Khách hàng gửi yêu cầu đổi trả sản phẩm lỗi trong 7 ngày
-     */
+    // Khách hàng tạo yêu cầu đổi trả / hoàn tiền (kiểm tra điều kiện 7 ngày, quyền sở hữu, trạng thái đơn)
     @Transactional
     public ReturnResponse createReturnRequest(ReturnCreateRequest request) {
         Long currentUserId = SecurityUtils.getCurrentUser().getId();

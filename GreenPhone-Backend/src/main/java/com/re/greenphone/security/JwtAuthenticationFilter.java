@@ -96,12 +96,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
 
                 if (jwtTokenProvider.validateToken(jwt)) {
-                    // 2. Check if the device session has been revoked (USR-15 / USR-16 remote logout)
+                    // 2. Kiểm tra nếu phiên thiết bị đã bị thu hồi từ xa (USR-15 / USR-16 Remote Revocation)
                     Long sessionId = jwtTokenProvider.getSessionIdFromToken(jwt);
                     if (sessionId != null && userDeviceSessionRepository != null) {
                         boolean isRevoked = userDeviceSessionRepository.findIsRevokedById(sessionId)
                                 .orElse(false);
                         if (isRevoked) {
+                            // Chặn đứng ngay lập tức nếu phiên đã bị đăng xuất từ xa
                             response.setContentType("application/json");
                             response.setCharacterEncoding("UTF-8");
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -110,6 +111,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         }
                     }
 
+                    // 3. Trích xuất thông tin người dùng và xác thực tài khoản còn hoạt động
                     String username = jwtTokenProvider.getUsernameFromToken(jwt);
                     Optional<User> userOpt = userRepository.findByEmail(username);
 

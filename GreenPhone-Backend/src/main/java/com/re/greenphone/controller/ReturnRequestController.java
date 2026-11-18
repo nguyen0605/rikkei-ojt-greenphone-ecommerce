@@ -17,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
+// [WAR-04] Controller tiếp nhận và xử lý yêu cầu đổi trả / hoàn tiền từ phía khách hàng
 @RestController
 @RequestMapping("/api/returns")
 @RequiredArgsConstructor
@@ -26,6 +27,7 @@ public class ReturnRequestController {
     private final ReturnRequestService returnRequestService;
     private final R2StorageService r2StorageService;
 
+    // Khách hàng gửi yêu cầu đổi trả hoặc hoàn tiền cho sản phẩm lỗi trong vòng 7 ngày
     @PostMapping
     @Operation(summary = "Tạo yêu cầu đổi trả hoặc hoàn tiền cho sản phẩm lỗi trong 7 ngày")
     public ResponseEntity<ApiResponse<ReturnResponse>> createReturnRequest(
@@ -35,6 +37,7 @@ public class ReturnRequestController {
                 .body(ApiResponse.created(response));
     }
 
+    // Tải ảnh chứng minh lỗi sản phẩm lên kho lưu trữ đám mây Cloudflare R2
     @PostMapping(value = "/proof-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload hình ảnh minh chứng lỗi thiết bị lên Cloudflare R2")
     public ResponseEntity<ApiResponse<String>> uploadProofImage(
@@ -43,6 +46,7 @@ public class ReturnRequestController {
         return ResponseEntity.ok(ApiResponse.success(imageUrl, "Tải ảnh minh chứng lỗi lên Cloudflare R2 thành công"));
     }
 
+    // Lấy danh sách toàn bộ các yêu cầu đổi trả của khách hàng đang đăng nhập
     @GetMapping("/my-requests")
     @Operation(summary = "Lấy danh sách yêu cầu đổi trả của khách hàng hiện tại")
     public ResponseEntity<ApiResponse<List<ReturnResponse>>> getMyReturnRequests() {
@@ -50,6 +54,7 @@ public class ReturnRequestController {
         return ResponseEntity.ok(ApiResponse.success(list));
     }
 
+    // Xem chi tiết một yêu cầu đổi trả theo ID
     @GetMapping("/{id}")
     @Operation(summary = "Xem chi tiết yêu cầu đổi trả theo ID")
     public ResponseEntity<ApiResponse<ReturnResponse>> getReturnDetail(@PathVariable Long id) {
