@@ -110,12 +110,14 @@ public class PhoneService {
             String fullTextTerm = toBooleanSearchTerm(query.trim());
             if (!fullTextTerm.isBlank()) {
                 Page<Phone> phonePage = phoneRepository.searchFullText(fullTextTerm, pageable);
-                List<PhoneDTO> dtos = phonePage.getContent().stream()
-                        .map(this::toListingDto)
-                        .toList();
+                if (phonePage.hasContent()) {
+                    List<PhoneDTO> dtos = phonePage.getContent().stream()
+                            .map(this::toListingDto)
+                            .toList();
 
-                return new PageResponse<>(dtos, phonePage.getNumber(), phonePage.getSize(),
-                        phonePage.getTotalElements(), phonePage.getTotalPages(), phonePage.isLast());
+                    return new PageResponse<>(dtos, phonePage.getNumber(), phonePage.getSize(),
+                            phonePage.getTotalElements(), phonePage.getTotalPages(), phonePage.isLast());
+                }
             }
         }
 
