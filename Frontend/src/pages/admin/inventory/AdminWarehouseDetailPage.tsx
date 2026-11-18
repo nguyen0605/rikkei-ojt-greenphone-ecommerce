@@ -51,8 +51,7 @@ export default function AdminWarehouseDetailPage() {
   });
   return <>{context}
     <Link to="/admin/warehouses">← Chi nhánh</Link>
-    <AdminPageHeader title={warehouse.data?.name ?? 'Chi tiết chi nhánh'} subtitle={warehouse.data?.address}
-      actions={<Button type="primary" disabled={!active || mutation.isPending} onClick={() => setAction({ mode: 'IMPORT' })}>Nhập sản phẩm</Button>} />
+    <AdminPageHeader title={warehouse.data?.name ?? 'Chi tiết chi nhánh'} subtitle={warehouse.data?.address} />
     {!active && warehouse.data && <Alert className="mb-4" type="warning" title="Chi nhánh INACTIVE: chỉ xem dữ liệu, không nhập/xuất/chuyển kho thủ công." />}
     {(warehouse.isError || stock.isError) && <Alert className="mb-4" type="error" title="Không thể tải chi nhánh hoặc tồn kho"
       action={<Button onClick={() => { void warehouse.refetch(); void stock.refetch(); }}>Thử lại</Button>} />}
@@ -79,7 +78,7 @@ export default function AdminWarehouseDetailPage() {
     <p className="mb-3 text-sm text-gray-500">Hiển thị {rows.length} / {stock.data?.length ?? 0} biến thể</p>
     <Table<WarehouseStock> rowKey="variantId" size="middle" tableLayout="fixed" loading={stock.isPending}
       dataSource={rows} scroll={{ x: 1100 }} pagination={{ current: page, pageSize: 10, onChange: setPage, hideOnSinglePage: true }}
-      locale={{ emptyText: stock.data?.length ? 'Không có biến thể phù hợp bộ lọc' : 'Chưa có sản phẩm tại chi nhánh. Bấm Nhập sản phẩm để thêm.' }} columns={[
+      locale={{ emptyText: stock.data?.length ? 'Không có biến thể phù hợp bộ lọc' : 'Chưa có sản phẩm tại chi nhánh. Tạo đơn nhập hàng (PO) để nhập hàng vào kho.' }} columns={[
         { title: 'Sản phẩm', width: '28%', render: (_, row) => <div><div className="font-semibold">{row.productName}</div><div className="mt-1 font-mono text-xs text-gray-500">{row.sku}</div></div> },
         { title: 'Biến thể', width: '27%', render: (_, row) => `${row.ram} / ${row.storage} / ${row.color}` },
         { title: 'Tồn chi nhánh', width: '14%', dataIndex: 'quantity', align: 'center', render: (quantity: number) => <span className="text-lg font-semibold text-green-700">{quantity}</span> },

@@ -5,6 +5,7 @@ import {
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, PictureOutlined, AppstoreOutlined, ArrowUpOutlined, ArrowDownOutlined, HistoryOutlined, RightOutlined } from '@ant-design/icons';
 import { useState, type Key } from 'react';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { adminPhoneService, brandService, adminOptionService, optionService } from '@/services';
 import { warehouseService, warehouseInventoryService } from '@/services/warehouseService';
 import VariantWarehouseStock from '@/components/admin/warehouse/VariantWarehouseStock';
@@ -90,7 +91,8 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
   const warehouseQuery = useQuery({ queryKey: ['admin', 'warehouses'], queryFn: ({ signal }) => warehouseService.list(signal), enabled: inventoryMode });
   // ── Search + filter + server paging ──
   const [page, setPage] = useState(1);
-  const [keyword, setKeyword] = useState('');
+  const [search, setSearch] = useState('');
+  const keyword = useDebouncedValue(search.trim(), 300);
   const [brandFilter, setBrandFilter] = useState<string | undefined>();
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
   const [lowStockOnly, setLowStockOnly] = useState(false);
@@ -429,7 +431,8 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
           <Input.Search
             placeholder="Tìm sản phẩm..."
             allowClear
-            onSearch={(v) => { setKeyword(v.trim()); setPage(1); }}
+            value={search}
+            onChange={(event) => { setSearch(event.target.value); setPage(1); }}
             className="!w-56"
           />
           <Select
