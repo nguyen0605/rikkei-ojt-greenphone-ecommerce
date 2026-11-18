@@ -8,6 +8,7 @@ import { selectCheckoutItems, selectCheckoutSummary } from '@/store/selectors/ca
 import { nextStep, prevStep, completeOrder, setCurrentStep, removeCheckoutVoucher, clearBuyNow } from '@/store/slices/checkoutSlice';
 import { clearCart, removeVoucher } from '@/store/slices/cartSlice';
 import { orderService, paymentService, phoneService } from '@/services';
+import { warehouseService } from '@/services/warehouseService';
 import { Button, App, Input } from 'antd';
 import { Shield, CheckCircle, Banknote, Building2, FileText, Info } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -180,6 +181,35 @@ export default function CheckoutPage() {
         shipping.latitude <= 90 &&
         shipping.longitude >= -180 &&
         shipping.longitude <= 180;
+
+      // Kiem tra ton kho tai chi nhanh gan nhat truoc khi tao don hang
+      const variantIds = items.map((i) => i.phoneVariantId);
+      try {
+        const nearest = await warehouseService.getNearestStock({
+          lat: hasCoords ? shipping.latitude : undefined,
+          lng: hasCoords ? shipping.longitude : undefined,
+          province: shipping.province || shipping.address,
+          variantIds,
+        });
+        if (nearest?.stocks) {
+          for (const it of items) {
+            const avail = nearest.stocks[it.phoneVariantId];
+            if (avail !== undefined && avail < it.quantity) {
+              const itemObj = checkoutItems.find((ci) => ci.variantId === it.phoneVariantId);
+              const pName = itemObj?.product?.name || `Phien ban #${it.phoneVariantId}`;
+              if (avail <= 0) {
+                message.error(`Sản phẩm "${pName}" đã hết hàng tại ${nearest.warehouseName}. Vui lòng chọn sản phẩm khác.`);
+              } else {
+                message.error(`Sản phẩm "${pName}" chỉ còn ${avail} sản phẩm tại ${nearest.warehouseName}. Vui lòng điều chỉnh lại số lượng.`);
+              }
+              setPlacing(false);
+              return;
+            }
+          }
+        }
+      } catch {
+        // Fallback neu khong the lay nearest thi de backend validation xu ly
+      }
 
       const noteParts: string[] = [];
       if (includePaperInvoice) {

@@ -6,6 +6,7 @@ import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectCheckoutItems, selectCheckoutSummary } from '@/store/selectors/cartSelectors';
 import { formatVND, cn } from '@/utils';
 import { promotionService } from '@/services';
+import { warehouseService } from '@/services/warehouseService';
 import type { AvailablePromotionDTO } from '@/types/api';
 import { applyCheckoutVoucher, removeCheckoutVoucher, updateBuyNowQuantity } from '@/store/slices/checkoutSlice';
 import { applyVoucher, removeVoucher } from '@/store/slices/cartSlice';
@@ -20,8 +21,32 @@ export default function OrderSummary() {
   const voucherCode = useAppSelector((s) => s.checkout.voucherCode);
   const voucherDiscount = useAppSelector((s) => s.checkout.voucherDiscount);
   const isAuthenticated = useAppSelector((s) => s.auth.isAuthenticated);
+  const shipping = useAppSelector((s) => s.checkout.shipping);
   const [userDismissedVoucher, setUserDismissedVoucher] = useState(false);
   const [qtyDraft, setQtyDraft] = useState<string | null>(null);
+
+  const variantIds = checkoutItems.map((i) => i.variantId).filter(Boolean) as number[];
+
+  const { data: nearestStock } = useQuery({
+    queryKey: [
+      'warehouse',
+      'nearest-stock',
+      shipping?.latitude,
+      shipping?.longitude,
+      shipping?.province,
+      shipping?.address,
+      variantIds.join(','),
+    ],
+    queryFn: () =>
+      warehouseService.getNearestStock({
+        lat: typeof shipping?.latitude === 'number' ? shipping.latitude : undefined,
+        lng: typeof shipping?.longitude === 'number' ? shipping.longitude : undefined,
+        province: shipping?.province || shipping?.address,
+        variantIds: variantIds.length > 0 ? variantIds : undefined,
+      }),
+    enabled: variantIds.length > 0,
+    staleTime: 5000,
+  });
 
   const { data: myPromos } = useQuery<AvailablePromotionDTO[]>({
     queryKey: ['promotions', 'available', summary.subtotal],
@@ -171,93 +196,122 @@ export default function OrderSummary() {
           )}
         </div>
         <div className="space-y-3">
-          {checkoutItems.map((item) => (
-            <div key={item.id} className="flex gap-3">
-              <img src={item.product.thumbnail} alt={item.product.name} className="h-16 w-16 rounded-lg object-cover" />
-              <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900">{item.product.name}</div>
-                <div className="text-xs text-gray-500">{[item.selectedStorage, item.selectedColor].filter(Boolean).join(' • ')}</div>
-                {buyNowItem ? (
-                  <div className="mt-2 flex items-center gap-2">
-                    <div className="inline-flex items-center rounded-lg border border-gray-200 bg-gray-50/70">
-                      <button
-                        type="button"
-                        aria-label="Giảm số lượng"
-                        data-testid="buy-now-qty-decrease"
-                        disabled={item.quantity <= 1}
-                        onClick={() => {
-                          setQtyDraft(null);
-                          dispatch(updateBuyNowQuantity(item.quantity - 1));
-                        }}
-                        className="flex h-7 w-7 items-center justify-center rounded-l-lg text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Minus className="h-3.5 w-3.5" />
-                      </button>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        aria-label="Số lượng sản phẩm"
-                        data-testid="buy-now-qty-input"
-                        value={qtyDraft ?? String(item.quantity)}
-                        onFocus={(e) => {
-                          setQtyDraft(String(item.quantity));
-                          e.currentTarget.select();
-                        }}
-                        onChange={(e) => {
-                          const digits = e.target.value.replace(/\D/g, '');
-                          if (digits === '') {
-                            setQtyDraft('');
-                            return;
-                          }
-                          const parsed = parseInt(digits, 10);
-                          if (Number.isNaN(parsed)) return;
-                          const maxStock = item.maxStock;
-                          let nextQty = Math.max(1, parsed);
-                          if (maxStock !== undefined && maxStock > 0 && nextQty > maxStock) {
-                            nextQty = maxStock;
-                            message.warning(`Chỉ còn ${maxStock} sản phẩm trong kho`);
-                          }
-                          setQtyDraft(String(nextQty));
-                          dispatch(updateBuyNowQuantity(nextQty));
-                        }}
-                        onBlur={() => {
-                          if (qtyDraft === '') {
-                            dispatch(updateBuyNowQuantity(1));
-                          }
-                          setQtyDraft(null);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.currentTarget.blur();
-                          }
-                        }}
-                        className="h-7 w-11 border-x border-gray-200 bg-white px-1 text-center text-xs font-semibold text-gray-900 focus:outline-none focus:ring-1 focus:ring-green-500"
-                      />
-                      <button
-                        type="button"
-                        aria-label="Tăng số lượng"
-                        data-testid="buy-now-qty-increase"
-                        disabled={item.maxStock !== undefined && item.quantity >= item.maxStock}
-                        onClick={() => {
-                          setQtyDraft(null);
-                          dispatch(updateBuyNowQuantity(item.quantity + 1));
-                        }}
-                        className="flex h-7 w-7 items-center justify-center rounded-r-lg text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                    {item.maxStock !== undefined && (
-                      <span className="text-[11px] text-gray-400">Còn {item.maxStock}</span>
-                    )}
-                  </div>
-                ) : (
-                  <div className="mt-1 text-xs text-gray-500">SL: {item.quantity}</div>
-                )}
-              </div>
-              <div className="text-sm font-semibold text-gray-900">{formatVND(item.product.price * item.quantity)}</div>
+          {nearestStock?.warehouseName && (
+            <div className="mb-3 flex items-center gap-1.5 rounded-lg bg-green-50/80 px-2.5 py-1 text-xs text-green-800 border border-green-200">
+              <Truck className="h-3.5 w-3.5 text-green-600 shrink-0" />
+              <span>Kho xuất hàng: <strong>{nearestStock.warehouseName}</strong>{nearestStock.distanceKm != null ? ` (~${nearestStock.distanceKm} km)` : ''}</span>
             </div>
-          ))}
+          )}
+          {checkoutItems.map((item) => {
+            const branchStock =
+              item.variantId && nearestStock?.stocks?.[item.variantId] !== undefined
+                ? nearestStock.stocks[item.variantId]
+                : item.maxStock;
+            const effectiveMax = branchStock !== undefined ? branchStock : item.maxStock;
+            const isOutOfStock = effectiveMax !== undefined && effectiveMax <= 0;
+
+            return (
+              <div key={item.id} className="flex gap-3">
+                <img src={item.product.thumbnail} alt={item.product.name} className="h-16 w-16 rounded-lg object-cover" />
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-900">{item.product.name}</div>
+                  <div className="text-xs text-gray-500">{[item.selectedStorage, item.selectedColor].filter(Boolean).join(' • ')}</div>
+                  {buyNowItem ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <div className="inline-flex items-center rounded-lg border border-gray-200 bg-gray-50/70">
+                        <button
+                          type="button"
+                          aria-label="Giảm số lượng"
+                          data-testid="buy-now-qty-decrease"
+                          disabled={item.quantity <= 1 || isOutOfStock}
+                          onClick={() => {
+                            setQtyDraft(null);
+                            dispatch(updateBuyNowQuantity(item.quantity - 1));
+                          }}
+                          className="flex h-7 w-7 items-center justify-center rounded-l-lg text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </button>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          aria-label="Số lượng sản phẩm"
+                          data-testid="buy-now-qty-input"
+                          value={qtyDraft ?? String(item.quantity)}
+                          onFocus={(e) => {
+                            setQtyDraft(String(item.quantity));
+                            e.currentTarget.select();
+                          }}
+                          onChange={(e) => {
+                            const digits = e.target.value.replace(/\D/g, '');
+                            if (digits === '') {
+                              setQtyDraft('');
+                              return;
+                            }
+                            const parsed = parseInt(digits, 10);
+                            if (Number.isNaN(parsed)) return;
+                            let nextQty = Math.max(1, parsed);
+                            if (effectiveMax !== undefined && effectiveMax > 0 && nextQty > effectiveMax) {
+                              nextQty = effectiveMax;
+                              message.warning(`Chỉ còn ${effectiveMax} sản phẩm tại ${nearestStock?.warehouseName || 'kho gần bạn'}`);
+                            }
+                            setQtyDraft(String(nextQty));
+                            dispatch(updateBuyNowQuantity(nextQty));
+                          }}
+                          onBlur={() => {
+                            if (qtyDraft === '') {
+                              dispatch(updateBuyNowQuantity(1));
+                            }
+                            setQtyDraft(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.currentTarget.blur();
+                            }
+                          }}
+                          className="h-7 w-11 border-x border-gray-200 bg-white px-1 text-center text-xs font-semibold text-gray-900 focus:outline-none focus:ring-1 focus:ring-green-500"
+                        />
+                        <button
+                          type="button"
+                          aria-label="Tăng số lượng"
+                          data-testid="buy-now-qty-increase"
+                          disabled={effectiveMax !== undefined && (effectiveMax <= 0 || item.quantity >= effectiveMax)}
+                          onClick={() => {
+                            setQtyDraft(null);
+                            dispatch(updateBuyNowQuantity(item.quantity + 1));
+                          }}
+                          className="flex h-7 w-7 items-center justify-center rounded-r-lg text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      {effectiveMax !== undefined && (
+                        <span className={cn("text-[11px]", isOutOfStock ? "text-red-600 font-semibold" : "text-gray-500 font-medium")}>
+                          {isOutOfStock ? (
+                            `Hết hàng (${nearestStock?.warehouseName || 'Chi nhánh'})`
+                          ) : (
+                            <>Còn <strong className="text-green-700">{effectiveMax}</strong> ({nearestStock?.warehouseName || 'Chi nhánh'})</>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                      <span>SL: {item.quantity}</span>
+                      {effectiveMax !== undefined && (
+                        <span className={cn("text-[11px]", isOutOfStock ? "text-red-600 font-semibold" : "text-gray-500")}>
+                          {isOutOfStock
+                            ? `• Hết hàng (${nearestStock?.warehouseName || 'Chi nhánh'})`
+                            : `• Còn ${effectiveMax} (${nearestStock?.warehouseName || 'Chi nhánh'})`}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="text-sm font-semibold text-gray-900">{formatVND(item.product.price * item.quantity)}</div>
+              </div>
+            );
+          })}
         </div>
 
         <div className="mt-4 space-y-2 border-t border-gray-100 pt-4">
