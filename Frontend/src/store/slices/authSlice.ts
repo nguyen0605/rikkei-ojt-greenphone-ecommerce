@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import { authService } from '@/services/authService';
-import { post } from '@/services/api';
+import { post, clearClientStorage } from '@/services/api';
 import { isTokenValid } from '@/utils/jwt';
 import type { LoginRequest, RegisterRequest } from '@/types/api';
 
@@ -104,8 +104,9 @@ const authSlice = createSlice({
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
-      localStorage.removeItem('greenphone.token');
-      localStorage.removeItem('greenphone.user');
+      state.error = null;
+      state.errorCode = null;
+      clearClientStorage();
     },
     setCredentials(state, action: PayloadAction<{ user: { id: number; email: string; fullName: string; role: string }; token: string }>) {
       state.loading = false;
@@ -173,8 +174,9 @@ const authSlice = createSlice({
         state.user = null;
         state.token = null;
         state.isAuthenticated = false;
-        localStorage.removeItem('greenphone.token');
-        localStorage.removeItem('greenphone.user');
+        state.error = null;
+        state.errorCode = null;
+        clearClientStorage();
       });
   },
 });

@@ -80,6 +80,40 @@ describe('authSlice', () => {
         expect(store.getState().auth.token).toBeNull();
         expect(store.getState().auth.isAuthenticated).toBe(false);
       });
+
+      it('should perform Zero-Trace logout: clear all greenphone keys, persist keys and sessionStorage while keeping rememberedEmail', () => {
+        const store = createTestStore();
+
+        localStorage.setItem('greenphone.token', 'test-token');
+        localStorage.setItem('greenphone.user', JSON.stringify({ id: 2, email: 'user@example.com' }));
+        localStorage.setItem('greenphone.addresses.2', JSON.stringify([{ id: 'addr_1', streetAddress: '123 Main' }]));
+        localStorage.setItem('persist:greenphone-root', '{"cart":"[]"}');
+        localStorage.setItem('greenphone.rememberedEmail', 'remembered@example.com');
+        sessionStorage.setItem('tempCheckout', 'checkout-data');
+
+        store.dispatch(logout());
+
+        expect(localStorage.getItem('greenphone.token')).toBeNull();
+        expect(localStorage.getItem('greenphone.user')).toBeNull();
+        expect(localStorage.getItem('greenphone.addresses.2')).toBeNull();
+        expect(localStorage.getItem('persist:greenphone-root')).toBeNull();
+        expect(localStorage.getItem('greenphone.rememberedEmail')).toBe('remembered@example.com');
+        expect(sessionStorage.getItem('tempCheckout')).toBeNull();
+      });
+
+      it('should perform Zero-Trace logout on logoutThunk.fulfilled', () => {
+        const store = createTestStore();
+
+        localStorage.setItem('greenphone.token', 'test-token');
+        localStorage.setItem('greenphone.addresses.99', '["data"]');
+        sessionStorage.setItem('cart-session', 'cart');
+
+        store.dispatch({ type: logoutThunk.fulfilled.type });
+
+        expect(localStorage.getItem('greenphone.token')).toBeNull();
+        expect(localStorage.getItem('greenphone.addresses.99')).toBeNull();
+        expect(sessionStorage.getItem('cart-session')).toBeNull();
+      });
     });
 
     describe('updateUserProfile', () => {
