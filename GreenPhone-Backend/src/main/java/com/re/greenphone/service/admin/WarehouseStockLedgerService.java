@@ -49,7 +49,7 @@ public class WarehouseStockLedgerService {
     public void apply(PhoneVariant variant, Warehouse warehouse, int aggregateBefore, int delta,
                       String type, String reason, String transferReference) {
         initialize(variant, aggregateBefore);
-        WarehouseStock stock = stocks.findByWarehouseIdAndPhoneVariantId(warehouse.getId(), variant.getId())
+        WarehouseStock stock = stocks.findByWarehouseIdAndPhoneVariantIdForUpdate(warehouse.getId(), variant.getId())
                 .orElseGet(() -> newStock(warehouse, variant, 0));
         int before = stock.getQuantity();
         final int after;
