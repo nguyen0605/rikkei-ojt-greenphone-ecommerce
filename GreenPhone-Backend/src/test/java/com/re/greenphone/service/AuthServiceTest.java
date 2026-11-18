@@ -132,6 +132,38 @@ class AuthServiceTest {
                 .hasMessageContaining("Email này đã được đăng ký");
     }
 
+    @Test void register_PhoneAlreadyExists() {
+        when(redisTemplate.hasKey("otp_lock:test@example.com")).thenReturn(false);
+        when(userRepository.existsByEmail(registerReq.getEmail())).thenReturn(false);
+        when(userRepository.existsByPhone("0900000001")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.register(registerReq))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("Số điện thoại này đã được đăng ký");
+    }
+
+    @Test void register_PhoneNormalizedWithPlus84_AlreadyExists() {
+        registerReq.setPhone("+84900000001");
+        when(redisTemplate.hasKey("otp_lock:test@example.com")).thenReturn(false);
+        when(userRepository.existsByEmail(registerReq.getEmail())).thenReturn(false);
+        when(userRepository.existsByPhone("0900000001")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.register(registerReq))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("Số điện thoại này đã được đăng ký");
+    }
+
+    @Test void normalizePhoneNumber_VariousFormats() {
+        assertThat(AuthService.normalizePhoneNumber(null)).isNull();
+        assertThat(AuthService.normalizePhoneNumber("")).isEmpty();
+        assertThat(AuthService.normalizePhoneNumber("0912345678")).isEqualTo("0912345678");
+        assertThat(AuthService.normalizePhoneNumber("+84912345678")).isEqualTo("0912345678");
+        assertThat(AuthService.normalizePhoneNumber("84912345678")).isEqualTo("0912345678");
+        assertThat(AuthService.normalizePhoneNumber("  0912 345 678  ")).isEqualTo("0912345678");
+        assertThat(AuthService.normalizePhoneNumber("+84 912-345-678")).isEqualTo("0912345678");
+        assertThat(AuthService.normalizePhoneNumber("0912.345.678")).isEqualTo("0912345678");
+    }
+
     @Test void register_AlwaysCustomerRole() {
         when(redisTemplate.hasKey("otp_lock:test@example.com")).thenReturn(false);
         when(userRepository.existsByEmail(registerReq.getEmail())).thenReturn(false);

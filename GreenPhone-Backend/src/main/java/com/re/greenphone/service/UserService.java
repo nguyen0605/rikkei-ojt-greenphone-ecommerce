@@ -1,6 +1,7 @@
 package com.re.greenphone.service;
 
 import com.re.greenphone.common.exception.BadRequestException;
+import com.re.greenphone.common.exception.ConflictException;
 import com.re.greenphone.common.exception.ResourceNotFoundException;
 import com.re.greenphone.dto.request.UserProfileRequest;
 import com.re.greenphone.dto.response.UserDTO;
@@ -34,9 +35,15 @@ public class UserService {
         User user = userRepository.findById(SecurityUtils.getCurrentUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", SecurityUtils.getCurrentUserId()));
 
-        if (request.getFullName() != null) user.setFullName(request.getFullName());
-        if (request.getPhone() != null) user.setPhone(request.getPhone());
-        if (request.getAddress() != null) user.setAddress(request.getAddress());
+        if (request.getFullName() != null) user.setFullName(request.getFullName().trim());
+        if (request.getPhone() != null && !request.getPhone().isBlank()) {
+            String normalizedPhone = AuthService.normalizePhoneNumber(request.getPhone());
+            if (!normalizedPhone.equals(user.getPhone()) && userRepository.existsByPhone(normalizedPhone)) {
+                throw new ConflictException("Số điện thoại này đã được sử dụng bởi một tài khoản khác.");
+            }
+            user.setPhone(normalizedPhone);
+        }
+        if (request.getAddress() != null) user.setAddress(request.getAddress().trim());
 
         user = userRepository.save(user);
         return userMapper.toDto(user);

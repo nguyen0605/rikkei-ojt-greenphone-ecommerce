@@ -52,9 +52,19 @@ export const loginThunk = createAsyncThunk('auth/login', async (data: LoginReque
   return { ...res, remember: data.remember };
 });
 
-export const registerThunk = createAsyncThunk('auth/register', async (data: RegisterRequest) => {
-  await authService.register(data);
-  return { email: data.email };
+export const registerThunk = createAsyncThunk<
+  { email: string },
+  RegisterRequest,
+  { rejectValue: { message: string; errorCode?: string } }
+>('auth/register', async (data, { rejectWithValue }) => {
+  try {
+    await authService.register(data);
+    return { email: data.email };
+  } catch (err: any) {
+    const message = err.response?.data?.message || err.message || 'Đăng ký thất bại';
+    const errorCode = err.response?.data?.errorCode || err.errorCode;
+    return rejectWithValue({ message, errorCode });
+  }
 });
 
 export const logoutThunk = createAsyncThunk('auth/logout', async () => {
@@ -126,7 +136,15 @@ const authSlice = createSlice({
       .addCase(loginThunk.rejected, (state, action) => { state.loading = false; state.error = action.error.message || 'Login failed'; })
       .addCase(registerThunk.pending, (state) => { state.loading = true; state.error = null; })
       .addCase(registerThunk.fulfilled, (state) => { state.loading = false; })
-      .addCase(registerThunk.rejected, (state, action) => { state.loading = false; state.error = action.error.message || 'Register failed'; })
+      .addCase(registerThunk.rejected, (state, action) => {
+        state.loading = false;
+        if (action.payload) {
+          state.error = action.payload.message;
+          state.errorCode = action.payload.errorCode || null;
+        } else {
+          state.error = action.error.message || 'Register failed';
+        }
+      })
       .addCase(verifyOTPThunk.pending, (state) => {
         state.loading = true;
         state.error = null;

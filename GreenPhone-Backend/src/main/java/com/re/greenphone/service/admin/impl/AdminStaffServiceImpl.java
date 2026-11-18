@@ -11,6 +11,7 @@ import com.re.greenphone.entity.Role;
 import com.re.greenphone.entity.User;
 import com.re.greenphone.repository.RoleRepository;
 import com.re.greenphone.repository.UserRepository;
+import com.re.greenphone.service.AuthService;
 import com.re.greenphone.service.admin.AdminStaffService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -72,8 +73,9 @@ public class AdminStaffServiceImpl implements AdminStaffService {
             throw new BadRequestException("Email đã tồn tại trong hệ thống: " + request.getEmail().trim());
         }
 
-        if (userRepository.existsByPhone(request.getPhone().trim())) {
-            throw new BadRequestException("Số điện thoại đã được đăng ký: " + request.getPhone().trim());
+        String normalizedPhone = AuthService.normalizePhoneNumber(request.getPhone());
+        if (userRepository.existsByPhone(normalizedPhone)) {
+            throw new BadRequestException("Số điện thoại đã được đăng ký: " + normalizedPhone);
         }
 
         String roleName = normalizeRole(request.getRole());
@@ -83,7 +85,7 @@ public class AdminStaffServiceImpl implements AdminStaffService {
         User user = new User();
         user.setFullName(request.getFullName().trim());
         user.setEmail(request.getEmail().trim().toLowerCase());
-        user.setPhone(request.getPhone().trim());
+        user.setPhone(normalizedPhone);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(role);
         user.setStatus("ACTIVE");
