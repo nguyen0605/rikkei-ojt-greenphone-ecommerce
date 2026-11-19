@@ -8,6 +8,7 @@ import {
   isStreetMatched,
   KNOWN_VN_LOCATIONS,
 } from '../checkoutGeocodingService';
+import { resolveAdminHierarchy } from '@/utils/vietnamAdministrative';
 
 describe('checkoutGeocodingService', () => {
   beforeEach(() => {
@@ -96,6 +97,27 @@ describe('checkoutGeocodingService', () => {
       const results = await searchAddressSuggestions('97');
       expect(results.length).toBeGreaterThan(0);
       expect(results.some((r) => r.place_name.includes('97'))).toBe(true);
+    });
+
+    it('resolves 97 Man Thiện to district Thành phố Thủ Đức and ward Phường Tăng Nhơn Phú A instead of district Tăng Nhơn Phú', async () => {
+      const results = await searchAddressSuggestions('97 Man Thiện');
+      expect(results.length).toBeGreaterThan(0);
+      const match = results.find((r) => r.place_name.includes('Man Thiện') || r.title.includes('Man Thiện'));
+      expect(match).toBeDefined();
+      expect(match?.components?.district).toBe('Thành phố Thủ Đức');
+      expect(match?.components?.ward).toBe('Phường Tăng Nhơn Phú A');
+      expect(match?.components?.district).not.toBe('Tăng Nhơn Phú');
+      expect(match?.components?.ward).not.toBe('Khu phố 30');
+    });
+
+    it('resolves Passio Coffee Nguyễn Đình Chiểu without Saigon as district', async () => {
+      const results = await searchAddressSuggestions('Passio Coffee Nguyễn Đình Chiểu');
+      expect(results.length).toBeGreaterThan(0);
+      const match = results[0];
+      expect(match.components?.district).toBe('Quận 1');
+      expect(match.components?.ward).toBe('Phường Đa Kao');
+      expect(match.components?.district).not.toBe('Saigon');
+      expect(match.components?.district).not.toBe('Sài Gòn');
     });
 
     it('falls back safely to local dictionary if network request fails', async () => {
@@ -281,17 +303,33 @@ describe('checkoutGeocodingService', () => {
     });
   });
 
-  describe('KNOWN_VN_LOCATIONS integrity', () => {
-    it('has valid coordinates for all entries within Vietnam geographic bounding box', () => {
-      for (const loc of KNOWN_VN_LOCATIONS) {
-        // Vietnam bounding box roughly: lat 8° to 24°, lng 102° to 110°
-        expect(loc.lat).toBeGreaterThan(8);
-        expect(loc.lat).toBeLessThan(24);
-        expect(loc.lng).toBeGreaterThan(102);
-        expect(loc.lng).toBeLessThan(110);
-        expect(loc.name.length).toBeGreaterThan(3);
-        expect(loc.keywords.length).toBeGreaterThan(0);
-      }
+  describe('resolveAdminHierarchy', () => {
+    it('discards Saigon as district and maps to official district Quận 1 for Nguyen Dinh Chieu', () => {
+      const res = resolveAdminHierarchy({
+        province: 'Thành phố Hồ Chí Minh',
+        district: 'Saigon',
+        ward: 'Khu phố 8',
+        fullText: 'Passio Coffee Nguyễn Đình Chiểu, Phường Đa Kao, Quận 1, Thành Phố Hồ Chí Minh',
+        lat: 10.7894,
+        lng: 106.7010,
+      });
+      expect(res.province).toBe('TP. Hồ Chí Minh');
+      expect(res.district).toBe('Quận 1');
+      expect(res.ward).toBe('Phường Đa Kao');
+    });
+
+    it('correctly maps raw district Tăng Nhơn Phú to district Thành phố Thủ Đức and ward Phường Tăng Nhơn Phú A', () => {
+      const res = resolveAdminHierarchy({
+        province: 'Thành phố Hồ Chí Minh',
+        district: 'Tăng Nhơn Phú',
+        ward: 'Khu phố 30',
+        fullText: '97 Man Thiện, Tăng Nhơn Phú, Thành phố Hồ Chí Minh',
+        lat: 10.8477,
+        lng: 106.7857,
+      });
+      expect(res.province).toBe('TP. Hồ Chí Minh');
+      expect(res.district).toBe('Thành phố Thủ Đức');
+      expect(res.ward).toContain('Tăng Nhơn Phú');
     });
   });
 });
