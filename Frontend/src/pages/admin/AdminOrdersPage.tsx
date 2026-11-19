@@ -195,29 +195,35 @@ export default function AdminOrdersPage() {
     );
   };
 
-  // Cột của bảng danh sách đơn hàng
+  // Cột của bảng danh sách đơn hàng (Cố định chiều rộng, căn chỉnh chuẩn xác và đồng nhất)
   const columns: TableColumnsType<OrderDTO> = [
     {
-      title: 'Đơn',
+      title: 'Mã đơn',
       dataIndex: 'id',
-      width: 80,
+      width: 95,
+      align: 'center' as const,
       render: (v: number, r) => (
-        <Button
-          type="link"
-          className="!p-0 font-bold !text-primary-600 hover:underline"
-          onClick={() => handleOpenDetail(r)}
-        >
-          #{v}
-        </Button>
+        <div className="flex items-center justify-center">
+          <Button
+            type="link"
+            className="!p-0 font-bold !text-primary-600 hover:underline"
+            onClick={() => handleOpenDetail(r)}
+          >
+            #{v}
+          </Button>
+        </div>
       ),
     },
     {
       title: 'Khách hàng',
       dataIndex: 'userName',
-      width: 160,
+      width: 180,
+      align: 'left' as const,
       render: (name: string, r) => (
-        <div>
-          <div className="font-medium text-ink">{r.receiverName || name}</div>
+        <div className="flex flex-col justify-center text-left">
+          <div className="font-medium text-ink truncate max-w-[160px]" title={r.receiverName || name}>
+            {r.receiverName || name}
+          </div>
           <div className="text-xs text-ink-3">{r.receiverPhone}</div>
         </div>
       ),
@@ -225,22 +231,24 @@ export default function AdminOrdersPage() {
     {
       title: 'Ngày đặt',
       dataIndex: 'createdAt',
-      render: (v: string) => formatDate(v),
-      width: 110,
+      render: (v: string) => <span className="text-xs text-ink-2 whitespace-nowrap">{formatDate(v)}</span>,
+      width: 120,
+      align: 'center' as const,
     },
     {
       title: 'Tổng tiền',
       dataIndex: 'finalAmount',
       render: (v: number) => (
-        <span className="font-semibold text-ink">{formatVND(v)}</span>
+        <span className="font-semibold text-ink whitespace-nowrap">{formatVND(v)}</span>
       ),
-      width: 130,
+      width: 135,
       align: 'right' as const,
     },
     {
       title: 'Thanh toán',
       dataIndex: 'paymentStatus',
-      width: 260,
+      width: 280,
+      align: 'center' as const,
       render: (s: string, r) => {
         const isTerminalPayment = isTerminalPaymentStatus(s);
         const isCancelledNonRefundable = r.orderStatus === 'CANCELLED' && s !== 'REFUND_PENDING';
@@ -248,19 +256,31 @@ export default function AdminOrdersPage() {
         const paymentOptions = getAvailableNextPaymentStatusOptions(s);
 
         return (
-          <div className="flex items-center gap-2">
-            {/* Cố định width 110px cho StatusTag để các dòng luôn thẳng hàng tuyệt đối */}
-            <div className="w-[110px] shrink-0 flex items-center">
-              <StatusTag status={s} className="!w-full !m-0" />
+          <div className="flex items-center justify-center gap-2">
+            {/* Cố định width 110px cho StatusTag */}
+            <div className="w-[110px] shrink-0 flex items-center justify-center">
+              <StatusTag status={s} className="!w-full !m-0 !h-[28px] !leading-[28px]" />
             </div>
-            <Select
-              size="small"
-              value={s}
-              style={{ width: 135 }}
-              disabled={isLocked}
-              onChange={(v) => handlePaymentStatusChange(r.id, v, s)}
-              options={paymentOptions}
-            />
+            <Tooltip
+              title={
+                isLocked
+                  ? isTerminalPayment
+                    ? 'Đã hoàn tiền thành công (Trạng thái kết thúc)'
+                    : 'Đơn đã hủy, không thể thay đổi'
+                  : undefined
+              }
+            >
+              <span className="inline-block">
+                <Select
+                  value={s}
+                  style={{ width: 145 }}
+                  className="!h-[34px] [&_.ant-select-selector]:!h-[34px] [&_.ant-select-selection-item]:!leading-[32px]"
+                  disabled={isLocked}
+                  onChange={(v) => handlePaymentStatusChange(r.id, v, s)}
+                  options={paymentOptions}
+                />
+              </span>
+            </Tooltip>
           </div>
         );
       },
@@ -268,7 +288,8 @@ export default function AdminOrdersPage() {
     {
       title: 'Trạng thái đơn',
       dataIndex: 'orderStatus',
-      width: 260,
+      width: 280,
+      align: 'center' as const,
       render: (s: string, r) => {
         // State Machine: Khóa cứng dropdown khi là DELIVERED, CANCELLED hoặc ĐÃ HOÀN TIỀN (REFUNDED)
         const isRefunded = isTerminalPaymentStatus(r.paymentStatus);
@@ -277,10 +298,10 @@ export default function AdminOrdersPage() {
         const options = getAvailableNextStatusOptions(s, r.paymentStatus);
 
         return (
-          <div className="flex items-center gap-2">
-            {/* Cố định width 105px cho StatusTag trạng thái đơn */}
-            <div className="w-[105px] shrink-0 flex items-center">
-              <StatusTag status={s} className="!w-full !m-0" />
+          <div className="flex items-center justify-center gap-2">
+            {/* Cố định width 110px cho StatusTag trạng thái đơn */}
+            <div className="w-[110px] shrink-0 flex items-center justify-center">
+              <StatusTag status={s} className="!w-full !m-0 !h-[28px] !leading-[28px]" />
             </div>
             <Tooltip
               title={
@@ -291,11 +312,11 @@ export default function AdminOrdersPage() {
                     : undefined
               }
             >
-              <span>
+              <span className="inline-block">
                 <Select
-                  size="small"
                   value={s}
-                  style={{ width: 140 }}
+                  style={{ width: 145 }}
+                  className="!h-[34px] [&_.ant-select-selector]:!h-[34px] [&_.ant-select-selection-item]:!leading-[32px]"
                   disabled={isTerminal}
                   onChange={(v) => handleOrderStatusChange(r.id, v, s)}
                   options={options}
@@ -312,16 +333,17 @@ export default function AdminOrdersPage() {
       width: 110,
       align: 'center' as const,
       render: (_, r) => (
-        <Space size="small">
+        <div className="flex items-center justify-center">
           <Button
             size="small"
             icon={<EyeOutlined />}
             onClick={() => handleOpenDetail(r)}
             title="Xem chi tiết"
+            className="!h-[32px] !w-[96px] inline-flex items-center justify-center gap-1 font-medium text-xs"
           >
             Chi tiết
           </Button>
-        </Space>
+        </div>
       ),
     },
   ];
@@ -363,7 +385,8 @@ export default function AdminOrdersPage() {
           dataSource={data?.content || []}
           rowKey="id"
           loading={isLoading}
-          size="middle"
+          tableLayout="fixed"
+          scroll={{ x: 1200 }}
           pagination={{
             current: page,
             pageSize: 15,
@@ -371,7 +394,7 @@ export default function AdminOrdersPage() {
             onChange: (p) => setPage(p),
             showSizeChanger: false,
           }}
-          className="[&_.ant-table-thead>tr>th]:!bg-bg-soft [&_.ant-table-thead>tr>th]:!text-xs [&_.ant-table-thead>tr>th]:!uppercase [&_.ant-table-thead>tr>th]:!tracking-wide [&_.ant-table-thead>tr>th]:!text-ink-2 [&_.ant-table-thead>tr>th]:!font-semibold"
+          className="[&_.ant-table-thead>tr>th]:!bg-bg-soft [&_.ant-table-thead>tr>th]:!text-xs [&_.ant-table-thead>tr>th]:!uppercase [&_.ant-table-thead>tr>th]:!tracking-wide [&_.ant-table-thead>tr>th]:!text-ink-2 [&_.ant-table-thead>tr>th]:!font-semibold [&_.ant-table-tbody>tr]:!h-[56px] [&_.ant-table-tbody>tr>td]:!h-[56px] [&_.ant-table-tbody>tr>td]:!py-1.5 [&_.ant-table-tbody>tr>td]:!align-middle"
         />
       </AdminCard>
 
