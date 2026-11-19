@@ -13,6 +13,8 @@ import com.re.greenphone.entity.Brand;
 import com.re.greenphone.entity.Phone;
 import com.re.greenphone.entity.PhoneImage;
 import com.re.greenphone.entity.PhoneVariant;
+import com.re.greenphone.entity.Warehouse;
+import com.re.greenphone.entity.WarehouseStock;
 import com.re.greenphone.mapper.PhoneImageMapper;
 import com.re.greenphone.mapper.PhoneMapper;
 import com.re.greenphone.mapper.PhoneVariantMapper;
@@ -69,22 +71,28 @@ public class AdminPhoneService {
     public PageResponse<PhoneDTO> getPhones(String keyword, Long brandId, String status,
                                             boolean lowStock,
                                             com.re.greenphone.common.pagination.PageRequest pageRequest) {
-        return getPhonesWithThreshold(keyword, brandId, status, lowStock, LOW_STOCK_THRESHOLD, pageRequest);
+        return getPhonesWithThreshold(keyword, brandId, status, lowStock, null, LOW_STOCK_THRESHOLD, pageRequest);
+    }
+
+    public PageResponse<PhoneDTO> getPhones(String keyword, Long brandId, String status,
+                                            boolean lowStock, Long warehouseId,
+                                            com.re.greenphone.common.pagination.PageRequest pageRequest) {
+        return getPhonesWithThreshold(keyword, brandId, status, lowStock, warehouseId, LOW_STOCK_THRESHOLD, pageRequest);
     }
 
     public PageResponse<PhoneDTO> getLowStockPhones(int threshold,
                                                     com.re.greenphone.common.pagination.PageRequest pageRequest) {
-        return getPhonesWithThreshold(null, null, null, true, threshold, pageRequest);
+        return getPhonesWithThreshold(null, null, null, true, null, threshold, pageRequest);
     }
 
     private PageResponse<PhoneDTO> getPhonesWithThreshold(String keyword, Long brandId, String status,
-                                                          boolean lowStock, int threshold,
+                                                          boolean lowStock, Long warehouseId, int threshold,
                                                           com.re.greenphone.common.pagination.PageRequest pageRequest) {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(
                 pageRequest.getPage(), pageRequest.getSize(),
                 Sort.by(Sort.Direction.fromString(pageRequest.getSortDir()), pageRequest.getSortBy()));
 
-        // Admin spec — search theo tên, lọc brand + status (admin xem cả INACTIVE)
+        // Admin spec — search theo tên, lọc brand + status + chi nhánh + cảnh báo tồn kho từng chi nhánh
         org.springframework.data.jpa.domain.Specification<Phone> spec = (root, cq, cb) -> {
             var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
             if (keyword != null && !keyword.isBlank()) {
@@ -97,8 +105,46 @@ public class AdminPhoneService {
                 predicates.add(cb.equal(root.get("status"), status));
             }
             if (lowStock) {
-                var variants = root.join("variants");
-                predicates.add(cb.lessThanOrEqualTo(variants.get("stockQuantity"), threshold));
+                // Thống kê sắp hết hàng dựa trên tồn kho riêng của từng chi nhánh
+                jakarta.persistence.criteria.Subquery<Long> wsSubquery = cq.subquery(Long.class);
+                jakarta.persistence.criteria.Root<WarehouseStock> wsRoot = wsSubquery.from(WarehouseStock.class);
+                jakarta.persistence.criteria.Join<WarehouseStock, PhoneVariant> pvJoin = wsRoot.join("phoneVariant");
+                jakarta.persistence.criteria.Join<WarehouseStock, Warehouse> wJoin = wsRoot.join("warehouse");
+
+                var wsPreds = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+                wsPreds.add(cb.equal(pvJoin.get("phone"), root));
+                wsPreds.add(cb.equal(wJoin.get("status"), "ACTIVE"));
+                wsPreds.add(cb.lessThanOrEqualTo(wsRoot.get("quantity"), threshold));
+
+                if (warehouseId != null && warehouseId > 0) {
+                    wsPreds.add(cb.equal(wJoin.get("id"), warehouseId));
+                    wsSubquery.select(wsRoot.get("id")).where(cb.and(wsPreds.toArray(new jakarta.persistence.criteria.Predicate[0])));
+                    predicates.add(cb.exists(wsSubquery));
+                } else {
+                    wsSubquery.select(wsRoot.get("id")).where(cb.and(wsPreds.toArray(new jakarta.persistence.criteria.Predicate[0])));
+
+                    // Fallback tương thích nếu dữ liệu chưa phân bổ sang warehouse_stock
+                    jakarta.persistence.criteria.Subquery<Long> anyWsSubquery = cq.subquery(Long.class);
+                    jakarta.persistence.criteria.Root<WarehouseStock> anyWsRoot = anyWsSubquery.from(WarehouseStock.class);
+                    anyWsSubquery.select(anyWsRoot.get("id"))
+                            .where(cb.equal(anyWsRoot.get("phoneVariant").get("phone"), root));
+
+                    var variantsJoin = root.join("variants", jakarta.persistence.criteria.JoinType.LEFT);
+                    var fallbackPred = cb.and(
+                            cb.not(cb.exists(anyWsSubquery)),
+                            cb.lessThanOrEqualTo(variantsJoin.get("stockQuantity"), threshold)
+                    );
+                    predicates.add(cb.or(cb.exists(wsSubquery), fallbackPred));
+                }
+                cq.distinct(true);
+            } else if (warehouseId != null && warehouseId > 0) {
+                jakarta.persistence.criteria.Subquery<Long> wsSubquery = cq.subquery(Long.class);
+                jakarta.persistence.criteria.Root<WarehouseStock> wsRoot = wsSubquery.from(WarehouseStock.class);
+                wsSubquery.select(wsRoot.get("id")).where(
+                        cb.equal(wsRoot.get("phoneVariant").get("phone"), root),
+                        cb.equal(wsRoot.get("warehouse").get("id"), warehouseId)
+                );
+                predicates.add(cb.exists(wsSubquery));
                 cq.distinct(true);
             }
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));

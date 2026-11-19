@@ -95,12 +95,14 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
   const keyword = useDebouncedValue(search.trim(), 300);
   const [brandFilter, setBrandFilter] = useState<string | undefined>();
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
+  const [warehouseFilter, setWarehouseFilter] = useState<string | undefined>();
   const [lowStockOnly, setLowStockOnly] = useState(false);
 
   const params: Record<string, string> = { page: String(page - 1), size: '15' };
   if (keyword) params.keyword = keyword;
   if (brandFilter) params.brandId = brandFilter;
   if (statusFilter) params.status = statusFilter;
+  if (inventoryMode && warehouseFilter) params.warehouseId = warehouseFilter;
   if (inventoryMode && lowStockOnly) params.lowStock = 'true';
 
   const { data: phones, isLoading } = useQuery({
@@ -114,8 +116,6 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
     (allOptions || []).find((c) => c.type === type);
   const itemsByType = (type: string): OptionItemDTO[] =>
     categoryOf(type)?.items || [];
-  const itemIdsByType = (type: string): number[] =>
-    itemsByType(type).map((i) => i.id);
 
   // ── Modal thông tin sản phẩm ──
   const [open, setOpen] = useState(false);
@@ -493,6 +493,19 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
               { value: 'INACTIVE', label: 'INACTIVE' },
             ]}
           />
+          {inventoryMode && (
+            <Select
+              placeholder="Tất cả chi nhánh"
+              allowClear
+              value={warehouseFilter}
+              onChange={(v) => { setWarehouseFilter(v); setPage(1); }}
+              className="!w-48"
+              options={[
+                { value: undefined, label: 'Tất cả chi nhánh' },
+                ...(warehouseQuery.data?.filter((w) => w.status === 'ACTIVE').map((w) => ({ value: String(w.id), label: w.name })) || [])
+              ]}
+            />
+          )}
           {inventoryMode && (
             <Button
               danger={lowStockOnly}

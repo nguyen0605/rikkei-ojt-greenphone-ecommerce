@@ -770,7 +770,12 @@ export interface PhoneComparisonResponseDTO {
 
 
 export interface FinancialTimeSeriesPoint { date: string; revenue: number; grossProfit?: number | null }
-export interface PaymentMethodBreakdown { paymentMethod: string; revenue: number }
+export interface PaymentMethodBreakdown {
+  paymentMethod: string;
+  revenue: number;
+  transactionCount?: number;
+  percentage?: number;
+}
 export interface FinancialReport {
   grossRevenue: number; discountAmount: number; shippingFee: number; netRevenue: number;
   cogs: number | null; grossProfit: number | null; profitMarginPercentage: number | null;
