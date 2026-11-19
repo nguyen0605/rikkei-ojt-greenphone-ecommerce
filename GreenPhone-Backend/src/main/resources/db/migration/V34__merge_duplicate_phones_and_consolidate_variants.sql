@@ -11,6 +11,17 @@ JOIN `warehouse_stock` ws_src ON ws_dest.warehouse_id = ws_src.warehouse_id AND 
 SET ws_dest.quantity = ws_dest.quantity + ws_src.quantity
 WHERE ws_dest.phone_variant_id = 9;
 
+-- Đồng bộ lại tổng tồn kho stock_quantity của phone_variant 9 bằng tổng tồn kho các kho chi nhánh sau khi gộp
+UPDATE `phone_variant` v
+JOIN (
+    SELECT phone_variant_id, COALESCE(SUM(quantity), 0) AS total_qty
+    FROM `warehouse_stock`
+    WHERE phone_variant_id = 9
+    GROUP BY phone_variant_id
+) sub ON v.id = sub.phone_variant_id
+SET v.stock_quantity = sub.total_qty
+WHERE v.id = 9;
+
 -- Di chuyển các bảng liên kết từ variant 647 sang variant 9 để bảo toàn đơn hàng và lịch sử giao dịch
 UPDATE `order_detail` SET `phone_variant_id` = 9 WHERE `phone_variant_id` = 647;
 UPDATE `warehouse_stock_history` SET `phone_variant_id` = 9 WHERE `phone_variant_id` = 647;
