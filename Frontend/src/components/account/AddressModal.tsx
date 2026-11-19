@@ -8,8 +8,10 @@ import {
   SearchOutlined,
   CheckCircleOutlined,
   InfoCircleOutlined,
+  QuestionCircleOutlined,
 } from '@ant-design/icons';
 import { Sparkles, MapPin, Home, Building2, Users, Navigation } from 'lucide-react';
+import LocationGuideModal from '@/components/common/LocationGuideModal';
 import { VIETNAM_PROVINCES, findMatchingProvince, parseAddressComponents } from '@/utils/provinces';
 import {
   getDistrictsForProvince,
@@ -61,6 +63,7 @@ export default function AddressModal({
   const [isLocatingAddress, setIsLocatingAddress] = useState(false);
   const [isLocatingCurrentGps, setIsLocatingCurrentGps] = useState(false);
   const [isEstimateLocation, setIsEstimateLocation] = useState(false);
+  const [showLocationGuideModal, setShowLocationGuideModal] = useState(false);
   const hasUserOverriddenCoords = useRef(false);
 
   // Danh sách gợi ý Quận/Huyện tương ứng với Tỉnh/Thành phố đang chọn
@@ -708,7 +711,8 @@ export default function AddressModal({
   };
 
   return (
-    <Modal
+    <>
+      <Modal
         title={
           <div className="flex items-center gap-2 text-lg font-bold text-gray-900 border-b border-gray-100 pb-3">
             <EnvironmentOutlined className="text-green-600" />
@@ -1035,6 +1039,14 @@ export default function AddressModal({
               >
                 Định vị từ địa chỉ đã nhập
               </Button>
+              <Button
+                size="small"
+                icon={<QuestionCircleOutlined className="text-amber-500" />}
+                onClick={() => setShowLocationGuideModal(true)}
+                className="!rounded-lg !text-xs !border-amber-300 !text-amber-700 hover:!bg-amber-50 font-medium"
+              >
+                Hướng dẫn bật vị trí
+              </Button>
             </div>
           </div>
 
@@ -1142,5 +1154,12 @@ export default function AddressModal({
         </div>
       </Form>
     </Modal>
+
+    <LocationGuideModal
+      open={showLocationGuideModal}
+      onClose={() => setShowLocationGuideModal(false)}
+      onRetryLocate={handleUseCurrentLocation}
+    />
+  </>
   );
 }

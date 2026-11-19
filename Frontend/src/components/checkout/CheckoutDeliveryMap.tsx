@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Compass, Locate, AlertCircle } from 'lucide-react';
+import { Compass, Locate, AlertCircle, HelpCircle } from 'lucide-react';
 import { message } from 'antd';
 import { getProvinceCoords } from './checkoutGeocodingService';
+import LocationGuideModal from '@/components/common/LocationGuideModal';
 
 export interface LocationCoords {
   lat: number;
@@ -77,6 +78,7 @@ export default function CheckoutDeliveryMap({
   const [isLoading, setIsLoading] = useState(true);
   const [hasTileError, setHasTileError] = useState(false);
   const [locatingUser, setLocatingUser] = useState(false);
+  const [showGuideModal, setShowGuideModal] = useState(false);
 
   // Giữ callback mới nhất để tránh stale closures trong event listeners Leaflet
   const onLocationSelectRef = useRef(onLocationSelect);
@@ -400,7 +402,25 @@ export default function CheckoutDeliveryMap({
           <Locate className={`h-3.5 w-3.5 text-blue-600 ${locatingUser ? 'animate-pulse' : ''}`} />
           <span className="hidden sm:inline">{locatingUser ? 'Đang định vị...' : 'Vị trí của tôi'}</span>
         </button>
+
+        <span className="h-3 w-px bg-gray-300" />
+
+        <button
+          type="button"
+          onClick={() => setShowGuideModal(true)}
+          title="Hướng dẫn bật quyền vị trí"
+          className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 hover:text-amber-700 transition-colors"
+        >
+          <HelpCircle className="h-3.5 w-3.5 text-amber-500" />
+          <span className="hidden sm:inline">Hướng dẫn</span>
+        </button>
       </div>
+
+      <LocationGuideModal
+        open={showGuideModal}
+        onClose={() => setShowGuideModal(false)}
+        onRetryLocate={handleLocateMe}
+      />
 
       {/* DOM Node gắn Leaflet Map */}
       <div ref={containerRef} className="h-full w-full" data-testid="checkout-leaflet-map-element" />

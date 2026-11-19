@@ -14,3 +14,4 @@ export { default as CTABanner } from './CTABanner';
 export { default as SectionHeader } from './SectionHeader';
 export { default as GlobalPageLoader } from './GlobalPageLoader';
 export { default as TopProgressBar } from './TopProgressBar';
+export { default as LocationGuideModal } from './LocationGuideModal';
