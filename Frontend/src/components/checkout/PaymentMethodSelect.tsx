@@ -1,11 +1,5 @@
 import { Radio } from 'antd';
-import {
-  Banknote,
-  Building2,
-  CreditCard,
-  Wallet,
-  Globe,
-} from 'lucide-react';
+import { Banknote, Building2 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setPayment } from '@/store/slices/checkoutSlice';
 import type { PaymentMethod } from '@/types';
@@ -16,35 +10,12 @@ const paymentMethods = [
     label: 'Thanh toán khi nhận hàng (COD)',
     desc: 'Thanh toán bằng tiền mặt khi nhận hàng',
     Icon: Banknote,
-    subIcons: [],
   },
   {
     value: 'bank-transfer' as PaymentMethod,
     label: 'Chuyển khoản ngân hàng',
-    desc: 'Thanh toán qua tài khoản ngân hàng',
+    desc: 'Thanh toán qua tài khoản ngân hàng (VietQR)',
     Icon: Building2,
-    subIcons: [],
-  },
-  {
-    value: 'atm' as PaymentMethod,
-    label: 'Thẻ ATM / Internet Banking',
-    desc: 'Thanh toán thẻ ATM nội địa',
-    Icon: CreditCard,
-    subIcons: [],
-  },
-  {
-    value: 'e-wallet' as PaymentMethod,
-    label: 'Ví điện tử',
-    desc: 'Thanh toán qua MoMo, ZaloPay, VNPay...',
-    Icon: Wallet,
-    subIcons: ['MoMo', 'ZaloPay'],
-  },
-  {
-    value: 'credit-card' as PaymentMethod,
-    label: 'Thẻ tín dụng / ghi nợ',
-    desc: 'Thanh toán qua Visa, MasterCard, JCB...',
-    Icon: Globe,
-    subIcons: ['VISA', 'MC', 'JCB'],
   },
 ];
 
@@ -84,18 +55,6 @@ export default function PaymentMethodSelect() {
                     {pm.label}
                   </div>
                   <div className="text-xs text-gray-500">{pm.desc}</div>
-                  {pm.subIcons.length > 0 && (
-                    <div className="mt-2 flex gap-2">
-                      {pm.subIcons.map((s) => (
-                        <span
-                          key={s}
-                          className="rounded bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-700"
-                        >
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </div>
             </Radio>

@@ -6,6 +6,7 @@ import { adminBrandService } from '@/services';
 import type { BrandDTO, BrandRequest } from '@/types/api';
 import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import AdminCard from '@/components/admin/AdminCard';
+import { getBrandLogoUrl } from '@/utils/brandLogos';
 
 /* Hallmark · Workbench (design.md): page header + pill CTA, table card, modal form. */
 
@@ -39,6 +40,10 @@ export default function AdminBrandsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-brands'] });
       qc.invalidateQueries({ queryKey: ['brands'] });
+      qc.invalidateQueries({ queryKey: ['admin-phones'] });
+      qc.invalidateQueries({ queryKey: ['phones'] });
+      qc.invalidateQueries({ queryKey: ['phones-featured'] });
+      qc.invalidateQueries({ queryKey: ['phone'] });
       message.success('Đã cập nhật trạng thái');
     },
     onError: (e) => message.error(e instanceof Error ? e.message : 'Cập nhật thất bại'),
@@ -49,23 +54,26 @@ export default function AdminBrandsPage() {
   const columns: TableColumnsType<BrandDTO> = [
     { title: 'STT', width: 60, render: (_: unknown, __: BrandDTO, index?: number) => <span className="text-ink-2">{(index ?? 0) + 1}</span> },
     {
-      title: 'Hãng', dataIndex: 'name', render: (v: string, r) => (
-        <div className="flex items-center gap-2.5">
-          {r.logoUrl ? (
-            <img src={r.logoUrl} alt={v} className="h-8 w-8 rounded-lg border border-rule bg-white object-contain p-0.5" />
-          ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-50 text-primary-600"><TagOutlined /></div>
-          )}
-          <span className="font-medium text-ink">{v}</span>
-        </div>
-      ),
+      title: 'Hãng', dataIndex: 'name', render: (v: string, r) => {
+        const logo = getBrandLogoUrl(r.name, r.logoUrl);
+        return (
+          <div className="flex items-center gap-2.5">
+            {logo ? (
+              <img src={logo} alt={v} className="h-8 w-8 rounded-lg border border-rule bg-white object-contain p-0.5" />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-50 text-primary-600"><TagOutlined /></div>
+            )}
+            <span className="font-medium text-ink">{v}</span>
+          </div>
+        );
+      },
     },
     {
       title: 'Trạng thái', dataIndex: 'status', width: 90,
       render: (s: string, r) => (
         <Switch
           checked={s === 'ACTIVE'}
-          loading={statusMut.isPending}
+          loading={statusMut.isPending && (statusMut.variables as { id: number; status: string } | undefined)?.id === r.id}
           onChange={(checked) => statusMut.mutate({ id: r.id, status: checked ? 'ACTIVE' : 'INACTIVE' })}
           checkedChildren="Bật"
           unCheckedChildren="Tắt"

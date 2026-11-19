@@ -57,6 +57,10 @@ public class AdminPhoneService {
     private final OrderDetailRepository orderDetailRepository;
     private final CartItemRepository cartItemRepository;
     private final ReviewRepository reviewRepository;
+    private final com.re.greenphone.repository.PurchaseOrderItemRepository purchaseOrderItemRepository;
+    private final com.re.greenphone.repository.WarehouseStockRepository warehouseStockRepository;
+    private final com.re.greenphone.repository.WarehouseTransferItemRepository warehouseTransferItemRepository;
+    private final com.re.greenphone.repository.WarrantyRepository warrantyRepository;
     private final PhoneMapper phoneMapper;
     private final PhoneVariantMapper phoneVariantMapper;
     private final PhoneImageMapper phoneImageMapper;
@@ -219,15 +223,20 @@ public class AdminPhoneService {
 
         List<PhoneVariant> variants = phoneVariantRepository.findByPhoneId(id);
         for (PhoneVariant variant : variants) {
-            if (orderDetailRepository.existsByPhoneVariantId(variant.getId())
-                    || cartItemRepository.existsByPhoneVariantId(variant.getId())) {
+            Long vid = variant.getId();
+            if (orderDetailRepository.existsByPhoneVariantId(vid)
+                    || cartItemRepository.existsByPhoneVariantId(vid)
+                    || purchaseOrderItemRepository.existsByPhoneVariantId(vid)
+                    || warehouseStockRepository.existsByPhoneVariantId(vid)
+                    || warehouseTransferItemRepository.existsByPhoneVariantId(vid)
+                    || warrantyRepository.existsByPhoneVariantId(vid)) {
                 throw new BadRequestException(
-                        "Không thể xóa sản phẩm đã được đặt trong đơn hàng/giỏ hàng. Hãy tắt trạng thái để ẩn sản phẩm.");
+                        "Không thể xóa sản phẩm đã có dữ liệu giao dịch hoặc kho hàng (Đơn hàng, Đơn nhập hàng PO, Tồn kho, Bảo hành). Vui lòng gạt nút Tắt trạng thái để ngừng kinh doanh sản phẩm này.");
             }
         }
         if (reviewRepository.existsByPhoneId(id)) {
             throw new BadRequestException(
-                    "Không thể xóa sản phẩm đã có đánh giá. Hãy tắt trạng thái để ẩn sản phẩm.");
+                    "Không thể xóa sản phẩm đã có đánh giá từ khách hàng. Vui lòng gạt nút Tắt trạng thái để ẩn sản phẩm.");
         }
 
         // Xóa ảnh khỏi Cloudflare R2 / Cloudinary trước, rồi xóa row ảnh
@@ -246,7 +255,7 @@ public class AdminPhoneService {
         phoneRepository.delete(phone);
     }
 
-    @CacheEvict(value = "phones", key = "#id")
+    @CacheEvict(value = "phones", allEntries = true)
     public PhoneDTO updateStatus(Long id, String status) {
         if (!List.of("ACTIVE", "INACTIVE").contains(status)) {
             throw new BadRequestException("Trạng thái không hợp lệ: " + status + ". Chỉ chấp nhận ACTIVE hoặc INACTIVE.");

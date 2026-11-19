@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, Tag, Popconfirm, App, Skeleton, Empty, Tooltip } from 'antd';
 import {
@@ -30,6 +30,14 @@ export default function AddressBookPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAddress, setEditingAddress] = useState<AddressItem | null>(null);
+
+  // Tự động mở lại modal nếu người dùng vừa bấm tải lại trang từ modal hướng dẫn vị trí
+  useEffect(() => {
+    if (typeof window !== 'undefined' && sessionStorage.getItem('gp_auto_open_address_modal') === 'true') {
+      sessionStorage.removeItem('gp_auto_open_address_modal');
+      setModalOpen(true);
+    }
+  }, []);
 
   const { data: addresses = [], isLoading } = useQuery<AddressItem[]>({
     queryKey: ['addresses'],

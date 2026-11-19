@@ -18,6 +18,68 @@ export const ORDER_STATUS_LABEL: Record<string, string> = {
   CANCELLED: 'Đã hủy',
 };
 
+export const PAYMENT_STATUSES = [
+  'UNPAID',
+  'PAID',
+  'REFUND_PENDING',
+  'REFUNDED',
+] as const;
+
+export type PaymentStatusType = (typeof PAYMENT_STATUSES)[number];
+
+export const PAYMENT_STATUS_LABEL: Record<string, string> = {
+  UNPAID: 'Chưa thanh toán',
+  PAID: 'Đã thanh toán',
+  REFUND_PENDING: 'Chờ hoàn tiền',
+  REFUNDED: 'Đã hoàn tiền',
+};
+
+/**
+ * Payment State Machine Transition Rules:
+ * - UNPAID         -> PAID
+ * - PAID           -> REFUND_PENDING
+ * - REFUND_PENDING -> REFUNDED, PAID
+ * - REFUNDED       -> Terminal State (Khóa cứng, không cho chuyển tiếp)
+ */
+export const PAYMENT_STATE_TRANSITIONS: Record<string, string[]> = {
+  UNPAID: ['PAID'],
+  PAID: ['REFUND_PENDING'],
+  REFUND_PENDING: ['REFUNDED', 'PAID'],
+  REFUNDED: [],
+};
+
+/**
+ * Kiểm tra xem trạng thái thanh toán có phải là trạng thái kết thúc (Terminal State) hay không.
+ */
+export const isTerminalPaymentStatus = (status?: string | null): boolean => {
+  if (!status) return false;
+  return status.toUpperCase() === 'REFUNDED';
+};
+
+/**
+ * Kiểm tra xem chuyển đổi trạng thái thanh toán có hợp lệ hay không.
+ */
+export const isValidPaymentStatusTransition = (fromStatus: string, toStatus: string): boolean => {
+  if (fromStatus === toStatus) return true;
+  const allowed = PAYMENT_STATE_TRANSITIONS[fromStatus.toUpperCase()] || [];
+  return allowed.includes(toStatus.toUpperCase());
+};
+
+/**
+ * Lấy danh sách options hợp lệ cho dropdown cập nhật trạng thái thanh toán.
+ */
+export const getAvailableNextPaymentStatusOptions = (
+  currentStatus: string
+): { value: string; label: string }[] => {
+  const current = currentStatus?.toUpperCase() || 'UNPAID';
+  const nextStates = PAYMENT_STATE_TRANSITIONS[current] || [];
+  const validStates = [current, ...nextStates];
+  return validStates.map((status) => ({
+    value: status,
+    label: `${PAYMENT_STATUS_LABEL[status] || status} (${status})`,
+  }));
+};
+
 /**
  * State Machine Transition Rules:
  * - PENDING    -> CONFIRMED, CANCELLED

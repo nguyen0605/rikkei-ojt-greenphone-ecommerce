@@ -24,7 +24,7 @@ public class User extends BaseEntity {
     @Column(name = "PASSWORD", nullable = false, length = 255)
     private String password;
 
-    @Column(name = "PHONE", nullable = false, length = 20)
+    @Column(name = "PHONE", nullable = false, unique = true, length = 20)
     private String phone;
 
     @Column(name = "ADDRESS", length = 255)
@@ -40,6 +40,15 @@ public class User extends BaseEntity {
 
     @Column(name = "STATUS", nullable = false, length = 30)
     private String status = "ACTIVE";
+
+    @Column(name = "BLOCKED_REASON", length = 500)
+    private String blockedReason;
+
+    @Column(name = "BLOCKED_AT")
+    private java.time.LocalDateTime blockedAt;
+
+    @Column(name = "BLOCKED_BY", length = 100)
+    private String blockedBy;
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
     private Cart cart;

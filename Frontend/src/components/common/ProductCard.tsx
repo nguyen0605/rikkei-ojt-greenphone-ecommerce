@@ -133,8 +133,8 @@ export default function ProductCard({ product, className }: Props) {
   };
 
   return (
-    <div className={cn('group relative block overflow-hidden rounded-xl border border-gray-100 bg-white transition-all hover:-translate-y-1 hover:border-green-200 hover:shadow-lg', className)}>
-      <Link to={`/san-pham/${product.id}`}>
+    <div className={cn('group relative flex h-full flex-col justify-between overflow-hidden rounded-xl border border-gray-100 bg-white transition-all hover:-translate-y-1 hover:border-green-200 hover:shadow-lg', className)}>
+      <Link to={`/san-pham/${product.id}`} className="flex flex-1 flex-col">
         <div className="relative aspect-square overflow-hidden bg-gray-50">
           {discountPercent > 0 && (
             <div className="absolute left-2 top-2 z-10 rounded bg-green-600 px-2 py-0.5 text-xs font-semibold text-white shadow-sm">
@@ -175,26 +175,32 @@ export default function ProductCard({ product, className }: Props) {
             />
           )}
         </div>
-        <div className="p-3">
-          <div className="mb-1 text-xs text-gray-500">{product.brandName}</div>
-          <h3 className="mb-1 line-clamp-2 min-h-[2.5rem] text-sm font-medium text-gray-900 group-hover:text-green-600">{product.name}</h3>
-          {product.lowestPrice != null && (
-            <div className="mb-1">
-              {bestVoucher ? (
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-sm font-bold text-red-600">
-                    {formatVND(bestVoucher.finalPrice)}
-                  </span>
-                  <span className="text-[11px] text-gray-400 line-through">
-                    {formatVND(product.lowestPrice)}
-                  </span>
-                </div>
-              ) : (
-                <div className="text-sm font-bold text-red-600">{formatVND(product.lowestPrice)}</div>
-              )}
-            </div>
-          )}
-          <div className="text-xs text-gray-400">{product.screen || ''}</div>
+        {/* Nội dung thông tin sản phẩm: Dùng flex-1 justify-between để mọi thẻ có cùng chiều cao đồng đều */}
+        <div className="flex flex-1 flex-col justify-between p-3">
+          <div>
+            <div className="mb-1 text-xs text-gray-500">{product.brandName}</div>
+            {/* Tiêu đề cố định min-h để không bị lệch hàng khi tên sản phẩm dài/ngắn */}
+            <h3 className="mb-1 line-clamp-2 min-h-[2.5rem] text-sm font-medium text-gray-900 group-hover:text-green-600">{product.name}</h3>
+          </div>
+          <div>
+            {product.lowestPrice != null && (
+              <div className="mb-1">
+                {bestVoucher ? (
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-sm font-bold text-red-600">
+                      {formatVND(bestVoucher.finalPrice)}
+                    </span>
+                    <span className="text-[11px] text-gray-400 line-through">
+                      {formatVND(product.lowestPrice)}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="text-sm font-bold text-red-600">{formatVND(product.lowestPrice)}</div>
+                )}
+              </div>
+            )}
+            <div className="text-xs text-gray-400">{product.screen || ''}</div>
+          </div>
         </div>
       </Link>
       <div className="px-3 pb-3">

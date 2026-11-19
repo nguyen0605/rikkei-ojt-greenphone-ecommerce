@@ -178,24 +178,28 @@ export default function CartPage() {
                   <TagOutlined className="text-green-600" /> Mã giảm giá
                 </span>
                 <Link to={ROUTES.VOUCHERS} className="text-xs font-semibold text-green-700 hover:underline">
-                  Săn voucher →
+                  Săn voucher
                 </Link>
               </div>
-              <div className="mt-1 flex items-center justify-between">
-                <p className="text-gray-500">
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <p className="text-gray-600 text-xs leading-relaxed">
                   {appliedVoucher
                     ? `Đã áp dụng mã ${appliedVoucher.code} (-${formatVND(appliedVoucher.discountAmount)})`
-                    : 'Mã giảm giá sẽ được tự động áp dụng tại bước thanh toán'}
+                    : 'Mã giảm giá sẽ được tự động áp dụng khi thanh toán'}
                 </p>
                 {appliedVoucher && (
                   <button
+                    type="button"
                     onClick={() => {
                       setCartDismissedVoucher(true);
                       dispatch(removeVoucher());
+                      message.info('Đã bỏ áp dụng mã khuyến mãi');
                     }}
-                    className="ml-2 flex-shrink-0 text-xs text-red-500 hover:underline"
+                    className="flex-shrink-0 inline-flex items-center gap-1 rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 hover:border-red-300 transition-colors shadow-xs cursor-pointer"
+                    title="Bỏ áp dụng mã khuyến mãi"
                   >
-                    Bỏ chọn
+                    <CloseOutlined className="text-[10px]" />
+                    Bỏ áp dụng
                   </button>
                 )}
               </div>
@@ -206,9 +210,26 @@ export default function CartPage() {
               <div className="flex justify-between text-gray-600"><span>Tạm tính</span><span>{formatVND(selectedSummary.subtotal)}</span></div>
               <div className="flex justify-between text-gray-600"><span>Phí giao hàng</span><span className="text-green-600">{summary.shippingFee === 0 ? 'Miễn phí' : formatVND(summary.shippingFee)}</span></div>
               {summary.discount > 0 && (
-                <div className="flex justify-between text-gray-600">
-                  <span>Giảm giá {appliedVoucher ? `(${appliedVoucher.code})` : ''}</span>
-                  <span className="text-green-600">-{formatVND(summary.discount)}</span>
+                <div className="flex justify-between items-center text-gray-600">
+                  <div className="flex items-center gap-1.5">
+                    <span>Giảm giá {appliedVoucher ? `(${appliedVoucher.code})` : ''}</span>
+                    {appliedVoucher && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCartDismissedVoucher(true);
+                          dispatch(removeVoucher());
+                          message.info('Đã bỏ áp dụng mã khuyến mãi');
+                        }}
+                        className="inline-flex items-center gap-0.5 rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-[11px] font-medium text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                        title="Bỏ áp dụng mã khuyến mãi"
+                      >
+                        <CloseOutlined className="text-[9px]" />
+                        Bỏ áp dụng
+                      </button>
+                    )}
+                  </div>
+                  <span className="text-green-600 font-medium">-{formatVND(summary.discount)}</span>
                 </div>
               )}
             </div>

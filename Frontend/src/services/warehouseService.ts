@@ -20,6 +20,34 @@ export interface WarehouseRequest {
   address: string;
 }
 
+export interface NearestWarehouseStockResponse {
+  warehouseId: number;
+  warehouseCode: string;
+  warehouseName: string;
+  warehouseAddress: string;
+  latitude: number | null;
+  longitude: number | null;
+  distanceKm: number | null;
+  status: string;
+  stocks: Record<number, number>;
+}
+
+export interface WarehouseBranchStock {
+  id: number;
+  code: string;
+  name: string;
+  address: string;
+  province: string;
+  district: string;
+  phone: string;
+  latitude: number | null;
+  longitude: number | null;
+  distanceKm: number | null;
+  quantity: number;
+  inStock: boolean;
+  status: string;
+}
+
 const path = '/v1/admin/warehouses';
 
 export const warehouseService = {
@@ -31,6 +59,10 @@ export const warehouseService = {
     const response = await api.patch<ApiResponse<Warehouse>>(`${path}/${id}/status`, { status });
     return response.data.data;
   },
+  getNearestStock: (params: { lat?: number; lng?: number; province?: string; variantIds?: number[] }) =>
+    get<NearestWarehouseStockResponse>('/v1/warehouses/nearest-stock', { params }),
+  getVariantBranchStocks: (variantId: number, params?: { lat?: number; lng?: number }) =>
+    get<WarehouseBranchStock[]>(`/v1/warehouses/variant-stock/${variantId}`, { params }),
 };
 
 export interface WarehouseStock {

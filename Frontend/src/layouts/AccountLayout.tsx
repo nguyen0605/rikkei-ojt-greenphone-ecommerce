@@ -33,7 +33,7 @@ export default function AccountLayout() {
     <RequireAuth>
       <div className="flex min-h-screen flex-col bg-gradient-to-b from-green-50/50 to-white">
         <Header />
-        <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
           {/* Page header */}
           <div className="mb-6 sm:mb-8">
             <NavLink

@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import './admin-layout.css';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useQueryClient, useIsFetching } from '@tanstack/react-query';
 import {
   DashboardOutlined, PhoneOutlined, TagOutlined, ShoppingCartOutlined,
   UserOutlined, StarOutlined, GiftOutlined, PictureOutlined,
   LogoutOutlined, MenuFoldOutlined, MenuUnfoldOutlined, SettingOutlined,
   MenuOutlined, TagsOutlined, DatabaseOutlined, TeamOutlined,
-  SwapOutlined, SafetyCertificateOutlined,
+  SwapOutlined, SafetyCertificateOutlined, GlobalOutlined, ReloadOutlined,
 } from '@ant-design/icons';
-import { Button, Tag } from 'antd';
+import { Button, Tag, message } from 'antd';
 import RequireAuth from '@/components/auth/RequireAuth';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { logout } from '@/store/slices/authSlice';
@@ -119,6 +120,22 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
+  const queryClient = useQueryClient();
+  const isFetchingCount = useIsFetching();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Làm mới toàn bộ dữ liệu cache của tất cả trang Admin
+  const handleGlobalRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      await queryClient.refetchQueries();
+      message.success('Đã làm mới dữ liệu toàn hệ thống');
+    } catch {
+      message.error('Lỗi khi làm mới dữ liệu');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const userRole = user?.role
     ? user.role.startsWith('ROLE_')
@@ -150,17 +167,38 @@ export default function AdminLayout() {
     <RequireAuth role="ADMIN">
       <div className="admin-console flex min-h-screen">
         {/* Mobile topbar */}
-        <div className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 border-b border-rule bg-white px-4 lg:hidden">
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-2 hover:bg-bg-muted"
-            aria-label="Mở menu"
-          >
-            <MenuOutlined className="text-base" />
-          </button>
+        <div className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-rule bg-white px-4 lg:hidden">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-2 hover:bg-bg-muted"
+              aria-label="Mở menu"
+            >
+              <MenuOutlined className="text-base" />
+            </button>
+            <div className="flex items-center gap-2">
+              <img src="/logo.png" alt="GreenPhone" className="h-8 w-8 rounded-lg object-contain" />
+              <span className="text-sm font-bold text-ink">GreenPhone Admin</span>
+            </div>
+          </div>
           <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="GreenPhone" className="h-8 w-8 rounded-lg object-contain" />
-            <span className="text-sm font-bold text-ink">GreenPhone Admin</span>
+            <button
+              onClick={handleGlobalRefresh}
+              disabled={isRefreshing || isFetchingCount > 0}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-60"
+              title="Làm mới dữ liệu"
+            >
+              <ReloadOutlined className={isRefreshing || isFetchingCount > 0 ? 'animate-spin' : ''} />
+              <span>Làm mới</span>
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+              title="Về trang cửa hàng"
+            >
+              <GlobalOutlined />
+              <span>Cửa hàng</span>
+            </button>
           </div>
         </div>
 
@@ -214,7 +252,26 @@ export default function AdminLayout() {
           </nav>
 
           {/* Footer */}
-          <div className="border-t border-rule p-3">
+          <div className="border-t border-rule p-3 space-y-1">
+            <button
+              aria-label="Làm mới toàn bộ dữ liệu"
+              title={collapsed ? 'Làm mới dữ liệu' : undefined}
+              disabled={isRefreshing || isFetchingCount > 0}
+              onClick={handleGlobalRefresh}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-2 transition-colors duration-200 hover:bg-primary-50 hover:text-primary-700 disabled:opacity-60"
+            >
+              <ReloadOutlined className={`text-[15px] leading-none ${isRefreshing || isFetchingCount > 0 ? 'animate-spin text-primary-600' : ''}`} />
+              {!collapsed && (isRefreshing || isFetchingCount > 0 ? 'Đang làm mới...' : 'Làm mới dữ liệu')}
+            </button>
+            <button
+              aria-label="Về trang người dùng"
+              title={collapsed ? 'Xem trang cửa hàng' : undefined}
+              onClick={() => { navigate('/'); setMobileOpen(false); }}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-emerald-700 bg-emerald-50/70 transition-colors duration-200 hover:bg-emerald-100/80"
+            >
+              <GlobalOutlined className="text-[15px] leading-none text-emerald-600" />
+              {!collapsed && 'Xem trang cửa hàng'}
+            </button>
             <button
               aria-label="Đăng xuất"
               title={collapsed ? 'Đăng xuất' : undefined}

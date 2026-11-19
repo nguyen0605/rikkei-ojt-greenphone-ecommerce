@@ -452,6 +452,35 @@ public class FlywayConfig {
                 stmt.executeUpdate("DELETE FROM `flyway_schema_history` WHERE `version` = '29'");
                 log.info("Da xoa version 29 khoi flyway_schema_history de dam bao Flyway seed du lieu day du cho thang 10 va thang 11.");
             }
+
+            // 9. Dọn dẹp thủ tục cũ và đồng bộ V33 (add blocked audit fields to users)
+            try {
+                stmt.execute("DROP PROCEDURE IF EXISTS add_user_blocked_audit_columns_if_not_exists");
+            } catch (Exception ignored) {}
+            stmt.executeUpdate("DELETE FROM `flyway_schema_history` WHERE `version` = '33' AND `success` = 0");
+            if (columnExists(metaData, catalog, "users", "blocked_reason")) {
+                boolean hasVersion33 = false;
+                try (ResultSet rs = stmt.executeQuery("SELECT 1 FROM `flyway_schema_history` WHERE `version` = '33' AND `success` = 1")) {
+                    if (rs.next()) {
+                        hasVersion33 = true;
+                    }
+                }
+                if (!hasVersion33) {
+                    int nextRank = 38;
+                    try (ResultSet rs = stmt.executeQuery("SELECT COALESCE(MAX(installed_rank), 37) + 1 FROM `flyway_schema_history`")) {
+                        if (rs.next()) {
+                            nextRank = rs.getInt(1);
+                        }
+                    }
+                    stmt.execute(String.format(
+                        "INSERT INTO `flyway_schema_history` " +
+                        "(`installed_rank`, `version`, `description`, `type`, `script`, `checksum`, `installed_by`, `execution_time`, `success`) " +
+                        "VALUES (%d, '33', 'add blocked audit fields to users', 'SQL', 'V33__add_blocked_audit_fields_to_users.sql', NULL, 'AUTO_SYNC', 1, 1)",
+                        nextRank
+                    ));
+                    log.info("Da tu dong dong bo version 33 vao flyway_schema_history.");
+                }
+            }
         } catch (Exception ex) {
             log.warn("Reconcile migration history: {}", ex.getMessage());
         }

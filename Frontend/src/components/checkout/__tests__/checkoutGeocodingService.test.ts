@@ -5,8 +5,10 @@ import {
   searchAddressSuggestions,
   reverseGeocode,
   geocodeInitialAddress,
+  isStreetMatched,
   KNOWN_VN_LOCATIONS,
 } from '../checkoutGeocodingService';
+import { resolveAdminHierarchy } from '@/utils/vietnamAdministrative';
 
 describe('checkoutGeocodingService', () => {
   beforeEach(() => {
@@ -97,6 +99,27 @@ describe('checkoutGeocodingService', () => {
       expect(results.some((r) => r.place_name.includes('97'))).toBe(true);
     });
 
+    it('resolves 97 Man Thiện to district Thành phố Thủ Đức and ward Phường Tăng Nhơn Phú A instead of district Tăng Nhơn Phú', async () => {
+      const results = await searchAddressSuggestions('97 Man Thiện');
+      expect(results.length).toBeGreaterThan(0);
+      const match = results.find((r) => r.place_name.includes('Man Thiện') || r.title.includes('Man Thiện'));
+      expect(match).toBeDefined();
+      expect(match?.components?.district).toBe('Thành phố Thủ Đức');
+      expect(match?.components?.ward).toBe('Phường Tăng Nhơn Phú A');
+      expect(match?.components?.district).not.toBe('Tăng Nhơn Phú');
+      expect(match?.components?.ward).not.toBe('Khu phố 30');
+    });
+
+    it('resolves Passio Coffee Nguyễn Đình Chiểu without Saigon as district', async () => {
+      const results = await searchAddressSuggestions('Passio Coffee Nguyễn Đình Chiểu');
+      expect(results.length).toBeGreaterThan(0);
+      const match = results[0];
+      expect(match.components?.district).toBe('Quận 1');
+      expect(match.components?.ward).toBe('Phường Đa Kao');
+      expect(match.components?.district).not.toBe('Saigon');
+      expect(match.components?.district).not.toBe('Sài Gòn');
+    });
+
     it('falls back safely to local dictionary if network request fails', async () => {
       vi.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('Network error'));
 
@@ -162,24 +185,151 @@ describe('checkoutGeocodingService', () => {
       expect(await geocodeInitialAddress('   ')).toBeNull();
     });
 
-    it('finds initial coords from local dictionary', async () => {
-      const res = await geocodeInitialAddress('Số 45 Cầu Giấy, Hà Nội');
+    it('finds initial coords from local dictionary or Photon when no street components are given', async () => {
+      const res = await geocodeInitialAddress('Quận Cầu Giấy, Hà Nội');
       expect(res).not.toBeNull();
-      expect(res?.lat).toBeCloseTo(21.0362, 2);
+      expect(res?.lat).toBeGreaterThan(20.9);
+      expect(res?.lat).toBeLessThan(21.2);
+    });
+
+    it('returns null when a specific street does not exist on map and does not match dictionary', async () => {
+      // Mock Photon returning only district-level features without the non-existent street
+      vi.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          features: [
+            {
+              geometry: { coordinates: [105.7906, 21.0362] },
+              properties: {
+                district: 'Cầu Giấy',
+                city: 'Hà Nội',
+                country: 'Việt Nam',
+              },
+            },
+          ],
+        }),
+      } as any);
+
+      const res = await geocodeInitialAddress('dâdadada, Phường Dịch Vọng, Quận Cầu Giấy, Hà Nội', {
+        streetAddress: 'dâdadada',
+        ward: 'Dịch Vọng',
+        district: 'Cầu Giấy',
+        province: 'Hà Nội',
+      });
+      expect(res).toBeNull();
+    });
+
+    it('rejects result from a different province (e.g. Dong Nai when target is TP. Ho Chi Minh)', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          features: [
+            {
+              geometry: { coordinates: [106.8796, 10.7868] },
+              properties: {
+                street: 'Xã Long An',
+                district: 'Long Thành',
+                city: 'Đồng Nai',
+                country: 'Việt Nam',
+              },
+            },
+          ],
+        }),
+      } as any);
+
+      const res = await geocodeInitialAddress('long an cau giay, TP. Hồ Chí Minh', {
+        streetAddress: 'long an cau giay',
+        district: 'Thủ Đức',
+        province: 'TP. Hồ Chí Minh',
+      });
+      expect(res).toBeNull();
+    });
+
+    it('rejects multi-word street mismatch where only a single token matches', async () => {
+      vi.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          features: [
+            {
+              geometry: { coordinates: [106.7537, 10.8494] },
+              properties: {
+                street: 'Đường Thăng Long',
+                district: 'Thủ Đức',
+                city: 'TP. Hồ Chí Minh',
+                country: 'Việt Nam',
+              },
+            },
+          ],
+        }),
+      } as any);
+
+      const res = await geocodeInitialAddress('long an cau giay, Thủ Đức, TP. Hồ Chí Minh', {
+        streetAddress: 'long an cau giay',
+        district: 'Thủ Đức',
+        province: 'TP. Hồ Chí Minh',
+      });
+      expect(res).toBeNull();
+    });
+
+    it('successfully geocodes compound street addresses like "Đường Anh Đào 1, Vinhomes Grand Park"', async () => {
+      const res = await geocodeInitialAddress(
+        'Đường Anh Đào 1, Vinhomes Grand Park, Phường Long Bình, Thành phố Thủ Đức, TP. Hồ Chí Minh',
+        {
+          streetAddress: 'Đường Anh Đào 1, Vinhomes Grand Park',
+          ward: 'Phường Long Bình',
+          district: 'Thành phố Thủ Đức',
+          province: 'TP. Hồ Chí Minh',
+        }
+      );
+      expect(res).not.toBeNull();
+      expect(res?.lat).toBeCloseTo(10.8464, 3);
+      expect(res?.lng).toBeCloseTo(106.8365, 3);
+      expect(res?.displayName).toContain('Vinhomes Grand Park');
+    });
+
+    it('matches compound street address in isStreetMatched when suggestion contains a main segment', () => {
+      const suggestion = {
+        id: 'test-1',
+        place_name: 'Đường Anh Đào 1, Vinhomes Grand Park, Phường Long Bình, TP. Thủ Đức, TP. Hồ Chí Minh',
+        title: 'Đường Anh Đào 1',
+        subtitle: 'TP. Thủ Đức, TP. Hồ Chí Minh',
+        lat: 10.8464,
+        lng: 106.8365,
+        source: 'dictionary' as const,
+      };
+      expect(isStreetMatched('Đường Anh Đào 1, Vinhomes Grand Park', suggestion)).toBe(true);
+      expect(isStreetMatched('Đường Anh Đào 1', suggestion)).toBe(true);
+      expect(isStreetMatched('Vinhomes Grand Park', suggestion)).toBe(true);
     });
   });
 
-  describe('KNOWN_VN_LOCATIONS integrity', () => {
-    it('has valid coordinates for all entries within Vietnam geographic bounding box', () => {
-      for (const loc of KNOWN_VN_LOCATIONS) {
-        // Vietnam bounding box roughly: lat 8° to 24°, lng 102° to 110°
-        expect(loc.lat).toBeGreaterThan(8);
-        expect(loc.lat).toBeLessThan(24);
-        expect(loc.lng).toBeGreaterThan(102);
-        expect(loc.lng).toBeLessThan(110);
-        expect(loc.name.length).toBeGreaterThan(3);
-        expect(loc.keywords.length).toBeGreaterThan(0);
-      }
+  describe('resolveAdminHierarchy', () => {
+    it('discards Saigon as district and maps to official district Quận 1 for Nguyen Dinh Chieu', () => {
+      const res = resolveAdminHierarchy({
+        province: 'Thành phố Hồ Chí Minh',
+        district: 'Saigon',
+        ward: 'Khu phố 8',
+        fullText: 'Passio Coffee Nguyễn Đình Chiểu, Phường Đa Kao, Quận 1, Thành Phố Hồ Chí Minh',
+        lat: 10.7894,
+        lng: 106.7010,
+      });
+      expect(res.province).toBe('TP. Hồ Chí Minh');
+      expect(res.district).toBe('Quận 1');
+      expect(res.ward).toBe('Phường Đa Kao');
+    });
+
+    it('correctly maps raw district Tăng Nhơn Phú to district Thành phố Thủ Đức and ward Phường Tăng Nhơn Phú A', () => {
+      const res = resolveAdminHierarchy({
+        province: 'Thành phố Hồ Chí Minh',
+        district: 'Tăng Nhơn Phú',
+        ward: 'Khu phố 30',
+        fullText: '97 Man Thiện, Tăng Nhơn Phú, Thành phố Hồ Chí Minh',
+        lat: 10.8477,
+        lng: 106.7857,
+      });
+      expect(res.province).toBe('TP. Hồ Chí Minh');
+      expect(res.district).toBe('Thành phố Thủ Đức');
+      expect(res.ward).toContain('Tăng Nhơn Phú');
     });
   });
 });

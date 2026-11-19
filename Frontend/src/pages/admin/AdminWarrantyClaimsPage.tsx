@@ -244,22 +244,15 @@ export default function AdminWarrantyClaimsPage() {
       <AdminPageHeader
         title="Tiếp nhận & Sửa chữa Bảo hành IMEI"
         subtitle="Tra cứu lịch sử bảo hành theo IMEI 15 số, lập phiếu RMA và cập nhật tiến trình sửa chữa"
+        onRefresh={() => void refetch()}
         actions={
-          <Space>
-            <Button
-              icon={<ReloadOutlined spin={isFetching} />}
-              onClick={() => refetch()}
-            >
-              Làm mới
-            </Button>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => setCreateOpen(true)}
-            >
-              Tiếp nhận máy bảo hành
-            </Button>
-          </Space>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setCreateOpen(true)}
+          >
+            Tiếp nhận máy bảo hành
+          </Button>
         }
       />
 

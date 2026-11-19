@@ -50,6 +50,8 @@ public class AuthService {
     private final StringRedisTemplate redisTemplate;
     private final com.re.greenphone.repository.UserDeviceSessionRepository userDeviceSessionRepository;
     private final DeviceSessionService deviceSessionService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private TokenRedisService tokenRedisService;
 
     private static final String OTP_PREFIX = "otp:";
     private static final String OTP_ATTEMPTS_PREFIX = "otp_attempts:";
@@ -65,6 +67,24 @@ public class AuthService {
 
     // ===== REGISTER =====
 
+    /**
+     * Chuẩn hóa số điện thoại về định dạng chuẩn 10 chữ số bắt đầu bằng '0'.
+     * Hỗ trợ loại bỏ khoảng trắng, dấu gạch nối, dấu chấm, tiền tố quốc tế +84 hoặc 84.
+     */
+    public static String normalizePhoneNumber(String phone) {
+        if (phone == null) {
+            return null;
+        }
+        String clean = phone.trim().replaceAll("[\\s\\-\\.]", "");
+        if (clean.startsWith("+84")) {
+            return "0" + clean.substring(3);
+        }
+        if (clean.startsWith("84") && clean.length() == 11) {
+            return "0" + clean.substring(2);
+        }
+        return clean;
+    }
+
     public AuthResponse register(RegisterRequest request) {
         checkAccountLocked(request.getEmail());
 
@@ -72,14 +92,20 @@ public class AuthService {
             throw new ConflictException("Email này đã được đăng ký. Vui lòng sử dụng email khác.");
         }
 
+        String normalizedPhone = normalizePhoneNumber(request.getPhone());
+        if (normalizedPhone != null && !normalizedPhone.isBlank() && userRepository.existsByPhone(normalizedPhone)) {
+            throw new ConflictException("Số điện thoại này đã được đăng ký. Vui lòng sử dụng số điện thoại khác.");
+        }
+
         // Customer self-registration is ALWAYS CUSTOMER role
         Role customerRole = roleRepository.findByName(RoleName.CUSTOMER.name())
                 .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + RoleName.CUSTOMER.name()));
 
         User user = authMapper.toEntity(request);
+        user.setPhone(normalizedPhone);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(customerRole);
-        user.setStatus("ACTIVE"); // simplified flow
+        user.setStatus("UNVERIFIED");
 
         User saved = userRepository.save(user);
 
@@ -90,9 +116,8 @@ public class AuthService {
         log.info("[OTP] Generated verification code for {}: {}", saved.getEmail(), otp);
         emailService.sendOTP(saved.getEmail(), otp);
 
-        String token = jwtTokenProvider.generateToken(UserPrincipal.create(saved));
-        String refreshToken = createAndStoreRefreshToken(saved.getId());
-        return authMapper.toAuthResponse(saved, token, refreshToken, jwtConfig.getExpiration());
+        // Do not generate active session tokens until email OTP is verified
+        return authMapper.toAuthResponse(saved, null, null, 0L);
     }
 
     // ===== LOGIN =====
@@ -111,7 +136,7 @@ public class AuthService {
         }
 
         if ("BLOCKED".equalsIgnoreCase(user.getStatus())) {
-            throw new BadRequestException("Tài khoản đã bị khóa. Vui lòng liên hệ với quản trị viên để được hỗ trợ.");
+            throw new com.re.greenphone.common.exception.AccountBlockedException(user.getBlockedReason());
         }
         if ("UNVERIFIED".equalsIgnoreCase(user.getStatus())) {
             throw new BadRequestException("Tài khoản chưa được kích hoạt. Vui lòng xác thực email của bạn.");
@@ -182,7 +207,7 @@ public class AuthService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if ("BLOCKED".equalsIgnoreCase(user.getStatus())) {
-            throw new BadRequestException("Tài khoản đã bị khóa. Vui lòng liên hệ với quản trị viên để được hỗ trợ.");
+            throw new com.re.greenphone.common.exception.AccountBlockedException(user.getBlockedReason());
         }
         if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
             throw new BadRequestException("Tài khoản không hoạt động. Vui lòng liên hệ với quản trị viên để được hỗ trợ.");
@@ -237,6 +262,10 @@ public class AuthService {
 
         try {
             long remainingTtl = jwtTokenProvider.getRemainingExpiration(token);
+            Long userId = jwtTokenProvider.getUserIdFromToken(token);
+            String jti = jwtTokenProvider.getJtiFromToken(token);
+            long remainingSeconds = remainingTtl / 1000;
+
             if (remainingTtl > 0) {
                 redisTemplate.opsForValue().set(
                         BLACKLIST_TOKEN_PREFIX + token,
@@ -246,7 +275,14 @@ public class AuthService {
                 log.info("Token successfully blacklisted for remaining {} ms", remainingTtl);
             }
 
-            Long userId = jwtTokenProvider.getUserIdFromToken(token);
+            if (tokenRedisService != null) {
+                if (userId != null) {
+                    tokenRedisService.deleteRefreshToken(userId);
+                }
+                tokenRedisService.blacklistAccessToken(jti, remainingSeconds);
+                tokenRedisService.blacklistRawToken(token, remainingSeconds);
+            }
+
             Long sessionId = jwtTokenProvider.getSessionIdFromToken(token);
             if (userId != null && sessionId != null) {
                 try {
@@ -292,14 +328,14 @@ public class AuthService {
 
     public void forgotPassword(String email) {
         checkAccountLocked(email);
-        // Don't reveal whether email exists — silently accept
-        userRepository.findByEmail(email).ifPresent(user -> {
-            String otp = generateOTP();
-            redisTemplate.opsForValue().set(OTP_PREFIX + email, otp, OTP_TTL);
-            redisTemplate.delete(OTP_ATTEMPTS_PREFIX + email);
-            log.info("[OTP] Forgot password code for {}: {}", email, otp);
-            emailService.sendOTP(email, otp);
-        });
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BadRequestException("Email không tồn tại trong hệ thống."));
+
+        String otp = generateOTP();
+        redisTemplate.opsForValue().set(OTP_PREFIX + email, otp, OTP_TTL);
+        redisTemplate.delete(OTP_ATTEMPTS_PREFIX + email);
+        log.info("[OTP] Forgot password code for {}: {}", email, otp);
+        emailService.sendOTP(email, otp);
     }
 
     public AuthResponse resetPassword(String email, String otp, String newPassword) {
@@ -393,6 +429,9 @@ public class AuthService {
         try {
             redisTemplate.opsForValue().set(REFRESH_TOKEN_PREFIX + refreshToken, String.valueOf(userId), ttlMs,
                     TimeUnit.MILLISECONDS);
+            if (tokenRedisService != null) {
+                tokenRedisService.saveRefreshToken(userId, refreshToken, ttlMs / 1000);
+            }
         } catch (Exception e) {
             log.warn("Redis unavailable for storing refresh token, proceeding: {}", e.getMessage());
         }

@@ -337,19 +337,21 @@ export default function ReviewReturnModal({
 
             {images.length > 0 ? (
               <Image.PreviewGroup>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4">
                   {images.map((url, idx) => (
                     <div
                       key={`${url}-${idx}`}
-                      className="group relative overflow-hidden rounded-xl border border-gray-200 bg-white p-1.5 shadow-sm transition-all hover:shadow-md hover:border-emerald-500"
+                      className="group flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white p-2 shadow-sm transition-all hover:shadow-md hover:border-emerald-500"
                     >
-                      <Image
-                        src={url}
-                        alt={`Ảnh lỗi #${idx + 1} - ${returnItem.returnCode}`}
-                        className="!h-32 !w-full rounded-lg object-cover"
-                        preview={{ mask: '🔍 Phóng to ảnh' }}
-                      />
-                      <div className="mt-1 text-center text-xs text-gray-400 font-medium">
+                      <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-gray-100 [&_.ant-image]:!h-full [&_.ant-image]:!w-full [&_.ant-image-img]:!h-full [&_.ant-image-img]:!w-full [&_.ant-image-img]:!object-cover">
+                        <Image
+                          src={url}
+                          alt={`Ảnh lỗi #${idx + 1} - ${returnItem.returnCode}`}
+                          className="!h-full !w-full !object-cover"
+                          preview={{ mask: '🔍 Phóng to ảnh' }}
+                        />
+                      </div>
+                      <div className="mt-2 text-center text-xs text-gray-500 font-medium">
                         Ảnh minh chứng #{idx + 1}
                       </div>
                     </div>

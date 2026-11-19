@@ -284,6 +284,14 @@ export default function VouchersPage() {
                       </span>
                     </div>
                   </div>
+                  <Button
+                    type="primary"
+                    size="small"
+                    className="mt-3 !rounded-full !bg-green-600 hover:!bg-green-700"
+                    onClick={() => navigate(ROUTES.PRODUCTS)}
+                  >
+                    Dùng ngay
+                  </Button>
                 </div>
               </div>
             </div>

@@ -15,7 +15,7 @@ public interface AuthMapper {
     @Mapping(target = "orders", ignore = true)
     @Mapping(target = "reviews", ignore = true)
     @Mapping(target = "userPromotions", ignore = true)
-    @Mapping(target = "status", constant = "ACTIVE")
+    @Mapping(target = "status", constant = "UNVERIFIED")
     @Mapping(target = "password", source = "password")
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)

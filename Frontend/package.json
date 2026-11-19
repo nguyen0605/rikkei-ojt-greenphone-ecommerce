@@ -30,6 +30,7 @@
     "dayjs": "^1.11.21",
     "file-saver": "^2.0.5",
     "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.9",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.21.0",
     "mapbox-gl": "^3.26.0",

@@ -1,11 +1,14 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Pagination } from 'antd';
 import {
   ShoppingBag,
   RotateCw,
   AlertCircle,
   Package,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { orderService } from '@/services/orderService';
 import type { OrderDTO } from '@/types/api';
@@ -89,7 +92,87 @@ export const OrderHistoryPage: React.FC = () => {
     return counts;
   }, [orders]);
 
+  // Phân trang tối đa 10 đơn hàng mỗi trang
+  const PAGE_SIZE = 10;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Tự động chuyển về trang 1 khi đổi tab
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [currentTab]);
+
+  const totalFiltered = filteredOrders.length;
+  const totalPages = Math.ceil(totalFiltered / PAGE_SIZE) || 1;
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedOrders = useMemo(() => {
+    const startIndex = (safePage - 1) * PAGE_SIZE;
+    return filteredOrders.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [filteredOrders, safePage]);
+
+  const tabListRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollButtons = useCallback(() => {
+    const el = tabListRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollLeft(scrollLeft > 4);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    const el = tabListRef.current;
+    if (!el) return;
+
+    updateScrollButtons();
+    el.addEventListener('scroll', updateScrollButtons, { passive: true });
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const resizeObserver = new ResizeObserver(() => updateScrollButtons());
+      resizeObserver.observe(el);
+      return () => {
+        el.removeEventListener('scroll', updateScrollButtons);
+        resizeObserver.disconnect();
+      };
+    }
+
+    return () => {
+      el.removeEventListener('scroll', updateScrollButtons);
+    };
+  }, [updateScrollButtons, orders]);
+
+  // Cuộn tab đang chọn vào khung nhìn
+  useEffect(() => {
+    const activeBtn = document.getElementById(`tab-${currentTab}`);
+    if (activeBtn && typeof activeBtn.scrollIntoView === 'function') {
+      activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, [currentTab]);
+
+  const handleScrollLeft = () => {
+    if (tabListRef.current) {
+      if (typeof tabListRef.current.scrollBy === 'function') {
+        tabListRef.current.scrollBy({ left: -220, behavior: 'smooth' });
+      } else {
+        tabListRef.current.scrollLeft -= 220;
+      }
+    }
+  };
+
+  const handleScrollRight = () => {
+    if (tabListRef.current) {
+      if (typeof tabListRef.current.scrollBy === 'function') {
+        tabListRef.current.scrollBy({ left: 220, behavior: 'smooth' });
+      } else {
+        tabListRef.current.scrollLeft += 220;
+      }
+    }
+  };
+
   const handleTabChange = (key: OrderTabKey) => {
+    setCurrentPage(1);
     if (key === 'all') {
       searchParams.delete('status');
       setSearchParams(searchParams);
@@ -109,12 +192,27 @@ export const OrderHistoryPage: React.FC = () => {
         </p>
       </div>
 
-      {/* 2. Thanh Tabs trạng thái (Scrollable ngang mượt mà trên mobile) */}
+      {/* 2. Thanh Tabs trạng thái với thanh trượt và nút điều hướng */}
       <div className="relative border-b border-gray-200">
+        {/* Nút trượt trái */}
+        {canScrollLeft && (
+          <div className="absolute left-0 top-0 bottom-0 z-10 flex items-center bg-gradient-to-r from-white via-white/95 to-transparent pr-4 pointer-events-none">
+            <button
+              type="button"
+              onClick={handleScrollLeft}
+              aria-label="Cuộn sang trái"
+              className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
         <div
+          ref={tabListRef}
           role="tablist"
           aria-label="Bộ lọc trạng thái đơn hàng"
-          className="flex space-x-2 overflow-x-auto pb-px scrollbar-none sm:space-x-4"
+          className="order-tabs-scroll flex space-x-2 overflow-x-auto pb-2 scroll-smooth sm:space-x-4"
         >
           {STATUS_TABS.map((tab) => {
             const isActive = currentTab === tab.key;
@@ -156,6 +254,20 @@ export const OrderHistoryPage: React.FC = () => {
             );
           })}
         </div>
+
+        {/* Nút trượt phải */}
+        {canScrollRight && (
+          <div className="absolute right-0 top-0 bottom-0 z-10 flex items-center bg-gradient-to-l from-white via-white/95 to-transparent pl-4 pointer-events-none">
+            <button
+              type="button"
+              onClick={handleScrollRight}
+              aria-label="Cuộn sang phải"
+              className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 3. Vùng nội dung danh sách đơn hàng */}
@@ -267,17 +379,40 @@ export const OrderHistoryPage: React.FC = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between text-xs text-gray-500 px-1">
               <span>
-                Hiển thị <strong className="font-semibold text-gray-800">{filteredOrders.length}</strong> đơn hàng
+                Hiển thị{' '}
+                <strong className="font-semibold text-gray-800">
+                  {totalFiltered <= PAGE_SIZE
+                    ? `${totalFiltered}`
+                    : `${(safePage - 1) * PAGE_SIZE + 1} - ${Math.min(safePage * PAGE_SIZE, totalFiltered)}`}
+                </strong>{' '}
+                trên tổng số{' '}
+                <strong className="font-semibold text-gray-800">{totalFiltered}</strong> đơn hàng
               </span>
             </div>
 
-            {filteredOrders.map((order: OrderDTO) => (
+            {paginatedOrders.map((order: OrderDTO) => (
               <OrderCard
                 key={order.id}
                 order={order}
                 onCancelRequest={(id) => setSelectedCancelOrderId(id)}
               />
             ))}
+
+            {/* Phân trang tối đa 10 đơn hàng mỗi trang */}
+            {totalFiltered > PAGE_SIZE && (
+              <div className="flex justify-center pt-6 pb-2" data-testid="orders-pagination">
+                <Pagination
+                  current={safePage}
+                  pageSize={PAGE_SIZE}
+                  total={totalFiltered}
+                  showSizeChanger={false}
+                  onChange={(page) => {
+                    setCurrentPage(page);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

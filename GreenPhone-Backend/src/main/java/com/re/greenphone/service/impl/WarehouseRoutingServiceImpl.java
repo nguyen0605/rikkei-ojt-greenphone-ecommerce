@@ -5,6 +5,8 @@ import com.re.greenphone.common.exception.ResourceNotFoundException;
 import com.re.greenphone.dto.request.OrderItemRequirement;
 import com.re.greenphone.dto.response.InterWarehouseTransferPlan;
 import com.re.greenphone.dto.response.NearestWarehouseResponse;
+import com.re.greenphone.dto.response.NearestWarehouseStockResponse;
+import com.re.greenphone.dto.response.WarehouseBranchStockResponse;
 import com.re.greenphone.dto.response.TransferPlanItem;
 import com.re.greenphone.entity.PhoneVariant;
 import com.re.greenphone.entity.Warehouse;
@@ -123,6 +125,229 @@ public class WarehouseRoutingServiceImpl implements WarehouseRoutingService {
                 .distanceKm(minDistance == Double.MAX_VALUE ? null : minDistance)
                 .status(nearest.getStatus())
                 .build();
+    }
+
+    @Override
+    public NearestWarehouseStockResponse findNearestWarehouseStock(
+            Double lat, Double lng, String province, List<Long> variantIds) {
+        List<Warehouse> activeWarehouses = warehouseRepository.findByStatus("ACTIVE");
+        if (activeWarehouses.isEmpty()) {
+            throw new ResourceNotFoundException("Warehouse", "status", "ACTIVE");
+        }
+
+        Warehouse target = null;
+        Double distanceKm = null;
+
+        if (lat != null && lng != null) {
+            try {
+                validateCoordinates(lat, lng);
+                List<Warehouse> sorted = sortWarehousesByProximity(activeWarehouses, lat, lng);
+                target = sorted.get(0);
+                if (target.getLatitude() != null && target.getLongitude() != null) {
+                    distanceKm = calculateDistance(lat, lng, target.getLatitudeAsDouble(), target.getLongitudeAsDouble());
+                }
+            } catch (Exception ignored) {
+                // Toa do khong hop le, fallback tinh thanh hoac mac dinh
+            }
+        }
+
+        if (target == null && province != null && !province.isBlank()) {
+            target = resolveWarehouseByProvince(activeWarehouses, province);
+        }
+
+        if (target == null) {
+            target = activeWarehouses.stream()
+                    .filter(w -> WarehouseStockLedgerService.MAIN_CODE.equals(w.getCode()))
+                    .findFirst()
+                    .orElse(activeWarehouses.get(0));
+        }
+
+        Map<Long, Integer> stockMap = new LinkedHashMap<>();
+        if (variantIds != null && !variantIds.isEmpty()) {
+            List<WarehouseStock> stockRecords = warehouseStockRepository.findByWarehouseIdInAndPhoneVariantIdIn(
+                    List.of(target.getId()), variantIds);
+            for (WarehouseStock s : stockRecords) {
+                stockMap.put(s.getPhoneVariant().getId(), s.getAvailableQuantity());
+            }
+            for (Long vid : variantIds) {
+                stockMap.putIfAbsent(vid, 0);
+            }
+        } else {
+            List<WarehouseStock> stockRecords = warehouseStockRepository.findByWarehouseIdOrderByIdAsc(target.getId());
+            for (WarehouseStock s : stockRecords) {
+                stockMap.put(s.getPhoneVariant().getId(), s.getAvailableQuantity());
+            }
+        }
+
+        return NearestWarehouseStockResponse.builder()
+                .warehouseId(target.getId())
+                .warehouseCode(target.getCode())
+                .warehouseName(target.getName())
+                .warehouseAddress(target.getAddress())
+                .latitude(target.getLatitude())
+                .longitude(target.getLongitude())
+                .distanceKm(distanceKm)
+                .status(target.getStatus())
+                .stocks(stockMap)
+                .build();
+    }
+
+    @Override
+    public List<WarehouseBranchStockResponse> getBranchStocksForVariant(Long variantId, Double lat, Double lng) {
+        if (variantId == null) {
+            throw new BadRequestException("Mã biến thể không được để trống");
+        }
+
+        List<Warehouse> activeWarehouses = warehouseRepository.findByStatus("ACTIVE");
+        if (activeWarehouses.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Long> warehouseIds = activeWarehouses.stream().map(Warehouse::getId).toList();
+        List<WarehouseStock> stocks = warehouseStockRepository.findByWarehouseIdInAndPhoneVariantIdIn(
+                warehouseIds, List.of(variantId));
+
+        Map<Long, Integer> stockMap = new HashMap<>();
+        for (WarehouseStock s : stocks) {
+            stockMap.put(s.getWarehouse().getId(), s.getAvailableQuantity());
+        }
+
+        List<WarehouseBranchStockResponse> result = new ArrayList<>();
+        for (Warehouse w : activeWarehouses) {
+            int qty = stockMap.getOrDefault(w.getId(), 0);
+            Double dist = null;
+            if (lat != null && lng != null && w.getLatitude() != null && w.getLongitude() != null) {
+                try {
+                    validateCoordinates(lat, lng);
+                    dist = calculateDistance(lat, lng, w.getLatitudeAsDouble(), w.getLongitudeAsDouble());
+                } catch (Exception ignored) {
+                }
+            }
+
+            String province = "Toàn quốc";
+            String district = "";
+            String phone = "1800 2097";
+
+            String code = w.getCode() != null ? w.getCode().toUpperCase() : "";
+            if (code.contains("HN") || (w.getAddress() != null && w.getAddress().contains("Hà Nội"))) {
+                province = "Hà Nội";
+                district = "Cầu Giấy";
+                phone = "024 7106 9999";
+            } else if (code.contains("HCM") || (w.getAddress() != null && (w.getAddress().contains("Hồ Chí Minh") || w.getAddress().contains("TP.HCM")))) {
+                province = "TP. Hồ Chí Minh";
+                district = "Quận 1";
+                phone = "028 7108 9999";
+            } else if (code.contains("DN") || (w.getAddress() != null && w.getAddress().contains("Đà Nẵng"))) {
+                province = "Đà Nẵng";
+                district = "Hải Châu";
+                phone = "0236 7109 999";
+            } else if (w.getAddress() != null) {
+                String[] parts = w.getAddress().split(",");
+                if (parts.length > 0) {
+                    province = parts[parts.length - 1].trim();
+                }
+                if (parts.length > 1) {
+                    district = parts[parts.length - 2].trim();
+                }
+            }
+
+            result.add(WarehouseBranchStockResponse.builder()
+                    .id(w.getId())
+                    .code(w.getCode())
+                    .name(w.getName())
+                    .address(w.getAddress())
+                    .province(province)
+                    .district(district)
+                    .phone(phone)
+                    .latitude(w.getLatitudeAsDouble())
+                    .longitude(w.getLongitudeAsDouble())
+                    .distanceKm(dist)
+                    .quantity(qty)
+                    .inStock(qty > 0)
+                    .status(w.getStatus())
+                    .build());
+        }
+
+        if (lat != null && lng != null) {
+            result.sort(Comparator.comparing(r -> r.getDistanceKm() != null ? r.getDistanceKm() : Double.MAX_VALUE));
+        }
+
+        return result;
+    }
+
+    private String unaccent(String s) {
+        if (s == null) return "";
+        String temp = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD);
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
+        return pattern.matcher(temp).replaceAll("").replace('đ', 'd').replace('Đ', 'd').toLowerCase();
+    }
+
+    public Warehouse resolveWarehouseByProvince(List<Warehouse> activeWarehouses, String province) {
+        if (province == null || province.isBlank() || activeWarehouses.isEmpty()) {
+            return null;
+        }
+        String p = province.toLowerCase();
+        String un = unaccent(province);
+
+        // Mien Nam -> WH-HCM-Q1
+        boolean isSouth = p.contains("hồ chí minh") || p.contains("tp.hcm") || p.contains("tphcm")
+                || p.contains("sài gòn") || p.contains("thủ đức") || p.contains("bình dương")
+                || p.contains("đồng nai") || p.contains("long an") || p.contains("cần thơ")
+                || p.contains("vũng tàu") || p.contains("bà rịa") || p.contains("tiền giang")
+                || p.contains("bến tre") || p.contains("vĩnh long") || p.contains("trà vinh")
+                || p.contains("hậu giang") || p.contains("sóc trăng") || p.contains("an giang")
+                || p.contains("kiên giang") || p.contains("bạc liêu") || p.contains("cà mau")
+                || p.contains("tây ninh") || p.contains("bình phước") || p.contains("lâm đồng")
+                || p.contains("đà lạt") || p.contains("đắk lắk") || p.contains("buôn ma thuột")
+                || p.contains("đắk nông") || p.contains("gia lai") || p.contains("pleiku") || p.contains("kon tum")
+                || un.contains("ho chi minh") || un.contains("sai gon") || un.contains("thu duc")
+                || un.contains("binh duong") || un.contains("dong nai") || un.contains("long an")
+                || un.contains("can tho") || un.contains("vung tau") || un.contains("ba ria")
+                || un.contains("tien giang") || un.contains("ben tre") || un.contains("vinh long")
+                || un.contains("tra vinh") || un.contains("hau giang") || un.contains("soc trang")
+                || un.contains("an giang") || un.contains("kien giang") || un.contains("bac lieu")
+                || un.contains("ca mau") || un.contains("tay ninh") || un.contains("binh phuoc")
+                || un.contains("lam dong") || un.contains("da lat") || un.contains("dak lak")
+                || un.contains("buon ma thuot") || un.contains("dak nong") || un.contains("gia lai")
+                || un.contains("pleiku") || un.contains("kon tum");
+
+        if (isSouth) {
+            return activeWarehouses.stream()
+                    .filter(w -> "WH-HCM-Q1".equalsIgnoreCase(w.getCode()) || w.getName().contains("TP.HCM") || (w.getAddress() != null && w.getAddress().contains("Hồ Chí Minh")))
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        // Mien Trung -> WH-DN-HAI
+        boolean isCentral = p.contains("đà nẵng") || p.contains("quảng nam") || p.contains("hội an")
+                || p.contains("tam kỳ") || p.contains("quảng ngãi") || p.contains("bình định")
+                || p.contains("quy nhơn") || p.contains("phú yên") || p.contains("tuy hòa")
+                || p.contains("khánh hòa") || p.contains("nha trang") || p.contains("ninh thuận")
+                || p.contains("phan rang") || p.contains("bình thuận") || p.contains("phan thiết")
+                || p.contains("huế") || p.contains("thừa thiên") || p.contains("quảng trị")
+                || p.contains("đông hà") || p.contains("quảng bình") || p.contains("đồng hới")
+                || p.contains("hà tĩnh") || p.contains("nghệ an") || p.contains("vinh")
+                || un.contains("da nang") || un.contains("quang nam") || un.contains("hoi an")
+                || un.contains("tam ky") || un.contains("quang ngai") || un.contains("binh dinh")
+                || un.contains("quy nhon") || un.contains("phu yen") || un.contains("tuy hoa")
+                || un.contains("khanh hoa") || un.contains("nha trang") || un.contains("ninh thuan")
+                || un.contains("phan rang") || un.contains("binh thuan") || un.contains("phan thiet")
+                || un.contains("hue") || un.contains("thua thien") || un.contains("quang tri")
+                || un.contains("dong ha") || un.contains("quang binh") || un.contains("dong hoi")
+                || un.contains("ha tinh") || un.contains("nghe an") || un.contains("vinh");
+
+        if (isCentral) {
+            return activeWarehouses.stream()
+                    .filter(w -> "WH-DN-HAI".equalsIgnoreCase(w.getCode()) || w.getName().contains("Đà Nẵng") || (w.getAddress() != null && w.getAddress().contains("Đà Nẵng")))
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        // Mien Bac -> WH-HN-MAIN
+        return activeWarehouses.stream()
+                .filter(w -> WarehouseStockLedgerService.MAIN_CODE.equalsIgnoreCase(w.getCode()) || w.getName().contains("Hà Nội"))
+                .findFirst()
+                .orElse(null);
     }
 
     @Override

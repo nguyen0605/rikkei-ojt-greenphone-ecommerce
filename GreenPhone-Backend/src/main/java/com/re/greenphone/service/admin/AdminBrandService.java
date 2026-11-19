@@ -29,6 +29,7 @@ public class AdminBrandService {
     private final BrandRepository brandRepository;
     private final PhoneRepository phoneRepository;
     private final BrandMapper brandMapper;
+    private final com.re.greenphone.service.BrandService brandService;
 
     public PageResponse<BrandDTO> getBrands(String keyword,
                                             com.re.greenphone.common.pagination.PageRequest pageRequest) {
@@ -43,19 +44,30 @@ public class AdminBrandService {
             page = brandRepository.findAll(pageable);
         }
         List<BrandDTO> dtos = brandMapper.toDtoList(page.getContent());
+        dtos.forEach(brandService::resolveBrandLogo);
         return new PageResponse<>(dtos, page.getNumber(), page.getSize(),
                 page.getTotalElements(), page.getTotalPages(), page.isLast());
     }
 
     @CacheEvict(value = "brands", allEntries = true)
     public BrandDTO createBrand(BrandRequest request) {
+        String logoUrl = request.getLogoUrl();
+        if (logoUrl == null || logoUrl.isBlank() || !logoUrl.contains("r2.dev")) {
+            String key = request.getName() != null ? request.getName().trim().toLowerCase() : "";
+            if (com.re.greenphone.service.BrandService.OFFICIAL_R2_BRAND_LOGOS.containsKey(key)) {
+                logoUrl = com.re.greenphone.service.BrandService.OFFICIAL_R2_BRAND_LOGOS.get(key);
+            }
+        }
+
         Brand brand = Brand.builder()
                 .name(request.getName())
-                .logoUrl(request.getLogoUrl())
+                .logoUrl(logoUrl)
                 .status("ACTIVE")
                 .build();
         brand = brandRepository.save(brand);
-        return brandMapper.toDto(brand);
+        BrandDTO dto = brandMapper.toDto(brand);
+        brandService.resolveBrandLogo(dto);
+        return dto;
     }
 
     @CacheEvict(value = "brands", allEntries = true)
@@ -65,7 +77,9 @@ public class AdminBrandService {
         brand.setName(request.getName());
         if (request.getLogoUrl() != null) brand.setLogoUrl(request.getLogoUrl());
         brand = brandRepository.save(brand);
-        return brandMapper.toDto(brand);
+        BrandDTO dto = brandMapper.toDto(brand);
+        brandService.resolveBrandLogo(dto);
+        return dto;
     }
 
     /**
@@ -84,7 +98,7 @@ public class AdminBrandService {
         brandRepository.delete(brand);
     }
 
-    @CacheEvict(value = "brands", allEntries = true)
+    @CacheEvict(value = {"brands", "phones"}, allEntries = true)
     public BrandDTO updateStatus(Long id, String status) {
         if (!List.of("ACTIVE", "INACTIVE").contains(status)) {
             throw new BadRequestException("Trạng thái không hợp lệ: " + status + ". Chỉ chấp nhận ACTIVE hoặc INACTIVE.");
@@ -93,6 +107,14 @@ public class AdminBrandService {
                 .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", id));
         brand.setStatus(status);
         brand = brandRepository.save(brand);
-        return brandMapper.toDto(brand);
+
+        // Đồng bộ trạng thái toàn bộ sản phẩm thuộc thương hiệu này
+        int updatedPhonesCount = phoneRepository.updateStatusByBrandId(id, status);
+        log.info("Cập nhật trạng thái Thương hiệu id={} ('{}') sang {}. Đã đồng bộ {} sản phẩm liên quan.",
+                id, brand.getName(), status, updatedPhonesCount);
+
+        BrandDTO dto = brandMapper.toDto(brand);
+        brandService.resolveBrandLogo(dto);
+        return dto;
     }
 }

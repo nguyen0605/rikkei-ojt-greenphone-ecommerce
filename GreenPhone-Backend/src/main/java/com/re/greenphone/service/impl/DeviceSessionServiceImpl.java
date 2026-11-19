@@ -49,7 +49,9 @@ public class DeviceSessionServiceImpl implements DeviceSessionService {
             }
         }
 
-        String userAgent = request != null ? request.getHeader("User-Agent") : null;
+        String clientUa = request != null ? request.getHeader("X-Client-User-Agent") : null;
+        String userAgent = (clientUa != null && !clientUa.isBlank()) ? clientUa : (request != null ? request.getHeader("User-Agent") : null);
+        log.info("[RECORD_DEVICE_SESSION] Received User-Agent: {}", userAgent);
         String os = parseOperatingSystem(userAgent);
         String browser = parseBrowser(userAgent);
         String deviceName = os + " (" + browser + ")";
@@ -145,15 +147,42 @@ public class DeviceSessionServiceImpl implements DeviceSessionService {
         return "Unknown OS";
     }
 
+    /**
+     * Nhận diện trình duyệt từ User-Agent: Ưu tiên phát hiện các trình duyệt nhân Chromium (Cốc Cốc, Edge, Opera)
+     * trước khi gán cho Google Chrome để tránh nhận diện nhầm Cốc Cốc hoặc Edge thành Chrome.
+     */
     private String parseBrowser(String userAgent) {
         if (userAgent == null || userAgent.isBlank()) return "Unknown Browser";
         String ua = userAgent.toLowerCase();
-        if (ua.contains("coc_coc") || ua.contains("coccoc")) return "Cốc Cốc";
-        if (ua.contains("edg/") || ua.contains("edge/")) return "Edge";
-        if (ua.contains("opr/") || ua.contains("opera/")) return "Opera";
-        if (ua.contains("chrome") && !ua.contains("chromium") && !ua.contains("edg") && !ua.contains("coccoc")) return "Chrome";
-        if (ua.contains("safari") && !ua.contains("chrome")) return "Safari";
-        if (ua.contains("firefox")) return "Firefox";
+
+        // 1. Nhận diện Cốc Cốc (User-Agent Cốc Cốc chứa coc_coc, coccoc, hoặc coc coc)
+        if (ua.contains("coc_coc") || ua.contains("coccoc") || ua.contains("coc coc")) {
+            return "Cốc Cốc";
+        }
+        // 2. Nhận diện Microsoft Edge (Edge bao gồm token edg, edge, edga, edgios)
+        if (ua.contains("edg/") || ua.contains("edge/") || ua.contains("edga/") || ua.contains("edgios/") || ua.contains("edg")) {
+            return "Edge";
+        }
+        // 3. Nhận diện Opera
+        if (ua.contains("opr/") || ua.contains("opera/")) {
+            return "Opera";
+        }
+        // 4. Nhận diện Brave Browser
+        if (ua.contains("brave")) {
+            return "Brave";
+        }
+        // 5. Nhận diện Google Chrome (loại trừ các trình duyệt Chromium khác đã check ở trên)
+        if (ua.contains("chrome") && !ua.contains("chromium")) {
+            return "Chrome";
+        }
+        // 6. Nhận diện Apple Safari
+        if (ua.contains("safari") && !ua.contains("chrome")) {
+            return "Safari";
+        }
+        // 7. Nhận diện Mozilla Firefox
+        if (ua.contains("firefox")) {
+            return "Firefox";
+        }
         return "Unknown Browser";
     }
 }

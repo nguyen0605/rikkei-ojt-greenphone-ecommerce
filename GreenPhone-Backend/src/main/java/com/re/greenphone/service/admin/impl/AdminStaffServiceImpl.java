@@ -11,6 +11,7 @@ import com.re.greenphone.entity.Role;
 import com.re.greenphone.entity.User;
 import com.re.greenphone.repository.RoleRepository;
 import com.re.greenphone.repository.UserRepository;
+import com.re.greenphone.service.AuthService;
 import com.re.greenphone.service.admin.AdminStaffService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,12 +30,35 @@ import java.util.List;
 @Transactional
 public class AdminStaffServiceImpl implements AdminStaffService {
 
+    public static final String SUPER_ADMIN_EMAIL = "admin@greenphone.vn";
+    public static final Long SUPER_ADMIN_ID = 1L;
+
     private static final List<String> STAFF_ROLES = List.of("ADMIN", "SALES", "WAREHOUSE", "MARKETING");
     private static final List<String> VALID_STATUSES = List.of("ACTIVE", "INACTIVE", "BLOCKED");
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.re.greenphone.repository.UserDeviceSessionRepository userDeviceSessionRepository;
+
+    private boolean isSuperAdmin(String username, User user) {
+        if (username != null && SUPER_ADMIN_EMAIL.equalsIgnoreCase(username.trim())) {
+            return true;
+        }
+        if (user != null) {
+            return (user.getId() != null && SUPER_ADMIN_ID.equals(user.getId()))
+                    || SUPER_ADMIN_EMAIL.equalsIgnoreCase(user.getEmail());
+        }
+        return false;
+    }
+
+    private User getCurrentUser(String currentUsername) {
+        if (currentUsername == null || currentUsername.isBlank()) {
+            return null;
+        }
+        return userRepository.findByEmail(currentUsername).orElse(null);
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -67,61 +91,96 @@ public class AdminStaffServiceImpl implements AdminStaffService {
     }
 
     @Override
-    public StaffDTO createStaff(CreateStaffRequest request) {
+    public StaffDTO createStaff(CreateStaffRequest request, String currentUsername) {
         if (userRepository.existsByEmail(request.getEmail().trim())) {
             throw new BadRequestException("Email đã tồn tại trong hệ thống: " + request.getEmail().trim());
         }
 
-        if (userRepository.existsByPhone(request.getPhone().trim())) {
-            throw new BadRequestException("Số điện thoại đã được đăng ký: " + request.getPhone().trim());
+        String normalizedPhone = AuthService.normalizePhoneNumber(request.getPhone());
+        if (userRepository.existsByPhone(normalizedPhone)) {
+            throw new BadRequestException("Số điện thoại đã được đăng ký: " + normalizedPhone);
         }
 
         String roleName = normalizeRole(request.getRole());
+        if ("ADMIN".equalsIgnoreCase(roleName)) {
+            User currentUser = getCurrentUser(currentUsername);
+            if (!isSuperAdmin(currentUsername, currentUser)) {
+                throw new BadRequestException("Chỉ Quản trị viên tối cao mới có quyền tạo tài khoản Quản trị viên mới");
+            }
+        }
+
         Role role = roleRepository.findByName(roleName)
                 .orElseThrow(() -> new BadRequestException("Vai trò không hợp lệ trong hệ thống: " + request.getRole()));
 
         User user = new User();
         user.setFullName(request.getFullName().trim());
         user.setEmail(request.getEmail().trim().toLowerCase());
-        user.setPhone(request.getPhone().trim());
+        user.setPhone(normalizedPhone);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(role);
         user.setStatus("ACTIVE");
         user.setAddress("Văn phòng GreenPhone");
 
         user = userRepository.save(user);
-        log.info("Quản trị viên đã tạo tài khoản nhân sự mới: email={}, role={}", user.getEmail(), roleName);
+        log.info("Quản trị viên đã tạo tài khoản nhân sự mới: email={}, role={}, thực hiện bởi={}",
+                user.getEmail(), roleName, currentUsername);
         return toDTO(user);
     }
 
     @Override
     public StaffDTO updateStaffRole(Long id, UpdateStaffRoleRequest request, String currentUsername) {
-        User user = userRepository.findById(id)
+        User targetUser = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Staff", "id", id));
-        validateStaffUser(user);
+        validateStaffUser(targetUser);
 
-        if (currentUsername != null && currentUsername.equalsIgnoreCase(user.getEmail())) {
+        if (currentUsername != null && currentUsername.equalsIgnoreCase(targetUser.getEmail())) {
             throw new BadRequestException("Không thể tự thay đổi vai trò của chính mình để bảo đảm an toàn hệ thống");
+        }
+
+        if (isSuperAdmin(targetUser.getEmail(), targetUser)) {
+            throw new BadRequestException("Tài khoản Quản trị viên tối cao là bất khả xâm phạm, không thể thay đổi vai trò");
+        }
+
+        User currentUser = getCurrentUser(currentUsername);
+        if (!isSuperAdmin(currentUsername, currentUser)) {
+            if ("ADMIN".equalsIgnoreCase(targetUser.getRole().getName())) {
+                throw new BadRequestException("Chỉ Quản trị viên tối cao mới có quyền điều chỉnh vai trò của Quản trị viên khác");
+            }
+            String newRoleName = normalizeRole(request.getRole());
+            if ("ADMIN".equalsIgnoreCase(newRoleName)) {
+                throw new BadRequestException("Chỉ Quản trị viên tối cao mới có quyền nâng cấp tài khoản lên Quản trị viên");
+            }
         }
 
         String roleName = normalizeRole(request.getRole());
         Role role = roleRepository.findByName(roleName)
                 .orElseThrow(() -> new BadRequestException("Vai trò không hợp lệ: " + request.getRole()));
 
-        user.setRole(role);
-        user = userRepository.save(user);
-        log.info("Cập nhật vai trò nhân viên id={}: role={}", id, roleName);
-        return toDTO(user);
+        targetUser.setRole(role);
+        targetUser = userRepository.save(targetUser);
+        log.info("Cập nhật vai trò nhân viên id={}: role={}, thực hiện bởi={}", id, roleName, currentUsername);
+        return toDTO(targetUser);
     }
 
     @Override
     public StaffDTO updateStaffStatus(Long id, String status, String currentUsername) {
-        User user = userRepository.findById(id)
+        User targetUser = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Staff", "id", id));
-        validateStaffUser(user);
+        validateStaffUser(targetUser);
 
-        if (currentUsername != null && currentUsername.equalsIgnoreCase(user.getEmail())) {
+        if (currentUsername != null && currentUsername.equalsIgnoreCase(targetUser.getEmail())) {
             throw new BadRequestException("Không thể tự thay đổi trạng thái hoặc khóa tài khoản của chính mình");
+        }
+
+        if (isSuperAdmin(targetUser.getEmail(), targetUser)) {
+            throw new BadRequestException("Tài khoản Quản trị viên tối cao là bất khả xâm phạm, không thể bị khóa hoặc thay đổi trạng thái");
+        }
+
+        User currentUser = getCurrentUser(currentUsername);
+        if ("ADMIN".equalsIgnoreCase(targetUser.getRole().getName())) {
+            if (!isSuperAdmin(currentUsername, currentUser)) {
+                throw new BadRequestException("Chỉ Quản trị viên tối cao mới có quyền khóa hoặc mở khóa tài khoản Quản trị viên khác");
+            }
         }
 
         String upperStatus = status != null ? status.trim().toUpperCase() : "";
@@ -129,10 +188,17 @@ public class AdminStaffServiceImpl implements AdminStaffService {
             throw new BadRequestException("Trạng thái không hợp lệ: " + status);
         }
 
-        user.setStatus(upperStatus);
-        user = userRepository.save(user);
-        log.info("Cập nhật trạng thái nhân viên id={}: status={}", id, upperStatus);
-        return toDTO(user);
+        targetUser.setStatus(upperStatus);
+        targetUser = userRepository.save(targetUser);
+
+        if ("BLOCKED".equals(upperStatus) || "INACTIVE".equals(upperStatus)) {
+            if (userDeviceSessionRepository != null && targetUser.getId() != null) {
+                userDeviceSessionRepository.revokeAllSessionsByUserId(targetUser.getId());
+                log.info("Khóa tài khoản nhân sự id={}. Đã thu hồi toàn bộ phiên đăng nhập.", targetUser.getId());
+            }
+        }
+        log.info("Cập nhật trạng thái nhân viên id={}: status={}, thực hiện bởi={}", id, upperStatus, currentUsername);
+        return toDTO(targetUser);
     }
 
     private String normalizeRole(String rawRole) {

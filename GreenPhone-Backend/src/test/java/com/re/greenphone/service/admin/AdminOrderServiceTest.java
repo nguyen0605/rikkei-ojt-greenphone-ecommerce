@@ -3,11 +3,13 @@ package com.re.greenphone.service.admin;
 import com.re.greenphone.common.exception.BadRequestException;
 import com.re.greenphone.dto.response.OrderDTO;
 import com.re.greenphone.entity.Order;
+import com.re.greenphone.entity.Payment;
 import com.re.greenphone.entity.PhoneVariant;
 import com.re.greenphone.entity.Promotion;
 import com.re.greenphone.entity.UserPromotion;
 import com.re.greenphone.mapper.OrderMapper;
 import com.re.greenphone.repository.OrderRepository;
+import com.re.greenphone.repository.PaymentRepository;
 import com.re.greenphone.repository.PhoneVariantRepository;
 import com.re.greenphone.repository.PromotionRepository;
 import com.re.greenphone.repository.UserPromotionRepository;
@@ -42,6 +44,9 @@ class AdminOrderServiceTest {
 
     @Mock
     private PhoneVariantRepository phoneVariantRepository;
+
+    @Mock
+    private PaymentRepository paymentRepository;
 
     @Mock
     private UserPromotionRepository userPromotionRepository;
@@ -153,6 +158,80 @@ class AdminOrderServiceTest {
 
         assertThat(order.getPaymentStatus()).isEqualTo("REFUNDED");
         assertThat(order.getNote()).contains("[Kế toán đã hoàn tiền thành công lúc");
+    }
+
+    @Test
+    @DisplayName("Cập nhật PaymentStatus từ UNPAID sang PAID thành công và đồng bộ Payment")
+    void updatePaymentStatus_unpaid_to_paid_success() {
+        Order order = Order.builder()
+                .orderStatus("PROCESSING")
+                .paymentStatus("UNPAID")
+                .paymentMethod("COD")
+                .totalAmount(new BigDecimal("15000000"))
+                .finalAmount(new BigDecimal("15000000"))
+                .build();
+        order.setId(5L);
+
+        when(orderRepository.findById(5L)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(orderMapper.toDto(any(Order.class))).thenReturn(OrderDTO.builder().id(5L).build());
+        when(paymentRepository.findByOrderIdOrderByIdAsc(5L)).thenReturn(List.of());
+
+        adminOrderService.updatePaymentStatus(5L, "PAID");
+
+        assertThat(order.getPaymentStatus()).isEqualTo("PAID");
+        verify(paymentRepository).save(any(Payment.class));
+    }
+
+    @Test
+    @DisplayName("Chặn vi phạm quy trình: Không thể nhảy từ UNPAID sang REFUNDED")
+    void updatePaymentStatus_invalidTransition_unpaid_to_refunded_throwsBadRequest() {
+        Order order = Order.builder()
+                .orderStatus("PENDING")
+                .paymentStatus("UNPAID")
+                .build();
+        order.setId(6L);
+
+        when(orderRepository.findById(6L)).thenReturn(Optional.of(order));
+
+        BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> adminOrderService.updatePaymentStatus(6L, "REFUNDED"));
+
+        assertThat(ex.getMessage()).contains("Vi phạm quy trình: Không thể chuyển trạng thái thanh toán từ UNPAID sang REFUNDED");
+    }
+
+    @Test
+    @DisplayName("Chặn vi phạm quy trình: Trạng thái REFUNDED là terminal state không được đổi")
+    void updatePaymentStatus_invalidTransition_refunded_to_unpaid_throwsBadRequest() {
+        Order order = Order.builder()
+                .orderStatus("CANCELLED")
+                .paymentStatus("REFUNDED")
+                .build();
+        order.setId(7L);
+
+        when(orderRepository.findById(7L)).thenReturn(Optional.of(order));
+
+        BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> adminOrderService.updatePaymentStatus(7L, "UNPAID"));
+
+        assertThat(ex.getMessage()).contains("Vi phạm quy trình: Không thể chuyển trạng thái thanh toán từ REFUNDED sang UNPAID");
+    }
+
+    @Test
+    @DisplayName("Chặn vi phạm quy trình: Đã thanh toán PAID không thể tự ý chuyển về UNPAID")
+    void updatePaymentStatus_invalidTransition_paid_to_unpaid_throwsBadRequest() {
+        Order order = Order.builder()
+                .orderStatus("CONFIRMED")
+                .paymentStatus("PAID")
+                .build();
+        order.setId(8L);
+
+        when(orderRepository.findById(8L)).thenReturn(Optional.of(order));
+
+        BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> adminOrderService.updatePaymentStatus(8L, "UNPAID"));
+
+        assertThat(ex.getMessage()).contains("Vi phạm quy trình: Không thể chuyển trạng thái thanh toán từ PAID sang UNPAID");
     }
 
     @Test

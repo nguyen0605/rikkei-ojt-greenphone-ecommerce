@@ -58,7 +58,10 @@ public class CartService {
 
             PhoneVariant variant = phoneVariantRepository.findById(itemReq.getPhoneVariantId())
                     .orElse(null);
-            if (variant == null || !"ACTIVE".equalsIgnoreCase(variant.getStatus())) {
+            if (variant == null
+                    || !"ACTIVE".equalsIgnoreCase(variant.getStatus())
+                    || (variant.getPhone() != null && !"ACTIVE".equalsIgnoreCase(variant.getPhone().getStatus()))
+                    || (variant.getPhone() != null && variant.getPhone().getBrand() != null && !"ACTIVE".equalsIgnoreCase(variant.getPhone().getBrand().getStatus()))) {
                 log.warn("Variant {} not found or inactive, skipping sync", itemReq.getPhoneVariantId());
                 continue;
             }
@@ -105,6 +108,12 @@ public class CartService {
 
         PhoneVariant variant = phoneVariantRepository.findById(request.getPhoneVariantId())
                 .orElseThrow(() -> new ResourceNotFoundException("PhoneVariant", "id", request.getPhoneVariantId()));
+
+        if (!"ACTIVE".equalsIgnoreCase(variant.getStatus())
+                || (variant.getPhone() != null && !"ACTIVE".equalsIgnoreCase(variant.getPhone().getStatus()))
+                || (variant.getPhone() != null && variant.getPhone().getBrand() != null && !"ACTIVE".equalsIgnoreCase(variant.getPhone().getBrand().getStatus()))) {
+            throw new BadRequestException("Sản phẩm hoặc thương hiệu hiện đang tạm ngừng kinh doanh.");
+        }
 
         if (variant.getStockQuantity() != null && variant.getStockQuantity() < request.getQuantity()) {
             throw new BadRequestException("Số lượng sản phẩm trong kho không đủ.");

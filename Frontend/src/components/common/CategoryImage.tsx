@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Smartphone } from 'lucide-react';
 import { cn } from '@/utils';
+import { getBrandLogoUrl } from '@/utils/brandLogos';
 
 export interface CategoryImageProps {
   src?: string | null;
@@ -29,17 +30,20 @@ export default function CategoryImage({
   const [hasError, setHasError] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
+  // Chuẩn hóa sang logo Cloudflare R2 chính thức nếu có nguồn ảnh
+  const resolvedSrc = src ? getBrandLogoUrl(brandName, src) : null;
+
   // Reset trạng thái khi URL ảnh thay đổi
   useEffect(() => {
     setHasError(false);
     setIsLoaded(false);
-  }, [src]);
+  }, [resolvedSrc]);
 
   const displayName = brandName || alt || 'GreenPhone';
   const initial = displayName.trim().charAt(0).toUpperCase();
 
   // Hiển thị fallback placeholder khi đường dẫn rỗng, null hoặc bị lỗi tải
-  if (!src || hasError) {
+  if (!resolvedSrc || hasError) {
     return (
       <div
         data-testid="category-image-fallback"
@@ -70,7 +74,7 @@ export default function CategoryImage({
         />
       )}
       <img
-        src={src}
+        src={resolvedSrc}
         alt={alt}
         width={width}
         height={height}

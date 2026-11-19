@@ -100,62 +100,18 @@ export default function HeaderSearch({ className }: HeaderSearchProps) {
 
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Enter') return;
-    // Skip IME composition (gõ tiếng Việt)
+    // Bỏ qua khi người dùng đang gõ Telex / Unikey tiếng Việt (composition)
     if (e.nativeEvent.isComposing) return;
     e.preventDefault();
 
     const q = value.trim();
     if (!q) return;
 
-    // Enter: nếu chưa có kết quả thì gọi search và mở dropdown;
-    // nếu đã có thì giữ dropdown mở cho người dùng chọn.
-    if (options.length === 0) {
-      // Kích hoạt search ngay (debouncedQuery có thể chưa kịp update)
-      phoneService
-        .search({ q, size: '5' })
-        .then((data) => {
-          const phones = data.content || [];
-          const resultOptions: Option[] = phones.map((phone: PhoneDTO) => ({
-            value: String(phone.id),
-            label: (
-              <div className="flex items-center gap-3 py-1">
-                {phone.mainImageUrl && (
-                  <img
-                    src={getOptimizedImageUrl(phone.mainImageUrl, { width: 48 })}
-                    alt={phone.name}
-                    className="h-10 w-10 shrink-0 rounded-lg object-cover"
-                  />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-gray-900">
-                    {phone.name}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {phone.lowestPrice != null ? formatVND(phone.lowestPrice) : 'Liên hệ'}
-                  </div>
-                </div>
-              </div>
-            ),
-          }));
-          resultOptions.push({
-            value: `__all__${q}`,
-            label: (
-              <div className="flex items-center justify-center gap-1 py-1 text-sm font-medium text-green-600">
-                <Search className="h-4 w-4" />
-                Xem tất cả kết quả cho "{q}"
-              </div>
-            ),
-          });
-          setOptions(resultOptions);
-          setOpen(true);
-        })
-        .catch(() => {
-          setOptions([]);
-        });
-    } else {
-      // Đã có kết quả → chỉ cần mở dropdown
-      setOpen(true);
-    }
+    // Khi người dùng bấm Enter: Chuyển hướng trực tiếp tới trang danh sách sản phẩm lọc theo từ khóa q
+    navigate(`${ROUTES.PRODUCTS}?q=${encodeURIComponent(q)}`);
+    setValue('');
+    setOptions([]);
+    setOpen(false);
   };
 
   return (

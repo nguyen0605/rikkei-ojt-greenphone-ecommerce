@@ -3,6 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Compass, Locate, AlertCircle } from 'lucide-react';
 import { message } from 'antd';
+import { getProvinceCoords } from './checkoutGeocodingService';
 
 export interface LocationCoords {
   lat: number;
@@ -14,6 +15,7 @@ interface CheckoutDeliveryMapProps {
   selectedLocation: LocationCoords | null;
   onLocationSelect: (location: LocationCoords) => void;
   className?: string;
+  focusProvince?: string;
 }
 
 // Tọa độ mặc định: Trung tâm TP. Hồ Chí Minh / Hà Nội
@@ -64,6 +66,7 @@ export default function CheckoutDeliveryMap({
   selectedLocation,
   onLocationSelect,
   className = '',
+  focusProvince,
 }: CheckoutDeliveryMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -85,9 +88,10 @@ export default function CheckoutDeliveryMap({
   useEffect(() => {
     if (!containerRef.current || mapInstanceRef.current) return;
 
+    const provinceCoords = focusProvince ? getProvinceCoords(focusProvince) : null;
     const initialCenter = selectedLocation
       ? ([selectedLocation.lat, selectedLocation.lng] as [number, number])
-      : DEFAULT_CENTER;
+      : (provinceCoords || DEFAULT_CENTER);
     const initialZoom = selectedLocation ? FOCUSED_ZOOM : DEFAULT_ZOOM;
 
     const map = L.map(containerRef.current, {
@@ -202,7 +206,7 @@ export default function CheckoutDeliveryMap({
     const { lat, lng, displayName } = selectedLocation;
     const popupContent = `
       <div style="font-family: inherit; font-size: 12px; line-height: 1.4; min-width: 140px;">
-        <div style="font-weight: 600; color: #15803d; margin-bottom: 2px;">📍 Vị trí nhận hàng</div>
+        <div style="font-weight: 600; color: #15803d; margin-bottom: 2px;">Vị trí nhận hàng</div>
         <div style="color: #4b5563; font-size: 11px;">${displayName || `${lat.toFixed(4)}, ${lng.toFixed(4)}`}</div>
         <div style="color: #9ca3af; font-size: 10px; margin-top: 4px;">Kéo ghim hoặc bấm bản đồ để đổi vị trí</div>
       </div>
@@ -234,6 +238,17 @@ export default function CheckoutDeliveryMap({
     });
   }, [selectedLocation]);
 
+  // Khi focusProvince thay đổi và chưa có ghim, tự động di chuyển camera tới trung tâm tỉnh/thành
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || selectedLocation || !focusProvince) return;
+
+    const provCoords = getProvinceCoords(focusProvince);
+    if (provCoords) {
+      map.flyTo(provCoords, DEFAULT_ZOOM, { duration: 0.6 });
+    }
+  }, [focusProvince, selectedLocation]);
+
   // Hành động: Đưa camera về lại điểm ghim giao hàng
   const handleRecenter = useCallback(() => {
     const map = mapInstanceRef.current;
@@ -262,57 +277,73 @@ export default function CheckoutDeliveryMap({
     if (!map) return;
 
     setLocatingUser(true);
+
+    const onLocationSuccess = (pos: GeolocationPosition) => {
+      setLocatingUser(false);
+      const { latitude, longitude, accuracy } = pos.coords;
+      deviceCoordsRef.current = { lat: latitude, lng: longitude };
+
+      // Tạo hoặc cập nhật Device Marker (Blue Pulse Dot)
+      if (!deviceMarkerRef.current) {
+        const deviceIcon = createDeviceLocationIcon();
+        const marker = L.marker([latitude, longitude], {
+          icon: deviceIcon,
+          zIndexOffset: 1000,
+        }).addTo(map);
+
+        marker.bindPopup(`
+          <div style="font-family: inherit; font-size: 12px; line-height: 1.4;">
+            <div style="font-weight: 600; color: #1d4ed8;">Vị trí thiết bị của bạn</div>
+            <div style="color: #6b7280; font-size: 11px;">Độ chính xác: ±${Math.round(accuracy || 10)}m</div>
+          </div>
+        `);
+        deviceMarkerRef.current = marker;
+      } else {
+        deviceMarkerRef.current.setLatLng([latitude, longitude]);
+      }
+
+      // Di chuyển camera tới vị trí thiết bị
+      map.flyTo([latitude, longitude], FOCUSED_ZOOM, { duration: 0.8 });
+
+      // Nếu hiện tại chưa có điểm giao hàng nào, tự động chọn vị trí thiết bị làm điểm giao
+      if (!selectedLocation) {
+        onLocationSelectRef.current({
+          lat: latitude,
+          lng: longitude,
+          displayName: 'Vị trí hiện tại của thiết bị',
+        });
+        message.success('Đã đặt vị trí nhận hàng tại vị trí thiết bị của bạn.');
+      } else {
+        message.info('Đã xác định vị trí thiết bị. Bấm hoặc kéo ghim nếu muốn giao đến đây.');
+      }
+    };
+
+    const onLocationError = (err: GeolocationPositionError) => {
+      setLocatingUser(false);
+      if (err.code === err.PERMISSION_DENIED) {
+        message.warning('Trình duyệt đã từ chối quyền truy cập vị trí. Vui lòng cấp quyền trong cài đặt trình duyệt.');
+      } else if (err.code === err.TIMEOUT) {
+        message.warning('Hết thời gian chờ định vị GPS. Vui lòng thử lại.');
+      } else {
+        message.warning('Không thể xác định vị trí thiết bị của bạn.');
+      }
+    };
+
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocatingUser(false);
-        const { latitude, longitude, accuracy } = pos.coords;
-        deviceCoordsRef.current = { lat: latitude, lng: longitude };
-
-        // Tạo hoặc cập nhật Device Marker (Blue Pulse Dot)
-        if (!deviceMarkerRef.current) {
-          const deviceIcon = createDeviceLocationIcon();
-          const marker = L.marker([latitude, longitude], {
-            icon: deviceIcon,
-            zIndexOffset: 1000,
-          }).addTo(map);
-
-          marker.bindPopup(`
-            <div style="font-family: inherit; font-size: 12px; line-height: 1.4;">
-              <div style="font-weight: 600; color: #1d4ed8;">📱 Vị trí thiết bị của bạn</div>
-              <div style="color: #6b7280; font-size: 11px;">Độ chính xác: ±${Math.round(accuracy || 10)}m</div>
-            </div>
-          `);
-          deviceMarkerRef.current = marker;
-        } else {
-          deviceMarkerRef.current.setLatLng([latitude, longitude]);
-        }
-
-        // Di chuyển camera tới vị trí thiết bị
-        map.flyTo([latitude, longitude], FOCUSED_ZOOM, { duration: 0.8 });
-
-        // Nếu hiện tại chưa có điểm giao hàng nào, tự động chọn vị trí thiết bị làm điểm giao
-        if (!selectedLocation) {
-          onLocationSelectRef.current({
-            lat: latitude,
-            lng: longitude,
-            displayName: 'Vị trí hiện tại của thiết bị',
-          });
-          message.success('Đã đặt vị trí nhận hàng tại vị trí thiết bị của bạn.');
-        } else {
-          message.info('Đã xác định vị trí thiết bị. Bấm hoặc kéo ghim nếu muốn giao đến đây.');
-        }
-      },
+      onLocationSuccess,
       (err) => {
-        setLocatingUser(false);
-        if (err.code === err.PERMISSION_DENIED) {
-          message.warning('Trình duyệt đã từ chối quyền truy cập vị trí. Vui lòng cấp quyền trong cài đặt trình duyệt.');
-        } else if (err.code === err.TIMEOUT) {
-          message.warning('Hết thời gian chờ định vị GPS. Vui lòng thử lại.');
+        // Fallback sang do chinh xac tieu chuan neu loi khong phai do tu choi quyen
+        if (err.code !== err.PERMISSION_DENIED) {
+          navigator.geolocation.getCurrentPosition(onLocationSuccess, onLocationError, {
+            enableHighAccuracy: false,
+            timeout: 10000,
+            maximumAge: 60000,
+          });
         } else {
-          message.warning('Không thể xác định vị trí thiết bị của bạn.');
+          onLocationError(err);
         }
       },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+      { enableHighAccuracy: true, timeout: 6000, maximumAge: 30000 }
     );
   }, [selectedLocation]);
 

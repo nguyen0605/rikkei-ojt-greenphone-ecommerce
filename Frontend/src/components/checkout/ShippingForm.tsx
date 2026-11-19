@@ -26,7 +26,6 @@ import {
   searchAddressSuggestions,
   reverseGeocode,
   geocodeInitialAddress,
-  searchLocalDictionary,
   isValidCoordinate,
   type AddressSuggestion,
 } from './checkoutGeocodingService';
@@ -63,6 +62,14 @@ export default function ShippingForm() {
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [isAddressSelectorModalOpen, setIsAddressSelectorModalOpen] = useState(false);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
+
+  // Tự động mở lại modal nếu vừa bấm tải lại trang từ hướng dẫn vị trí
+  useEffect(() => {
+    if (typeof window !== 'undefined' && sessionStorage.getItem('gp_auto_open_address_modal') === 'true') {
+      sessionStorage.removeItem('gp_auto_open_address_modal');
+      setIsAddressModalOpen(true);
+    }
+  }, []);
 
   // Trạng thái tìm kiếm và bản đồ
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
@@ -173,21 +180,14 @@ export default function ShippingForm() {
                 })
               );
             } else {
-              // Fallback nếu không tìm thấy qua online geocoding: dùng từ điển theo tỉnh/thành
-              const fallback = searchLocalDictionary(addr.province || 'Hồ Chí Minh', 1);
-              if (fallback.length > 0 && isValidCoordinate(fallback[0].lat, fallback[0].lng)) {
-                setSelectedLocation({
-                  lat: fallback[0].lat,
-                  lng: fallback[0].lng,
-                  displayName: fallback[0].place_name,
-                });
-                dispatch(
-                  updateShipping({
-                    latitude: fallback[0].lat,
-                    longitude: fallback[0].lng,
-                  })
-                );
-              }
+              // Địa chỉ không có trên bản đồ -> Không trỏ tới chỗ đó
+              setSelectedLocation(null);
+              dispatch(
+                updateShipping({
+                  latitude: undefined,
+                  longitude: undefined,
+                })
+              );
             }
           }
         });

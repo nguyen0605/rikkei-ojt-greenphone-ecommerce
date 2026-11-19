@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   LaptopOutlined,
   MobileOutlined,
@@ -10,6 +10,7 @@ import {
   EnvironmentOutlined,
 } from '@ant-design/icons';
 import type { DeviceSessionDTO } from '@/types/api';
+import { getLocationByIp } from '@/utils/geoIp';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/vi';
@@ -30,6 +31,22 @@ export const DeviceItemCard: React.FC<DeviceItemCardProps> = ({
   isRevoking = false,
   location,
 }) => {
+  // Tự động ước tính vị trí theo IP (không cần người dùng bật GPS)
+  const [estimatedLocation, setEstimatedLocation] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (device.ipAddress) {
+      getLocationByIp(device.ipAddress).then((loc) => {
+        if (isMounted && loc) {
+          setEstimatedLocation(loc);
+        }
+      });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [device.ipAddress]);
   const getDeviceIcon = () => {
     const osLower = (device.os || '').toLowerCase();
     const devLower = (device.deviceName || '').toLowerCase();
@@ -105,10 +122,10 @@ export const DeviceItemCard: React.FC<DeviceItemCardProps> = ({
                 </span>
               )}
 
-              {isCurrent && location && (
+              {(location || estimatedLocation) && (
                 <span className="flex items-center gap-1 text-emerald-700 font-medium bg-emerald-100/60 px-2 py-0.5 rounded-md">
                   <EnvironmentOutlined className="text-emerald-600" />
-                  <span>{location}</span>
+                  <span>{location || estimatedLocation}</span>
                 </span>
               )}
 

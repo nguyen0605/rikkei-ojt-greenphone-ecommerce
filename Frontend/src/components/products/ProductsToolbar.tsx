@@ -60,13 +60,18 @@ export function ProductsPagination({
   pageSize,
   onChange,
 }: ProductsPaginationProps) {
+  const handleChange = (page: number, size: number) => {
+    onChange(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <div className="mt-8 flex justify-center">
       <Pagination
         current={current}
         total={total}
         pageSize={pageSize}
-        onChange={onChange}
+        onChange={handleChange}
         showSizeChanger={false}
       />
     </div>

@@ -85,7 +85,7 @@ public class AdminBannerService {
     public void deleteBanner(Long id) {
         Banner banner = bannerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Banner", "id", id));
-        banner.setStatus("INACTIVE");
-        bannerRepository.save(banner);
+        bannerRepository.delete(banner);
+        log.info("Deleted banner id={}", id);
     }
 }

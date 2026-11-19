@@ -16,6 +16,33 @@ vi.mock('@/components/checkout/checkoutGeocodingService', () => ({
   }),
   searchAddressSuggestions: vi.fn().mockResolvedValue([]),
   reverseGeocode: vi.fn().mockResolvedValue('Cầu Giấy, Hà Nội'),
+  reverseGeocodeDetails: vi.fn().mockResolvedValue({
+    id: 'geo-1',
+    place_name: 'Số 123 Đường Cầu Giấy, Hà Nội',
+    title: 'Số 123 Đường Cầu Giấy',
+    subtitle: 'Hà Nội, Việt Nam',
+    lat: 21.0362,
+    lng: 105.7906,
+    source: 'photon',
+    components: {
+      province: 'Hà Nội',
+      district: 'Cầu Giấy',
+      ward: 'Dịch Vọng',
+      streetAddress: 'Số 123 Đường Cầu Giấy',
+    },
+  }),
+  isValidCoordinate: vi.fn().mockImplementation((lat, lng) => {
+    return (
+      typeof lat === 'number' &&
+      typeof lng === 'number' &&
+      Number.isFinite(lat) &&
+      Number.isFinite(lng) &&
+      lat >= -90 &&
+      lat <= 90 &&
+      lng >= -180 &&
+      lng <= 180
+    );
+  }),
   searchLocalDictionary: vi.fn().mockReturnValue([
     {
       id: 'dict-1',
@@ -44,6 +71,20 @@ describe('AddressModal', () => {
         removeEventListener: vi.fn(),
         dispatchEvent: vi.fn(),
       })),
+    });
+    Object.defineProperty(navigator, 'geolocation', {
+      writable: true,
+      value: {
+        getCurrentPosition: vi.fn().mockImplementation((success) =>
+          success({
+            coords: {
+              latitude: 21.0362,
+              longitude: 105.7906,
+              accuracy: 10,
+            },
+          })
+        ),
+      },
     });
   });
 
@@ -112,8 +153,8 @@ describe('AddressModal', () => {
 
     await user.type(screen.getByPlaceholderText('Nguyễn Văn A'), 'Phạm Thị D');
     await user.type(screen.getByPlaceholderText('0912345678'), '0912345678');
-    await user.type(screen.getAllByPlaceholderText('Quận / Huyện')[0], 'Cầu Giấy');
-    await user.type(screen.getAllByPlaceholderText('Phường / Xã')[0], 'Dịch Vọng');
+    await user.type(screen.getAllByPlaceholderText(/Quận \/ Huyện/i)[0], 'Cầu Giấy');
+    await user.type(screen.getAllByPlaceholderText(/Phường \/ Xã/i)[0], 'Dịch Vọng');
     await user.type(
       screen.getByPlaceholderText(/Số 123 Đường Cầu Giấy/i),
       'Số 50 Đường Cầu Giấy'
@@ -151,8 +192,8 @@ describe('AddressModal', () => {
 
     await user.type(screen.getByPlaceholderText('Nguyễn Văn A'), 'Trần Văn C');
     await user.type(screen.getByPlaceholderText('0912345678'), '0988776655');
-    await user.type(screen.getAllByPlaceholderText('Quận / Huyện')[0], 'Ba Đình');
-    await user.type(screen.getAllByPlaceholderText('Phường / Xã')[0], 'Kim Mã');
+    await user.type(screen.getAllByPlaceholderText(/Quận \/ Huyện/i)[0], 'Ba Đình');
+    await user.type(screen.getAllByPlaceholderText(/Phường \/ Xã/i)[0], 'Kim Mã');
     await user.type(
       screen.getByPlaceholderText(/Số 123 Đường Cầu Giấy/i),
       'Tòa nhà Capital Tower, 109 Trần Hưng Đạo'
@@ -168,6 +209,171 @@ describe('AddressModal', () => {
           receiverName: 'Trần Văn C',
         })
       );
+    });
+  });
+
+  it('blocks submission and shows error when address does not exist on map', async () => {
+    const user = userEvent.setup();
+    const handleSubmit = vi.fn().mockResolvedValue(undefined);
+    const { geocodeInitialAddress } = await import('@/components/checkout/checkoutGeocodingService');
+    vi.mocked(geocodeInitialAddress).mockResolvedValueOnce(null);
+
+    render(<AddressModal open={true} onCancel={vi.fn()} onSubmit={handleSubmit} />);
+
+    await user.type(screen.getByPlaceholderText('Nguyễn Văn A'), 'Người Dùng Test');
+    await user.type(screen.getByPlaceholderText('0912345678'), '0912345678');
+    await user.type(screen.getAllByPlaceholderText(/Quận \/ Huyện/i)[0], 'Cầu Giấy');
+    await user.type(screen.getAllByPlaceholderText(/Phường \/ Xã/i)[0], 'Dịch Vọng');
+    await user.type(
+      screen.getByPlaceholderText(/Số 123 Đường Cầu Giấy/i),
+      'dâdadada địa chỉ không tồn tại'
+    );
+
+    const submitBtn = screen.getByRole('button', { name: 'Thêm địa chỉ' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByText('Địa chỉ không tồn tại trên bản đồ hoặc không thuộc khu vực đã chọn. Vui lòng kiểm tra lại địa chỉ hoặc chọn vị trí trên bản đồ.').length
+      ).toBeGreaterThan(0);
+    });
+
+    expect(handleSubmit).not.toHaveBeenCalled();
+  });
+
+  it('shows error and unpins location when manual locate button finds no address on map', async () => {
+    const user = userEvent.setup();
+    const { geocodeInitialAddress } = await import('@/components/checkout/checkoutGeocodingService');
+    vi.mocked(geocodeInitialAddress).mockResolvedValueOnce(null);
+
+    render(<AddressModal open={true} onCancel={vi.fn()} onSubmit={vi.fn()} />);
+
+    await user.type(screen.getAllByPlaceholderText(/Quận \/ Huyện/i)[0], 'Cầu Giấy');
+    await user.type(screen.getAllByPlaceholderText(/Phường \/ Xã/i)[0], 'Dịch Vọng');
+    await user.type(
+      screen.getByPlaceholderText(/Số 123 Đường Cầu Giấy/i),
+      'dâdadada địa chỉ ảo'
+    );
+
+    const locateBtn = screen.getByRole('button', { name: /Định vị từ địa chỉ đã nhập/i });
+    await user.click(locateBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Chưa có trên bản đồ')).toBeInTheDocument();
+    });
+  });
+
+  it('warns user if attempting to locate when street address has not been entered', async () => {
+    const user = userEvent.setup();
+    render(<AddressModal open={true} onCancel={vi.fn()} onSubmit={vi.fn()} />);
+
+    // Ô streetAddress đang trống, bấm nút Định vị
+    const locateBtn = screen.getByRole('button', { name: /Định vị từ địa chỉ đã nhập/i });
+    await user.click(locateBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getAllByText('Vui lòng nhập số nhà, tên đường hoặc địa chỉ cụ thể trước khi định vị.').length
+      ).toBeGreaterThan(0);
+    });
+  });
+
+  it('allows locating current position and auto-filling address fields via GPS button next to other', async () => {
+    const user = userEvent.setup();
+    render(<AddressModal open={true} onCancel={vi.fn()} onSubmit={vi.fn()} />);
+
+    // Kiểm tra nút Vị trí hiện tại hiển thị bên cạnh mục Khác
+    const currentLocationBtn = screen.getByRole('button', { name: /Vị trí hiện tại/i });
+    expect(currentLocationBtn).toBeInTheDocument();
+
+    await user.click(currentLocationBtn);
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Số 123 Đường Cầu Giấy')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Cầu Giấy')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Dịch Vọng')).toBeInTheDocument();
+    });
+  });
+
+  it('blocks submission and shows error if district does not belong to selected province', async () => {
+    const user = userEvent.setup();
+    const handleSubmit = vi.fn().mockResolvedValue(undefined);
+
+    render(<AddressModal open={true} onCancel={vi.fn()} onSubmit={handleSubmit} />);
+
+    // Default province is Hà Nội
+    await user.type(screen.getByPlaceholderText('Nguyễn Văn A'), 'Test User');
+    await user.type(screen.getByPlaceholderText('0912345678'), '0912345678');
+    // Type a district that belongs to TP.HCM, not Hà Nội
+    await user.type(screen.getAllByPlaceholderText(/Quận \/ Huyện/i)[0], 'Quận 1');
+    await user.type(screen.getAllByPlaceholderText(/Phường \/ Xã/i)[0], 'Bến Nghé');
+    await user.type(screen.getByPlaceholderText(/Số 123 Đường Cầu Giấy/i), '123 Đường Lê Lợi');
+
+    const submitBtn = screen.getByRole('button', { name: 'Thêm địa chỉ' });
+    await user.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/"Quận 1" không thuộc Hà Nội/i)).toBeInTheDocument();
+    });
+    expect(handleSubmit).not.toHaveBeenCalled();
+  });
+
+  it('auto-fills all address fields including province, district and ward from GPS coords in TP. HCM', async () => {
+    const user = userEvent.setup();
+    const { reverseGeocodeDetails } = await import('@/components/checkout/checkoutGeocodingService');
+    vi.mocked(reverseGeocodeDetails).mockResolvedValueOnce({
+      id: 'nom-1',
+      place_name: 'Đường Anh Đào 1, Vinhomes Grand Park, Phường Long Bình, Thành phố Hồ Chí Minh',
+      title: 'Đường Anh Đào 1, Vinhomes Grand Park',
+      subtitle: 'Phường Long Bình, Thành phố Hồ Chí Minh',
+      lat: 10.8465,
+      lng: 106.8365,
+      source: 'nominatim',
+      components: {
+        province: 'Thành phố Hồ Chí Minh',
+        district: '',
+        ward: 'Phường Long Bình',
+        streetAddress: 'Đường Anh Đào 1, Vinhomes Grand Park',
+      },
+    });
+
+    render(<AddressModal open={true} onCancel={vi.fn()} onSubmit={vi.fn()} />);
+
+    const currentLocationBtn = screen.getByRole('button', { name: /Vị trí hiện tại/i });
+    await user.click(currentLocationBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('TP. Hồ Chí Minh')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Thành phố Thủ Đức')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Phường Long Bình')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Đường Anh Đào 1, Vinhomes Grand Park')).toBeInTheDocument();
+    });
+  });
+
+  it('displays warning notification when browser denies geolocation', async () => {
+    const user = userEvent.setup();
+    // Giả lập quyền vị trí bị từ chối (PERMISSION_DENIED = 1)
+    Object.defineProperty(navigator, 'geolocation', {
+      writable: true,
+      value: {
+        getCurrentPosition: vi.fn().mockImplementation((_success, error) => {
+          error({
+            code: 1, // PERMISSION_DENIED
+            message: 'User denied Geolocation',
+          });
+        }),
+      },
+    });
+
+    render(<AddressModal open={true} onCancel={vi.fn()} onSubmit={vi.fn()} />);
+
+    const currentLocationBtn = screen.getByRole('button', { name: /Vị trí hiện tại/i });
+    await user.click(currentLocationBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Vui lòng bật quyền truy cập vị trí trên trình duyệt/i)
+      ).toBeInTheDocument();
     });
   });
 });
