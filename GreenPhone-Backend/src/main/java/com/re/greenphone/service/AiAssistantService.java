@@ -39,7 +39,7 @@ public class AiAssistantService {
     @Value("${gemini.api.key:}")
     private String geminiApiKey;
 
-    @Value("${gemini.api.model:gemini-3.5-flash-lite}")
+    @Value("${gemini.api.model:gemini-1.5-flash}")
     private String geminiModel;
 
     @Value("${gemini.api.url:https://generativelanguage.googleapis.com/v1beta/models}")
@@ -441,13 +441,14 @@ public class AiAssistantService {
     }
 
     /**
-     * Phan hoi Rule-based khi khong the ket noi toi Gemini AI.
+     * Phan hoi Rule-based thong minh khi khong the ket noi toi Gemini AI.
+     * Tu dong phan tich chuyen sau theo tung chu de: Gaming, Camera, Pin trau hoac Ngan sach.
      */
     public AiChatResponse buildFallbackResponse(Criteria criteria, List<PhoneCandidate> candidates) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Dạ GreenPhone xin chào bạn! Cảm ơn bạn đã liên hệ tư vấn.\n");
 
         if (candidates.isEmpty()) {
+            sb.append("Dạ GreenPhone xin chào bạn! Cảm ơn bạn đã liên hệ tư vấn.\n");
             sb.append("Hiện tại với tiêu chí bạn đang tìm kiếm, hệ thống tạm thời chưa có mẫu máy phù hợp ngay lập tức. ");
             sb.append("Bạn vui lòng truy cập trang danh mục /san-pham hoặc điều chỉnh tầm giá để tham khảo thêm hơn 50 dòng điện thoại chính hãng giá tốt tại GreenPhone nhé!");
             return AiChatResponse.builder()
@@ -456,34 +457,60 @@ public class AiAssistantService {
                     .build();
         }
 
-        sb.append("Dựa trên nhu cầu của bạn");
-        if (criteria.brand() != null) {
-            sb.append(" về dòng máy ").append(criteria.brand());
+        // 1. Loi mo dau ca nhan hoa chuyen sau theo tung nhu cau cu the
+        if (criteria.gamingFocus()) {
+            sb.append("Dạ GreenPhone chào bạn! Nếu bạn đang tìm kiếm cỗ máy chiến game đỉnh cao nhất (leo rank Liên Quân, PUBG Mobile, Tốc Chiến, Genshin Impact ở mức 60-120 FPS mượt mà), yếu tố quyết định là chip xử lý đồ họa mạnh mẽ, màn hình tần số quét 120Hz và khả năng tản nhiệt buồng hơi ổn định.\n\n");
+            sb.append("Dưới đây là các 'quái vật hiệu năng' chơi game tốt nhất hiện có tại GreenPhone dành cho bạn:\n\n");
+        } else if (criteria.cameraFocus()) {
+            sb.append("Dạ GreenPhone chào bạn! Đối với nhu cầu chụp ảnh đẹp, quay video sắc nét, bắt trọn từng khoảnh khắc và chân dung nghệ thuật, GreenPhone xin gợi ý các dòng 'camera phone' có cảm biến lớn từ 50MP đến 200MP, hỗ trợ chống rung quang học OIS và ống kính tiềm vọng đỉnh cao sau đây:\n\n");
+        } else if (criteria.batteryFocus()) {
+            sb.append("Dạ GreenPhone chào bạn! Với ưu tiên pin trâu bền bỉ để thoải mái sử dụng liên tục cả ngày dài không lo gián đoạn, GreenPhone gợi ý những mẫu điện thoại trang bị viên pin lớn từ 5000mAh đến 6000mAh kèm công nghệ sạc siêu nhanh hàng đầu hiện nay:\n\n");
+        } else {
+            sb.append("Dạ GreenPhone xin chào bạn! Dựa trên nhu cầu");
+            if (criteria.brand() != null) {
+                sb.append(" về thương hiệu ").append(criteria.brand());
+            }
+            if (criteria.maxPrice() != null) {
+                sb.append(" trong tầm giá dưới ").append(PRICE_FORMAT.format(criteria.maxPrice())).append("đ");
+            }
+            sb.append(", GreenPhone xin tư vấn các mẫu điện thoại nổi bật, toàn diện nhất hiện nay:\n\n");
         }
-        if (criteria.maxPrice() != null) {
-            sb.append(" trong tầm giá dưới ").append(PRICE_FORMAT.format(criteria.maxPrice())).append("đ");
-        }
-        sb.append(", GreenPhone xin gợi ý các mẫu điện thoại nổi bật sau đây:\n\n");
 
+        // 2. Liet ke tung dong may kem phan tich danh gia chuyen sau
         List<PhoneDTO> suggested = new ArrayList<>();
         int count = 0;
         for (PhoneCandidate c : candidates) {
             Phone p = c.phone();
             count++;
-            sb.append(String.format("%d. %s (Giá từ: %s đ)\n",
+            sb.append(String.format("%d. %s (Giá tham khảo: %s đ)\n",
                     count, p.getName(), PRICE_FORMAT.format(c.lowestPrice())));
-            if (p.getChip() != null || p.getRearCamera() != null || p.getBattery() != null) {
-                sb.append(String.format("   - Cấu hình: Chip %s | Camera %s | Pin %s\n",
-                        p.getChip() != null ? p.getChip() : "Đang cập nhật",
-                        p.getRearCamera() != null ? p.getRearCamera() : "Đang cập nhật",
-                        p.getBattery() != null ? p.getBattery() : "Đang cập nhật"));
+
+            // Phan tich chuyen sau theo dac tinh may
+            if (criteria.gamingFocus()) {
+                String chip = p.getChip() != null ? p.getChip() : "Chip cao cấp";
+                String battery = p.getBattery() != null ? p.getBattery() : "Pin lớn";
+                sb.append(String.format("   - Đánh giá Gaming: Sức mạnh từ %s mang lại FPS ổn định tuyệt đối; kết hợp %s giúp bạn chiến game nhiều giờ liền không lo tụt pin.\n",
+                        chip, battery));
+            } else if (criteria.cameraFocus()) {
+                String cam = p.getRearCamera() != null ? p.getRearCamera() : "Độ phân giải cao";
+                sb.append(String.format("   - Đánh giá Camera: Cụm camera %s bắt nét siêu nhanh, khử nhiễu xuất sắc và chụp đêm cực kỳ ấn tượng.\n", cam));
+            } else if (criteria.batteryFocus()) {
+                String bat = p.getBattery() != null ? p.getBattery() : "Pin dung lượng lớn";
+                sb.append(String.format("   - Đánh giá Thời lượng: Trang bị %s, tối ưu điện năng vượt trội cho thời gian On-screen cả ngày dài.\n", bat));
+            } else {
+                if (p.getChip() != null || p.getRearCamera() != null || p.getBattery() != null) {
+                    sb.append(String.format("   - Thông số: Chip %s | Camera %s | Pin %s\n",
+                            p.getChip() != null ? p.getChip() : "Đang cập nhật",
+                            p.getRearCamera() != null ? p.getRearCamera() : "Đang cập nhật",
+                            p.getBattery() != null ? p.getBattery() : "Đang cập nhật"));
+                }
             }
 
             suggested.add(toPhoneDto(p, c.lowestPrice()));
             if (count >= 3) break;
         }
 
-        sb.append("\nBạn có thể nhấn vào thẻ sản phẩm bên dưới để xem chi tiết thông số hoặc ghé thăm trang /san-pham để xem thêm các ưu đãi hấp dẫn!");
+        sb.append("\nBạn có thể nhấn trực tiếp vào từng thẻ sản phẩm bên dưới để xem hình ảnh thực tế, thông số chi tiết hoặc đặt mua với nhiều ưu đãi nhé!");
 
         // Kiem tra bo loc ngan sach nghiem ngat
         if (criteria.maxPrice() != null) {
