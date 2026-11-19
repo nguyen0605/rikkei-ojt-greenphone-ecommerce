@@ -117,7 +117,7 @@ describe('authSlice', () => {
     });
 
     describe('updateUserProfile', () => {
-      it('should update user fields and sync to localStorage', () => {
+      it('should update user fields in redux state without persisting token or pii to localStorage', () => {
         const store = createTestStore();
         store.dispatch({
           type: loginThunk.fulfilled.type,
@@ -128,7 +128,7 @@ describe('authSlice', () => {
         const user = store.getState().auth.user;
         expect(user?.fullName).toBe('New Name');
         expect(user?.avatar).toBe('data:image/png;base64,...');
-        expect(localStorage.getItem('greenphone.user')).toContain('New Name');
+        expect(localStorage.getItem('greenphone.token')).toBeNull();
       });
     });
   });
