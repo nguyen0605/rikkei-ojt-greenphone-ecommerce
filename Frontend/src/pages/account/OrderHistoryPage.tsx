@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Pagination } from 'antd';
 import {
   ShoppingBag,
   RotateCw,
@@ -91,6 +92,24 @@ export const OrderHistoryPage: React.FC = () => {
     return counts;
   }, [orders]);
 
+  // Phân trang tối đa 10 đơn hàng mỗi trang
+  const PAGE_SIZE = 10;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Tự động chuyển về trang 1 khi đổi tab
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [currentTab]);
+
+  const totalFiltered = filteredOrders.length;
+  const totalPages = Math.ceil(totalFiltered / PAGE_SIZE) || 1;
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedOrders = useMemo(() => {
+    const startIndex = (safePage - 1) * PAGE_SIZE;
+    return filteredOrders.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [filteredOrders, safePage]);
+
   const tabListRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -153,6 +172,7 @@ export const OrderHistoryPage: React.FC = () => {
   };
 
   const handleTabChange = (key: OrderTabKey) => {
+    setCurrentPage(1);
     if (key === 'all') {
       searchParams.delete('status');
       setSearchParams(searchParams);
@@ -359,17 +379,40 @@ export const OrderHistoryPage: React.FC = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between text-xs text-gray-500 px-1">
               <span>
-                Hiển thị <strong className="font-semibold text-gray-800">{filteredOrders.length}</strong> đơn hàng
+                Hiển thị{' '}
+                <strong className="font-semibold text-gray-800">
+                  {totalFiltered <= PAGE_SIZE
+                    ? `${totalFiltered}`
+                    : `${(safePage - 1) * PAGE_SIZE + 1} - ${Math.min(safePage * PAGE_SIZE, totalFiltered)}`}
+                </strong>{' '}
+                trên tổng số{' '}
+                <strong className="font-semibold text-gray-800">{totalFiltered}</strong> đơn hàng
               </span>
             </div>
 
-            {filteredOrders.map((order: OrderDTO) => (
+            {paginatedOrders.map((order: OrderDTO) => (
               <OrderCard
                 key={order.id}
                 order={order}
                 onCancelRequest={(id) => setSelectedCancelOrderId(id)}
               />
             ))}
+
+            {/* Phân trang tối đa 10 đơn hàng mỗi trang */}
+            {totalFiltered > PAGE_SIZE && (
+              <div className="flex justify-center pt-6 pb-2" data-testid="orders-pagination">
+                <Pagination
+                  current={safePage}
+                  pageSize={PAGE_SIZE}
+                  total={totalFiltered}
+                  showSizeChanger={false}
+                  onChange={(page) => {
+                    setCurrentPage(page);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
