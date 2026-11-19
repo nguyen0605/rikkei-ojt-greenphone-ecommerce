@@ -43,6 +43,7 @@ export default function WishlistButton({
   const location = useLocation();
   const { message } = App.useApp();
   const [isBouncing, setIsBouncing] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const isAuthenticated = useAppSelector((state) => state.auth?.isAuthenticated ?? false);
 
@@ -60,6 +61,7 @@ export default function WishlistButton({
 
     // Chặn người dùng chưa đăng nhập, hiển thị thông báo và chuyển hướng tới /dang-nhap
     if (!isAuthenticated) {
+      message.destroy?.();
       message.warning('Vui lòng đăng nhập để lưu sản phẩm vào danh sách yêu thích');
       const currentPath = location.pathname + location.search;
       navigate(ROUTES.LOGIN, {
@@ -67,6 +69,10 @@ export default function WishlistButton({
       });
       return;
     }
+
+    // Chống bấm liên tục tạo hàng đợi thông báo
+    if (isUpdating) return;
+    setIsUpdating(true);
 
     // Trigger bounce micro-interaction
     setIsBouncing(true);
@@ -86,6 +92,7 @@ export default function WishlistButton({
     )
       .unwrap()
       .then((res) => {
+        message.destroy?.();
         if (res.isLiked) {
           message.success(name ? `Đã thêm ${name} vào danh sách yêu thích` : 'Đã thêm vào danh sách yêu thích');
           onToggle?.(true);
@@ -95,7 +102,11 @@ export default function WishlistButton({
         }
       })
       .catch((err) => {
+        message.destroy?.();
         message.error(typeof err === 'string' ? err : 'Không thể cập nhật danh sách yêu thích, vui lòng thử lại.');
+      })
+      .finally(() => {
+        setIsUpdating(false);
       });
   };
 

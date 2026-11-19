@@ -14,6 +14,8 @@ import {
 } from '@ant-design/icons';
 import { userService, formatFullAddress } from '@/services';
 import type { AddressItem, AddressRequest, AddressLabel } from '@/types/api';
+import { useAppDispatch } from '@/store/hooks';
+import { resetShipping } from '@/store/slices/checkoutSlice';
 
 const AddressModal = lazy(() => import('@/components/account/AddressModal'));
 
@@ -27,6 +29,7 @@ const LABEL_MAP: Record<AddressLabel, { text: string; color: string }> = {
 export default function AddressBookPage() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
+  const dispatch = useAppDispatch();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAddress, setEditingAddress] = useState<AddressItem | null>(null);
@@ -48,6 +51,7 @@ export default function AddressBookPage() {
     mutationFn: (data: AddressRequest) => userService.createAddress(data),
     onSuccess: () => {
       message.success('Thêm địa chỉ giao hàng thành công!');
+      dispatch(resetShipping());
       queryClient.invalidateQueries({ queryKey: ['addresses'] });
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       setModalOpen(false);
@@ -62,6 +66,7 @@ export default function AddressBookPage() {
       userService.updateAddress(id, data),
     onSuccess: () => {
       message.success('Cập nhật địa chỉ thành công!');
+      dispatch(resetShipping());
       queryClient.invalidateQueries({ queryKey: ['addresses'] });
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       setModalOpen(false);
@@ -76,6 +81,7 @@ export default function AddressBookPage() {
     mutationFn: (id: string | number) => userService.deleteAddress(id),
     onSuccess: () => {
       message.success('Đã xóa địa chỉ thành công!');
+      dispatch(resetShipping());
       queryClient.invalidateQueries({ queryKey: ['addresses'] });
       queryClient.invalidateQueries({ queryKey: ['profile'] });
     },
@@ -88,6 +94,7 @@ export default function AddressBookPage() {
     mutationFn: (id: string | number) => userService.setDefaultAddress(id),
     onSuccess: () => {
       message.success('Đã thiết lập địa chỉ mặc định!');
+      dispatch(resetShipping());
       queryClient.invalidateQueries({ queryKey: ['addresses'] });
       queryClient.invalidateQueries({ queryKey: ['profile'] });
     },

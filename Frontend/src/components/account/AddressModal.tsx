@@ -8,8 +8,10 @@ import {
   SearchOutlined,
   CheckCircleOutlined,
   InfoCircleOutlined,
+  QuestionCircleOutlined,
 } from '@ant-design/icons';
 import { Sparkles, MapPin, Home, Building2, Users, Navigation } from 'lucide-react';
+import LocationGuideModal from '@/components/common/LocationGuideModal';
 import { VIETNAM_PROVINCES, findMatchingProvince, parseAddressComponents } from '@/utils/provinces';
 import {
   getDistrictsForProvince,
@@ -61,7 +63,7 @@ export default function AddressModal({
   const [isLocatingAddress, setIsLocatingAddress] = useState(false);
   const [isLocatingCurrentGps, setIsLocatingCurrentGps] = useState(false);
   const [isEstimateLocation, setIsEstimateLocation] = useState(false);
-  const [showPermissionGuideModal, setShowPermissionGuideModal] = useState(false);
+  const [showLocationGuideModal, setShowLocationGuideModal] = useState(false);
   const hasUserOverriddenCoords = useRef(false);
 
   // Danh sách gợi ý Quận/Huyện tương ứng với Tỉnh/Thành phố đang chọn
@@ -306,7 +308,6 @@ export default function AddressModal({
       } else {
         form.resetFields();
         form.setFieldsValue({
-          province: 'Hà Nội',
           label: 'HOME',
           isDefault: false,
         });
@@ -450,14 +451,14 @@ export default function AddressModal({
 
     let pos: GeolocationPosition | null = null;
     try {
-      // Buoc 1: Thu lay toa do GPS do chinh xac cao (GPS phan cung neu co)
-      pos = await getPosition({ enableHighAccuracy: true, timeout: 6000, maximumAge: 30000 });
+      // Gọi trực tiếp navigator.geolocation. Trình duyệt Google Chrome sẽ tự động hiển thị popup native xin quyền
+      pos = await getPosition({ enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 });
     } catch (firstErr: unknown) {
       const err = firstErr as GeolocationPositionError;
       // Neu loi timeout (code 3) hoac khong kha dung (code 2), thu fallback sang do chinh xac tieu chuan (WiFi / IP)
       if (err?.code === 2 || err?.code === 3) {
         try {
-          pos = await getPosition({ enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 });
+          pos = await getPosition({ enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 });
         } catch {
           pos = null;
         }
@@ -466,10 +467,9 @@ export default function AddressModal({
       if (!pos) {
         setIsLocatingCurrentGps(false);
         if (err?.code === 1 || err?.code === (window.GeolocationPositionError?.PERMISSION_DENIED ?? 1)) {
-          setShowPermissionGuideModal(true);
           message.warning('Vui lòng bật quyền truy cập vị trí trên trình duyệt (ở biểu tượng ổ khóa bên trái thanh URL) để tự động điền địa chỉ.');
         } else if (err?.code === 3 || err?.code === (window.GeolocationPositionError?.TIMEOUT ?? 3)) {
-          message.warning('Hết thời gian chờ định vị GPS. Vui lòng thử lại.');
+          message.warning('Hết thời gian chờ định vị GPS. Vui lòng thử lại hoặc chọn vị trí trên bản đồ.');
         } else {
           message.warning('Không thể xác định vị trí hiện tại của thiết bị.');
         }
@@ -483,9 +483,6 @@ export default function AddressModal({
         message.error('Tọa độ vị trí hiện tại không hợp lệ.');
         return;
       }
-
-      // Tat modal huong dan neu dang mo
-      setShowPermissionGuideModal(false);
 
       // Phân tích chi tiết địa chỉ từ tọa độ GPS
       const details = await reverseGeocodeDetails(latitude, longitude);
@@ -544,7 +541,6 @@ export default function AddressModal({
 
     const handlePermChange = () => {
       if (permObj && permObj.state === 'granted') {
-        setShowPermissionGuideModal(false);
         handleUseCurrentLocation();
       }
     };
@@ -720,7 +716,7 @@ export default function AddressModal({
         title={
           <div className="flex items-center gap-2 text-lg font-bold text-gray-900 border-b border-gray-100 pb-3">
             <EnvironmentOutlined className="text-green-600" />
-            <span>{initialData ? 'Chỉnh sửa địa chỉ nhận hàng' : 'Thêm địa chỉ nhận hàng mới'}</span>
+            <span>{initialData?.id ? 'Chỉnh sửa địa chỉ nhận hàng' : 'Thêm địa chỉ nhận hàng mới'}</span>
           </div>
         }
       open={open}
@@ -736,7 +732,7 @@ export default function AddressModal({
         layout="vertical"
         onFinish={handleFinish}
         className="pt-2"
-        requiredMark="optional"
+        requiredMark={false}
       >
         {duplicateError && (
           <div
@@ -1014,17 +1010,6 @@ export default function AddressModal({
                 </Radio.Button>
               </Radio.Group>
             </Form.Item>
-
-            {/* Nút trỏ vị trí hiện tại cạnh mục Khác để người dùng không cần nhập địa chỉ hiện tại */}
-            <Button
-              type="default"
-              icon={<Navigation className="w-3.5 h-3.5 text-blue-600" />}
-              onClick={handleUseCurrentLocation}
-              loading={isLocatingCurrentGps}
-              className="!rounded-xl !border-blue-200 !bg-blue-50/80 !text-blue-700 hover:!bg-blue-100 hover:!border-blue-400 !font-medium !text-xs !h-8 !px-3 shadow-2xs"
-            >
-              Vị trí hiện tại
-            </Button>
           </div>
         </Form.Item>
 
@@ -1043,7 +1028,7 @@ export default function AddressModal({
                 loading={isLocatingCurrentGps}
                 className="!rounded-lg !text-xs !border-blue-500 !text-blue-600 hover:!bg-blue-50 font-medium"
               >
-                Định vị GPS hiện tại
+                Vị trí hiện tại
               </Button>
               <Button
                 size="small"
@@ -1053,6 +1038,14 @@ export default function AddressModal({
                 className="!rounded-lg !text-xs !border-green-600 !text-green-600 hover:!bg-green-50 self-start sm:self-auto"
               >
                 Định vị từ địa chỉ đã nhập
+              </Button>
+              <Button
+                size="small"
+                icon={<QuestionCircleOutlined className="text-amber-500" />}
+                onClick={() => setShowLocationGuideModal(true)}
+                className="!rounded-lg !text-xs !border-amber-300 !text-amber-700 hover:!bg-amber-50 font-medium"
+              >
+                Hướng dẫn bật vị trí
               </Button>
             </div>
           </div>
@@ -1118,7 +1111,7 @@ export default function AddressModal({
         {/* Note */}
         <Form.Item
           name="note"
-          label={<span className="text-sm font-medium text-gray-700">Ghi chú giao hàng (Tùy chọn)</span>}
+          label={<span className="text-sm font-medium text-gray-700">Ghi chú giao hàng</span>}
           rules={[{ max: 200, message: 'Ghi chú tối đa 200 ký tự' }]}
         >
           <Input.TextArea
@@ -1156,111 +1149,17 @@ export default function AddressModal({
             loading={loading}
             className="!h-10 !rounded-xl !bg-green-600 !px-6 !font-semibold hover:!bg-green-700 shadow-sm"
           >
-            {initialData ? 'Cập nhật địa chỉ' : 'Thêm địa chỉ'}
+            {initialData?.id ? 'Cập nhật địa chỉ' : 'Thêm địa chỉ'}
           </Button>
         </div>
       </Form>
     </Modal>
 
-    {/* Modal huong dan vi tri can bam khi trinh duyet chan quyen vi tri */}
-    <Modal
-      open={showPermissionGuideModal}
-      onCancel={() => setShowPermissionGuideModal(false)}
-      footer={null}
-      centered
-      width={460}
-      title={
-        <div className="flex items-center gap-2 text-base font-bold text-gray-900 border-b border-gray-100 pb-3">
-          <EnvironmentOutlined className="text-blue-600" />
-          <span>Hướng dẫn bật quyền vị trí trên trình duyệt</span>
-        </div>
-      }
-    >
-      <div className="py-2 space-y-3.5">
-        <p className="text-xs text-gray-600 leading-relaxed">
-          Trình duyệt đang chặn định vị GPS. Bạn chỉ cần thực hiện 2 bước đơn giản để bật:
-        </p>
-
-        {/* Buoc 1: Mo phong thanh dia chi trinh duyet */}
-        <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3 space-y-1.5">
-          <div className="flex items-center gap-2 text-xs font-bold text-blue-900">
-            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-white text-[10px]">1</span>
-            <span>Nhìn lên góc trên bên trái thanh địa chỉ trình duyệt:</span>
-          </div>
-          <div className="rounded-lg bg-gray-900 px-3 py-2 text-xs text-white font-mono flex items-center justify-between shadow-inner">
-            <div className="flex items-center gap-2">
-              <span className="rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white animate-pulse">
-                Nhấp vào đây
-              </span>
-              <span className="text-gray-300">
-                (i) {typeof window !== 'undefined' ? window.location.host : 'localhost:5173'}
-              </span>
-            </div>
-            <span className="text-gray-500 text-[10px]">Thanh URL</span>
-          </div>
-          <p className="text-[11px] text-gray-600 pl-6">
-            Nhấp chuột vào biểu tượng <strong>(i)</strong> hoặc biểu tượng <strong>Ổ khóa</strong> ở bên trái địa chỉ web.
-          </p>
-        </div>
-
-        {/* Buoc 2: Bam Reset permission hoac gat BAT Location */}
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-1.5">
-          <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
-            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-gray-700 text-white text-[10px]">2</span>
-            <span>Trong bảng cài đặt mở ra:</span>
-          </div>
-          <div className="rounded-lg bg-white border border-gray-200 p-2.5 text-xs space-y-2 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-700 font-medium">Bấm vào nút:</span>
-              <span className="rounded-full border border-blue-500 text-blue-600 font-bold px-2.5 py-0.5 text-[11px]">
-                Reset permission
-              </span>
-            </div>
-            <div className="flex items-center justify-between border-t border-gray-100 pt-1.5 text-gray-500">
-              <span>Hoặc gạt mục Vị trí (Location):</span>
-              <span className="rounded bg-green-100 text-green-800 font-bold px-2 py-0.5 text-[11px]">
-                Gạt sang BẬT
-              </span>
-            </div>
-          </div>
-          <div className="rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-[11px] text-amber-800 leading-normal">
-            <strong>Mẹo áp dụng ngay:</strong> Trên Google Chrome, sau khi gạt Bật ở ổ khóa, trình duyệt cần <strong>tải lại trang (F5)</strong> để áp dụng quyền mới. Hãy bấm nút <strong>Tải lại trang (F5)</strong> bên dưới để hệ thống tự động tải lại và lấy vị trí ngay. Nếu dùng máy tính bàn/laptop Windows, hãy kiểm tra thêm mục <em>Cài đặt Windows &gt; Quyền riêng tư (Privacy) &gt; Vị trí (Location)</em> cũng đang được Bật.
-          </div>
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100">
-          <Button onClick={() => setShowPermissionGuideModal(false)} className="!rounded-xl text-xs">
-            Đóng
-          </Button>
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => {
-                if (typeof window !== 'undefined') {
-                  sessionStorage.setItem('gp_auto_locate_on_reload', 'true');
-                  sessionStorage.setItem('gp_auto_open_address_modal', 'true');
-                  window.location.reload();
-                }
-              }}
-              className="!rounded-xl text-xs font-semibold !text-blue-600 !border-blue-300 hover:!bg-blue-50"
-            >
-              Tải lại trang (F5)
-            </Button>
-            <Button
-              type="primary"
-              loading={isLocatingCurrentGps}
-              onClick={async () => {
-                setShowPermissionGuideModal(false);
-                await handleUseCurrentLocation();
-              }}
-              className="!rounded-xl !bg-blue-600 hover:!bg-blue-700 text-xs font-semibold"
-            >
-              Tôi đã bật, định vị ngay
-            </Button>
-          </div>
-        </div>
-      </div>
-    </Modal>
+    <LocationGuideModal
+      open={showLocationGuideModal}
+      onClose={() => setShowLocationGuideModal(false)}
+      onRetryLocate={handleUseCurrentLocation}
+    />
   </>
-);
+  );
 }

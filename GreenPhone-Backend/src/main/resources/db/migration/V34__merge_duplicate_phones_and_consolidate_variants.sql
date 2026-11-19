@@ -24,6 +24,7 @@ WHERE v.id = 9;
 
 -- Di chuyển các bảng liên kết từ variant 647 sang variant 9 để bảo toàn đơn hàng và lịch sử giao dịch
 UPDATE `order_detail` SET `phone_variant_id` = 9 WHERE `phone_variant_id` = 647;
+UPDATE `purchase_order_item` SET `phone_variant_id` = 9 WHERE `phone_variant_id` = 647;
 UPDATE `warehouse_stock_history` SET `phone_variant_id` = 9 WHERE `phone_variant_id` = 647;
 UPDATE `inventory_stock_history` SET `phone_variant_id` = 9 WHERE `phone_variant_id` = 647;
 UPDATE `warehouse_transfer_item` SET `phone_variant_id` = 9 WHERE `phone_variant_id` = 647;

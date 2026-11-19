@@ -53,6 +53,7 @@ export default function WishlistPage() {
 
   const handleRemove = (productId: string, name?: string) => {
     dispatch(removeFromWishlist(productId));
+    message.destroy?.();
     message.info(name ? `Đã xóa ${name} khỏi danh sách yêu thích` : 'Đã xóa khỏi danh sách yêu thích');
   };
 

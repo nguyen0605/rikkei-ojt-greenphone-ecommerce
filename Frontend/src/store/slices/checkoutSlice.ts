@@ -72,6 +72,10 @@ const checkoutSlice = createSlice({
       state.userPromotionId = undefined;
       state.voucherCode = undefined;
       state.voucherDiscount = 0;
+      state.shipping = { ...initialState.shipping };
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('gp_checkout_selected_address_id');
+      }
       persistBuyNowItem(action.payload);
     },
     clearBuyNow: (state) => {
@@ -128,9 +132,21 @@ const checkoutSlice = createSlice({
       state.orderId = action.payload.orderId;
       state.completedAt = new Date().toISOString();
       state.buyNowItem = undefined;
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('gp_checkout_selected_address_id');
+      }
       persistBuyNowItem(undefined);
     },
+    resetShipping: (state) => {
+      state.shipping = { ...initialState.shipping };
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('gp_checkout_selected_address_id');
+      }
+    },
     resetCheckout: () => {
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('gp_checkout_selected_address_id');
+      }
       persistBuyNowItem(undefined);
       return {
         ...initialState,
@@ -148,6 +164,7 @@ export const {
   nextStep,
   prevStep,
   updateShipping,
+  resetShipping,
   setDelivery,
   setPayment,
   applyCheckoutVoucher,
