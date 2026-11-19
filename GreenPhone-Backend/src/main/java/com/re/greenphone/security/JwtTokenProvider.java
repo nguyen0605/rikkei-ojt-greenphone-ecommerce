@@ -36,6 +36,7 @@ public class JwtTokenProvider {
                 : "ROLE_CUSTOMER";
 
         var builder = Jwts.builder()
+                .id(java.util.UUID.randomUUID().toString())
                 .subject(userPrincipal.getUsername())
                 .claim("userId", userPrincipal.getId())
                 .claim("fullName", userPrincipal.getFullName())
@@ -90,6 +91,18 @@ public class JwtTokenProvider {
             return null;
         } catch (Exception e) {
             log.debug("Failed to extract sessionId from token: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    public String getJtiFromToken(String token) {
+        try {
+            Claims claims = parseClaims(token);
+            return claims.getId();
+        } catch (ExpiredJwtException e) {
+            return e.getClaims() != null ? e.getClaims().getId() : null;
+        } catch (Exception e) {
+            log.debug("Failed to extract jti from token: {}", e.getMessage());
             return null;
         }
     }

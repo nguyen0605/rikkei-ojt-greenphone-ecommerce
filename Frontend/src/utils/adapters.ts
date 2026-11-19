@@ -1,5 +1,6 @@
 import type { PhoneDTO, PhoneVariantDTO, BrandDTO } from '@/types/api';
 import type { Product, BrandInfo } from '@/types';
+import { getBrandLogoUrl } from '@/utils/brandLogos';
 
 export function phoneToProduct(phone: PhoneDTO, variants: PhoneVariantDTO[]): Product {
   const cheapest = variants.reduce((a, b) => (b.discountPrice || b.price) < (a.discountPrice || a.price) ? b : a, variants[0]);
@@ -35,7 +36,7 @@ export function brandToBrandInfo(brand: BrandDTO): BrandInfo {
   return {
     id: String(brand.id),
     name: brand.name,
-    logo: brand.logoUrl || '',
+    logo: getBrandLogoUrl(brand.name, brand.logoUrl) || '',
     href: `/san-pham?brand=${brand.id}`,
     productCount: 0,
   };

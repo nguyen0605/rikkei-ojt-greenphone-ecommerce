@@ -12,7 +12,7 @@ public interface AdminStaffService {
 
     StaffDTO getStaffDetail(Long id);
 
-    StaffDTO createStaff(CreateStaffRequest request);
+    StaffDTO createStaff(CreateStaffRequest request, String currentUsername);
 
     StaffDTO updateStaffRole(Long id, UpdateStaffRoleRequest request, String currentUsername);
 

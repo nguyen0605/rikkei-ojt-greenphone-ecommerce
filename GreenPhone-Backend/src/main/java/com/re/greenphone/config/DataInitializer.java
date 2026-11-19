@@ -63,13 +63,13 @@ public class DataInitializer implements CommandLineRunner {
 
         log.info("No brand data found — seeding sample data...");
 
-        // 1. Brands
-        Brand apple     = brandRepository.save(newBrand("Apple",     "https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg"));
-        Brand samsung   = brandRepository.save(newBrand("Samsung",   "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT8B1TcHuGgrDXF8o__I_LqtKyJXIHAANU9gK3x9qtHyg&s=10"));
-        Brand xiaomi    = brandRepository.save(newBrand("Xiaomi",    "https://upload.wikimedia.org/wikipedia/commons/a/ae/Xiaomi_logo_%282021-%29.svg"));
-        Brand oppo      = brandRepository.save(newBrand("OPPO",      "https://upload.wikimedia.org/wikipedia/commons/a/a2/OPPO_LOGO_2019.png"));
-        Brand realme    = brandRepository.save(newBrand("Realme",    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS3rHDOe64vJVdUTI2uXONCBRTw5Joj__at6t4rR3dzxg&s=10"));
-        Brand vivo      = brandRepository.save(newBrand("Vivo",      "https://crystalpng.com/wp-content/uploads/2025/05/vivo-logo.png"));
+        // 1. Brands with Cloudflare R2 logos
+        Brand apple     = brandRepository.save(newBrand("Apple",     "https://pub-df08b62e1cfd4f979be4298a44bb0da0.r2.dev/brands/Apple.webp"));
+        Brand samsung   = brandRepository.save(newBrand("Samsung",   "https://pub-df08b62e1cfd4f979be4298a44bb0da0.r2.dev/brands/samsung.avif"));
+        Brand xiaomi    = brandRepository.save(newBrand("Xiaomi",    "https://pub-df08b62e1cfd4f979be4298a44bb0da0.r2.dev/brands/Xiaomi.webp"));
+        Brand oppo      = brandRepository.save(newBrand("OPPO",      "https://pub-df08b62e1cfd4f979be4298a44bb0da0.r2.dev/brands/OPPO.webp"));
+        Brand realme    = brandRepository.save(newBrand("Realme",    "https://pub-df08b62e1cfd4f979be4298a44bb0da0.r2.dev/products/a0c253690c4c5025f1b59dc17e497d32.png"));
+        Brand vivo      = brandRepository.save(newBrand("Vivo",      "https://pub-df08b62e1cfd4f979be4298a44bb0da0.r2.dev/products/85d834d65acd030de8a244f9c42ea47f.png"));
 
         // 2. Roles — reuse pre-seeded roles from greenphone.sql, create only if missing
         Role customerRole = roleRepository.findByName("CUSTOMER")

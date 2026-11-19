@@ -8,6 +8,7 @@ import {
   UserOutlined, PlusOutlined, SearchOutlined, LockOutlined, UnlockOutlined,
   EditOutlined,
 } from '@ant-design/icons';
+import { useAppSelector } from '@/store/hooks';
 import { adminStaffService } from '@/services/adminStaffService';
 import type { StaffDTO } from '@/types/api';
 import AdminPageHeader from '@/components/admin/AdminPageHeader';
@@ -27,6 +28,9 @@ const ROLE_FILTER_OPTIONS = [
 
 export default function AdminStaffPage() {
   const qc = useQueryClient();
+  const { user: currentUser } = useAppSelector((s) => s.auth);
+  const isSuperAdmin = currentUser?.id === 1 || currentUser?.email?.toLowerCase() === 'admin@greenphone.vn';
+
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
@@ -125,57 +129,120 @@ export default function AdminStaffPage() {
       title: 'Thao tác',
       width: 140,
       align: 'center',
-      render: (_: unknown, record: StaffDTO) => (
-        <Space size="small">
-          <Tooltip title="Điều chỉnh vai trò">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => setRoleModalStaff(record)}
-              className="!text-ink-2 hover:!text-primary-600 hover:!bg-primary-50 !rounded-lg"
-            />
-          </Tooltip>
+      render: (_: unknown, record: StaffDTO) => {
+        const isSelf = !!currentUser && (currentUser.id === record.id || currentUser.email?.toLowerCase() === record.email?.toLowerCase());
+        const isRecordSuperAdmin = record.id === 1 || record.email?.toLowerCase() === 'admin@greenphone.vn';
+        const isRecordAdmin = record.role === 'ROLE_ADMIN' || record.role === 'ADMIN';
 
-          {record.status === 'ACTIVE' ? (
-            <Popconfirm
-              title="Khóa tài khoản nhân viên"
-              description={`Bạn có chắc muốn khóa tài khoản "${record.fullName}"?`}
-              onConfirm={() => statusMutation.mutate({ id: record.id, status: 'BLOCKED' })}
-              okText="Khóa tài khoản"
-              cancelText="Hủy"
-              okButtonProps={{ danger: true }}
-            >
-              <Tooltip title="Khóa tài khoản">
+        // Quyền sửa vai trò:
+        let canEditRole = true;
+        let editTooltip = 'Điều chỉnh vai trò';
+        if (isRecordSuperAdmin) {
+          canEditRole = false;
+          editTooltip = 'Quản trị viên tối cao - Quyền hạn bất khả xâm phạm';
+        } else if (isSelf) {
+          canEditRole = false;
+          editTooltip = 'Không thể tự thay đổi vai trò của chính mình';
+        } else if (isRecordAdmin && !isSuperAdmin) {
+          canEditRole = false;
+          editTooltip = 'Chỉ Quản trị viên tối cao mới có thể điều chỉnh quyền của Quản trị viên khác';
+        }
+
+        // Quyền khóa / mở khóa:
+        let canToggleStatus = true;
+        let statusTooltip = record.status === 'ACTIVE' ? 'Khóa tài khoản' : 'Mở khóa tài khoản';
+        if (isRecordSuperAdmin) {
+          canToggleStatus = false;
+          statusTooltip = 'Tài khoản Quản trị viên tối cao không thể bị khóa';
+        } else if (isSelf) {
+          canToggleStatus = false;
+          statusTooltip = 'Không thể tự khóa tài khoản của chính mình';
+        } else if (isRecordAdmin && !isSuperAdmin) {
+          canToggleStatus = false;
+          statusTooltip = 'Chỉ Quản trị viên tối cao mới có thể khóa tài khoản Quản trị viên khác';
+        }
+
+        return (
+          <Space size="small">
+            <Tooltip title={editTooltip}>
+              <span>
                 <Button
                   type="text"
                   size="small"
-                  icon={<LockOutlined />}
-                  danger
-                  className="hover:!bg-red-50 !rounded-lg"
+                  icon={<EditOutlined />}
+                  disabled={!canEditRole}
+                  onClick={() => setRoleModalStaff(record)}
+                  className="!text-ink-2 hover:!text-primary-600 hover:!bg-primary-50 !rounded-lg disabled:!opacity-40 disabled:!cursor-not-allowed"
                 />
+              </span>
+            </Tooltip>
+
+            {record.status === 'ACTIVE' ? (
+              canToggleStatus ? (
+                <Popconfirm
+                  title="Khóa tài khoản nhân viên"
+                  description={`Bạn có chắc muốn khóa tài khoản "${record.fullName}"?`}
+                  onConfirm={() => statusMutation.mutate({ id: record.id, status: 'BLOCKED' })}
+                  okText="Khóa tài khoản"
+                  cancelText="Hủy"
+                  okButtonProps={{ danger: true }}
+                >
+                  <Tooltip title={statusTooltip}>
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<LockOutlined />}
+                      danger
+                      className="hover:!bg-red-50 !rounded-lg"
+                    />
+                  </Tooltip>
+                </Popconfirm>
+              ) : (
+                <Tooltip title={statusTooltip}>
+                  <span>
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<LockOutlined />}
+                      disabled
+                      className="!rounded-lg !opacity-40 !cursor-not-allowed text-gray-400"
+                    />
+                  </span>
+                </Tooltip>
+              )
+            ) : canToggleStatus ? (
+              <Popconfirm
+                title="Mở khóa tài khoản nhân viên"
+                description={`Bạn có chắc muốn kích hoạt lại tài khoản "${record.fullName}"?`}
+                onConfirm={() => statusMutation.mutate({ id: record.id, status: 'ACTIVE' })}
+                okText="Kích hoạt lại"
+                cancelText="Hủy"
+              >
+                <Tooltip title={statusTooltip}>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<UnlockOutlined />}
+                    className="!text-emerald-600 hover:!bg-emerald-50 !rounded-lg"
+                  />
+                </Tooltip>
+              </Popconfirm>
+            ) : (
+              <Tooltip title={statusTooltip}>
+                <span>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<UnlockOutlined />}
+                    disabled
+                    className="!rounded-lg !opacity-40 !cursor-not-allowed text-gray-400"
+                  />
+                </span>
               </Tooltip>
-            </Popconfirm>
-          ) : (
-            <Popconfirm
-              title="Mở khóa tài khoản nhân viên"
-              description={`Bạn có chắc muốn kích hoạt lại tài khoản "${record.fullName}"?`}
-              onConfirm={() => statusMutation.mutate({ id: record.id, status: 'ACTIVE' })}
-              okText="Kích hoạt lại"
-              cancelText="Hủy"
-            >
-              <Tooltip title="Mở khóa tài khoản">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<UnlockOutlined />}
-                  className="!text-emerald-600 hover:!bg-emerald-50 !rounded-lg"
-                />
-              </Tooltip>
-            </Popconfirm>
-          )}
-        </Space>
-      ),
+            )}
+          </Space>
+        );
+      },
     },
   ];
 

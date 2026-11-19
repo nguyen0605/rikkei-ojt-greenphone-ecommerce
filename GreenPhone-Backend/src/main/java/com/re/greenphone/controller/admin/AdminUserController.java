@@ -33,7 +33,11 @@ public class AdminUserController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}/status")
-    public ResponseEntity<ApiResponse<?>> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(ApiResponse.success(adminUserService.updateUserStatus(id, body.get("status"))));
+    public ResponseEntity<ApiResponse<?>> updateStatus(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body,
+            org.springframework.security.core.Authentication authentication) {
+        String currentUsername = authentication != null ? authentication.getName() : null;
+        return ResponseEntity.ok(ApiResponse.success(adminUserService.updateUserStatus(id, body.get("status"), currentUsername)));
     }
 }

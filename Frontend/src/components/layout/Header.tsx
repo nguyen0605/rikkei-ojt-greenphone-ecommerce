@@ -16,6 +16,7 @@ import BrandLogo from '@/components/common/BrandLogo';
 import HeaderSearch from '@/components/layout/HeaderSearch';
 import BrandDropdown from '@/components/layout/BrandDropdown';
 import NotificationBell from '@/components/layout/NotificationBell';
+import { authService } from '@/services/authService';
 import { getStoredCompareSlots, COMPARE_UPDATED_EVENT } from '@/services/phoneComparisonService';
 const navItems = [
   { key: 'home', label: 'Trang chủ', href: '/' },
@@ -66,6 +67,20 @@ export default function Header() {
       window.removeEventListener('storage', updateCount);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const verifySession = () => {
+      authService.me().catch(() => {});
+    };
+    verifySession();
+    window.addEventListener('focus', verifySession);
+    const interval = setInterval(verifySession, 30000);
+    return () => {
+      window.removeEventListener('focus', verifySession);
+      clearInterval(interval);
+    };
+  }, [isAuthenticated]);
 
   const handleLogout = () => {
     dispatch(logout());
