@@ -122,6 +122,32 @@ export default function AdminOrdersPage() {
     });
   };
 
+  // Xác nhận chuyển trạng thái đơn hàng
+  const handleOrderStatusChange = (orderId: number, nextStatus: string, currentStatus: string) => {
+    if (nextStatus === currentStatus) return;
+
+    if (nextStatus === 'CANCELLED') {
+      const order = data?.content?.find((o) => o.id === orderId);
+      if (order) {
+        handleOpenCancelModal(order);
+      }
+      return;
+    }
+
+    const currentLabel = ORDER_STATUS_LABEL[currentStatus] || currentStatus;
+    const nextLabel = ORDER_STATUS_LABEL[nextStatus] || nextStatus;
+
+    Modal.confirm({
+      title: 'Xác nhận chuyển trạng thái đơn hàng',
+      content: `Bạn có chắc chắn muốn chuyển trạng thái đơn hàng #${orderId} từ "${currentLabel}" sang "${nextLabel}"?`,
+      okText: 'Xác nhận',
+      cancelText: 'Hủy bỏ',
+      onOk: () => {
+        statusMut.mutate({ id: orderId, status: nextStatus });
+      },
+    });
+  };
+
   // Xử lý mở Drawer chi tiết
   const handleOpenDetail = (order: OrderDTO) => {
     setSelectedOrderId(order.id);
@@ -254,13 +280,7 @@ export default function AdminOrdersPage() {
               value={s}
               style={{ width: 140 }}
               disabled={isTerminal}
-              onChange={(v) => {
-                if (v === 'CANCELLED') {
-                  handleOpenCancelModal(r);
-                } else {
-                  statusMut.mutate({ id: r.id, status: v });
-                }
-              }}
+              onChange={(v) => handleOrderStatusChange(r.id, v, s)}
               options={options}
             />
           </div>
@@ -345,10 +365,18 @@ export default function AdminOrdersPage() {
         onClose={() => setIsDrawerOpen(false)}
         onOpenCancelModal={(order) => handleOpenCancelModal(order)}
         onConfirmOrder={(order) => {
-          statusMut.mutate(
-            { id: order.id, status: 'CONFIRMED' },
-            { onSuccess: () => setIsDrawerOpen(false) }
-          );
+          Modal.confirm({
+            title: 'Xác nhận duyệt đơn hàng',
+            content: `Bạn có chắc chắn muốn duyệt và chuyển đơn hàng #${order.id} sang trạng thái "Đã xác nhận"?`,
+            okText: 'Xác nhận duyệt',
+            cancelText: 'Hủy bỏ',
+            onOk: () => {
+              statusMut.mutate(
+                { id: order.id, status: 'CONFIRMED' },
+                { onSuccess: () => setIsDrawerOpen(false) }
+              );
+            },
+          });
         }}
         isConfirming={statusMut.isPending}
       />
