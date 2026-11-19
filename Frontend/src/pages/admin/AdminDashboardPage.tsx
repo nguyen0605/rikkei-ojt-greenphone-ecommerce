@@ -6,14 +6,14 @@ import { AppstoreOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircle
 import DashboardMetricCard, { type MetricTone } from '@/components/admin/dashboard/DashboardMetricCard';
 import '@/components/admin/dashboard/dashboard.css';
 import dayjs, { type Dayjs } from 'dayjs';
-import * as XLSX from 'xlsx';
-import { jsPDF } from 'jspdf';
+import { formatVND } from '@/utils';
 import { adminStatisticsService } from '@/services/adminStatisticsService';
 import { useAppSelector } from '@/store/hooks';
-import { formatVND } from '@/utils';
 import FinancialKpiCards from '@/components/admin/dashboard/FinancialKpiCards';
 import RevenueLineChart from '@/components/admin/dashboard/RevenueLineChart';
 import PaymentMethodPieChart from '@/components/admin/dashboard/PaymentMethodPieChart';
+import DashboardPdfPreviewModal from '@/components/admin/dashboard/DashboardPdfPreviewModal';
+import { exportDashboardExcel, downloadDashboardPdf } from '@/utils/dashboardExportUtils';
 
 function KeyboardAccessibleTable(props: ComponentPropsWithRef<'table'>) {
   return <table {...props} tabIndex={0} aria-label="Bảng sản phẩm bán chạy, dùng phím mũi tên để cuộn" />;
@@ -27,6 +27,7 @@ export default function AdminDashboardPage() {
   const staff = ['ADMIN', 'SALES', 'MARKETING', 'WAREHOUSE'].includes(role ?? '');
   const canViewRevenue = ['ADMIN', 'SALES', 'MARKETING'].includes(role ?? '');
   const [month, setMonth] = useState<Dayjs>(dayjs());
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
   const from = month.startOf('month').toISOString().replace('Z', '');
   const to = month.startOf('month').add(1, 'month').toISOString().replace('Z', '');
   const scope = [user?.id, role, from, to];
@@ -60,25 +61,40 @@ export default function AdminDashboardPage() {
     { label: 'Biên lợi nhuận', value: financial.profitMarginPercentage == null ? 'Chưa đủ dữ liệu' : `${financial.profitMarginPercentage}%` },
     { label: 'Tiền hoàn trả', value: financial.refundAmount, monetary: true },
   );
-  const exportRows = rows.map(({ label, value }) => ({ 'Chỉ số': label, 'Giá trị': value }));
-  const topRows = (top.data ?? []).map((p, index) => ({ Top: index + 1, 'Sản phẩm': p.phoneName, 'Hãng': p.brandName, 'Đã bán': p.soldQuantity }));
   const filename = `dashboard-${month.format('YYYY-MM')}`;
+
   function exportExcel() {
-    const book = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(exportRows), 'Chỉ số');
-    XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(topRows), 'Top bán chạy');
-    XLSX.writeFile(book, `${filename}.xlsx`);
+    exportDashboardExcel({
+      month,
+      filename,
+      role,
+      userFullName: user?.fullName,
+      rows,
+      topProducts: top.data ?? [],
+      financial,
+      points,
+      isAdmin,
+      canViewRevenue,
+    });
   }
+
+  function downloadPdf() {
+    downloadDashboardPdf({
+      month,
+      filename,
+      role,
+      userFullName: user?.fullName,
+      rows,
+      topProducts: top.data ?? [],
+      financial,
+      points,
+      isAdmin,
+      canViewRevenue,
+    });
+  }
+
   function exportPdf() {
-    const canvas = document.createElement('canvas'); canvas.width = 1500; canvas.height = 1900;
-    const context = canvas.getContext('2d'); if (!context) return;
-    context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = '#16352a'; context.font = 'bold 32px sans-serif';
-    context.fillText(`GreenPhone — Tổng quan ${month.format('MM/YYYY')}`, 60, 70); context.font = '24px sans-serif';
-    rows.forEach((row, index) => context.fillText(`${row.label}: ${row.monetary && typeof row.value === 'number' ? formatVND(row.value) : row.value}`, 60, 135 + index * 42));
-    const offset = 170 + rows.length * 42; context.fillText('Top sản phẩm bán chạy', 60, offset);
-    (top.data ?? []).forEach((p, index) => context.fillText(`${index + 1}. ${p.phoneName} — ${p.soldQuantity}`, 60, offset + 45 + index * 42, 1380));
-    const pdf = new jsPDF(); pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, 210, 266); pdf.save(`${filename}.pdf`);
+    setPdfPreviewOpen(true);
   }
   if (!staff) return <Alert type="warning" title="Bạn không có quyền xem thống kê" />;
   const operations = [
@@ -130,5 +146,17 @@ export default function AdminDashboardPage() {
         { title: 'Đã bán', dataIndex: 'soldQuantity', align: 'right', render: (quantity: number) => <span className="dashboard-sold">{quantity}</span> },
       ]} />
     </Card>
+    <DashboardPdfPreviewModal
+      open={pdfPreviewOpen}
+      onClose={() => setPdfPreviewOpen(false)}
+      onDownload={downloadPdf}
+      month={month}
+      rows={rows}
+      topProducts={top.data ?? []}
+      financial={financial}
+      role={role}
+      userFullName={user?.fullName}
+      filename={filename}
+    />
   </div>;
 }

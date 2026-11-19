@@ -62,6 +62,8 @@ describe('Dashboard role security', () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,demo');
     mount(); await waitFor(() => expect(screen.getByRole('button', { name: 'Xuất PDF' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Xuất PDF' }));
+    expect(await screen.findByText('Xem trước báo cáo PDF')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Tải xuống PDF' }));
     const text = JSON.stringify(fillText.mock.calls);
     if (role === 'ROLE_ADMIN') expect(text).toContain('COGS');
     else expect(text).not.toMatch(/COGS|Lợi nhuận|Biên lợi nhuận/);

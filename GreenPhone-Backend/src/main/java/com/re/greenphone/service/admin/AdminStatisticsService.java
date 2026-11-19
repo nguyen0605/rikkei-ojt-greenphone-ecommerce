@@ -127,8 +127,21 @@ public class AdminStatisticsService {
         }
         BigDecimal profit = missing>0 ? null : net.subtract(cogs);
         BigDecimal margin = profit == null ? null : net.signum()==0 ? BigDecimal.ZERO : profit.multiply(BigDecimal.valueOf(100)).divide(net,2,RoundingMode.HALF_UP);
-        var methods = orderRepository.paymentBreakdown(range[0],range[1]).stream()
-                .map(row -> new PaymentMethodBreakdown((String)row[0],decimal(row[1]))).toList();
+        var rawMethods = orderRepository.paymentBreakdown(range[0], range[1]);
+        BigDecimal totalMethodRevenue = BigDecimal.ZERO;
+        for (Object[] row : rawMethods) {
+            totalMethodRevenue = totalMethodRevenue.add(decimal(row[1]));
+        }
+        final BigDecimal totalRev = totalMethodRevenue;
+        var methods = rawMethods.stream().map(row -> {
+            String method = row[0] != null ? row[0].toString() : "UNKNOWN";
+            BigDecimal rev = decimal(row[1]);
+            long count = row.length > 2 && row[2] != null ? ((Number) row[2]).longValue() : 0L;
+            BigDecimal pct = (totalRev.signum() > 0)
+                    ? rev.multiply(BigDecimal.valueOf(100)).divide(totalRev, 2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+            return new PaymentMethodBreakdown(method, rev, count, pct);
+        }).toList();
         return new FinancialReportDTO(gross,discounts,shipping,net,
                 missing>0 ? null : cogs,profit,margin,refunded,missing,range[0].toString(),range[1].toString(),points,methods);
     }
