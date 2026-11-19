@@ -26,6 +26,8 @@ public interface WarrantyRepository extends JpaRepository<Warranty, Long> {
 
     boolean existsByOrderId(Long orderId);
 
+    boolean existsByPhoneVariantId(Long phoneVariantId);
+
     @Query("SELECT DISTINCT w FROM Warranty w " +
            "LEFT JOIN FETCH w.phoneVariant pv " +
            "LEFT JOIN FETCH pv.phone p " +
