@@ -183,8 +183,17 @@ export default function RegisterPage() {
           name="password"
           rules={[
             { required: true, message: 'Vui lòng nhập mật khẩu' },
-            { min: 6, message: 'Mật khẩu phải có ít nhất 6 ký tự' },
+            { min: 6, message: 'Mật khẩu tối thiểu 6 ký tự' },
             { max: 64, message: 'Mật khẩu không được vượt quá 64 ký tự' },
+            () => ({
+              validator(_, value) {
+                if (!value) return Promise.resolve();
+                if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(value)) {
+                  return Promise.reject(new Error('Mật khẩu cần chứa cả chữ cái và số'));
+                }
+                return Promise.resolve();
+              },
+            }),
           ]}
           extra={
             showStrength ? <PasswordStrength password={password} /> : null
@@ -195,7 +204,7 @@ export default function RegisterPage() {
             maxLength={64}
             prefix={<Lock className="h-4 w-4 text-gray-400" />}
             type={showPassword ? 'text' : 'password'}
-            placeholder="Nhập mật khẩu"
+            placeholder="Tối thiểu 6 ký tự, gồm cả chữ và số"
             className="!h-12 !rounded-xl"
             autoComplete="new-password"
             suffix={
