@@ -4,7 +4,7 @@
  * Hỗ trợ gợi ý tự động (Autocomplete) và kiểm tra tính hợp lệ của địa chỉ giao hàng.
  */
 
-import { VIETNAM_PROVINCES, findMatchingProvince } from './provinces';
+import { VIETNAM_PROVINCES, findMatchingProvince, parseAddressComponents } from './provinces';
 
 export interface DistrictData {
   name: string;
@@ -1003,6 +1003,80 @@ export function getWardsForDistrict(
 }
 
 /**
+ * Chuẩn hóa và tìm tên Quận / Huyện chính thức theo Tỉnh / Thành phố
+ */
+export function findMatchingDistrict(
+  districtName?: string | null,
+  provinceName?: string | null
+): string | undefined {
+  if (!districtName || !provinceName) return undefined;
+  const matchedProv = findMatchingProvince(provinceName);
+  if (!matchedProv) return undefined;
+
+  const validDistricts = getDistrictsForProvince(matchedProv);
+  if (validDistricts.length === 0) return undefined;
+
+  const normTarget = normalizeAdminName(districtName);
+  if (!normTarget) return undefined;
+
+  // Danh sách các từ khóa TUYỆT ĐỐI KHÔNG PHẢI là Quận/Huyện:
+  const INVALID_DISTRICT_KEYWORDS = [
+    'saigon', 'sai gon', 'sai gòn', 'sài gòn',
+    'ho chi minh', 'hồ chí minh', 'tp ho chi minh', 'tp hcm', 'hcmc',
+    'ha noi', 'hà nội', 'da nang', 'đà nẵng', 'hai phong', 'hải phòng', 'can tho', 'cần thơ',
+    'vietnam', 'việt nam', 'vn'
+  ];
+  if (INVALID_DISTRICT_KEYWORDS.includes(normTarget)) {
+    return undefined;
+  }
+
+  // Xử lý các bí danh đặc thù cho TP. Hồ Chí Minh
+  if (matchedProv === 'TP. Hồ Chí Minh') {
+    if (
+      normTarget === 'thu duc' ||
+      normTarget === 'tp thu duc' ||
+      normTarget === 'quan thu duc' ||
+      normTarget === 'q thu duc' ||
+      normTarget === 'quan 9' ||
+      normTarget === 'q 9' ||
+      normTarget === 'q9' ||
+      normTarget === 'quan 2' ||
+      normTarget === 'q 2' ||
+      normTarget === 'q2'
+    ) {
+      return 'Thành phố Thủ Đức';
+    }
+  }
+
+  // 1. Khớp chính xác hoàn toàn (exact match)
+  for (const d of validDistricts) {
+    const normD = normalizeAdminName(d);
+    if (normD === normTarget) return d;
+    if (
+      normD === `quan ${normTarget}` ||
+      normD === `huyen ${normTarget}` ||
+      normD === `thanh pho ${normTarget}` ||
+      normTarget === `quan ${normD}` ||
+      normTarget === `huyen ${normD}`
+    ) {
+      return d;
+    }
+  }
+
+  // 2. Khớp chuỗi con
+  for (const d of validDistricts) {
+    const normD = normalizeAdminName(d);
+    if (normD.length >= 3 && normTarget.length >= 3) {
+      if (normD.includes(normTarget) || normTarget.includes(normD)) {
+        return d;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+/**
  * Kiểm tra Quận / Huyện có thuộc Tỉnh / Thành phố đã chọn hay không.
  * Nếu tỉnh không có trong danh mục chi tiết, cho phép chấp nhận để không chặn người dùng các tỉnh nhỏ.
  */
@@ -1020,11 +1094,7 @@ export function isDistrictInProvince(
     return true;
   }
 
-  const normTarget = normalizeAdminName(districtName);
-  return validDistricts.some((d) => {
-    const normD = normalizeAdminName(d);
-    return normD === normTarget || normD.includes(normTarget) || normTarget.includes(normD);
-  });
+  return Boolean(findMatchingDistrict(districtName, matchedProv));
 }
 
 /**
@@ -1054,6 +1124,208 @@ export function findDistrictByWard(
     }
   }
   return undefined;
+}
+
+/**
+ * Suy đoán Quận / Huyện từ tọa độ địa lý (Bounding boxes cho các khu vực đô thị trọng điểm)
+ */
+export function getDistrictFromCoords(
+  lat: number,
+  lng: number,
+  provinceName?: string | null
+): string | undefined {
+  const matchedProv = findMatchingProvince(provinceName);
+
+  if (!matchedProv || matchedProv === 'TP. Hồ Chí Minh') {
+    // TP. Thủ Đức (Quận 2, Quận 9, Thủ Đức cũ - vùng phía Đông TP.HCM)
+    if (lng >= 106.735 && lat >= 10.74 && lat <= 10.92) {
+      return 'Thành phố Thủ Đức';
+    }
+    // Quận 1 (trung tâm, Bến Nghé, Bến Thành, Đa Kao)
+    if (lat >= 10.765 && lat <= 10.795 && lng >= 106.685 && lng <= 106.710) {
+      return 'Quận 1';
+    }
+    // Quận 3 (tiếp giáp Quận 1, Võ Thị Sáu)
+    if (lat >= 10.768 && lat <= 10.795 && lng >= 106.665 && lng < 106.685) {
+      return 'Quận 3';
+    }
+    // Quận 4
+    if (lat >= 10.745 && lat <= 10.765 && lng >= 106.690 && lng <= 106.720) {
+      return 'Quận 4';
+    }
+    // Quận 5 (Chợ Lớn)
+    if (lat >= 10.745 && lat <= 10.765 && lng >= 106.650 && lng < 106.690) {
+      return 'Quận 5';
+    }
+    // Quận 7 (Phú Mỹ Hưng, Tân Phong)
+    if (lat >= 10.710 && lat <= 10.755 && lng >= 106.695 && lng <= 106.760) {
+      return 'Quận 7';
+    }
+    // Quận Bình Thạnh
+    if (lat >= 10.790 && lat <= 10.835 && lng >= 106.695 && lng <= 106.735) {
+      return 'Quận Bình Thạnh';
+    }
+    // Quận Gò Vấp
+    if (lat >= 10.815 && lat <= 10.865 && lng >= 106.650 && lng <= 106.705) {
+      return 'Quận Gò Vấp';
+    }
+    // Quận Phú Nhuận
+    if (lat >= 10.785 && lat <= 10.815 && lng >= 106.660 && lng <= 106.690) {
+      return 'Quận Phú Nhuận';
+    }
+    // Quận Tân Bình
+    if (lat >= 10.780 && lat <= 10.825 && lng >= 106.630 && lng < 106.665) {
+      return 'Quận Tân Bình';
+    }
+  }
+
+  if (!matchedProv || matchedProv === 'Hà Nội') {
+    // Cầu Giấy
+    if (lat >= 21.015 && lat <= 21.055 && lng >= 105.770 && lng <= 105.815) {
+      return 'Cầu Giấy';
+    }
+    // Ba Đình
+    if (lat >= 21.015 && lat <= 21.045 && lng >= 105.815 && lng <= 105.840) {
+      return 'Ba Đình';
+    }
+    // Hoàn Kiếm
+    if (lat >= 21.020 && lat <= 21.045 && lng >= 105.840 && lng <= 105.865) {
+      return 'Hoàn Kiếm';
+    }
+    // Đống Đa
+    if (lat >= 20.995 && lat <= 21.025 && lng >= 105.815 && lng <= 105.850) {
+      return 'Đống Đa';
+    }
+    // Nam Từ Liêm
+    if (lat >= 20.995 && lat <= 21.050 && lng >= 105.730 && lng <= 105.785) {
+      return 'Nam Từ Liêm';
+    }
+  }
+
+  return undefined;
+}
+
+export interface ResolvedAdminHierarchy {
+  province: string;
+  district: string;
+  ward: string;
+}
+
+/**
+ * Phân giải thứ bậc hành chính toàn diện:
+ * - Chuẩn hóa Tỉnh / Thành phố
+ * - Loại bỏ các từ khóa sai lệch như 'Saigon', 'Hà Nội' khỏi Quận/Huyện
+ * - Nếu Quận/Huyện thực chất là Phường/Xã (ví dụ: 'Tăng Nhơn Phú', 'Thảo Điền'), tự động gán đúng Quận trực thuộc (ví dụ: 'Thành phố Thủ Đức')
+ * - Loại bỏ các đơn vị phụ cấp khu phố ('Khu phố 30', 'Khu phố 8') để ưu tiên Phường/Xã chính thức
+ */
+export function resolveAdminHierarchy(params: {
+  province?: string | null;
+  district?: string | null;
+  ward?: string | null;
+  fullText?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+}): ResolvedAdminHierarchy {
+  const full = params.fullText || '';
+  const resolvedProv =
+    findMatchingProvince(params.province) ||
+    findMatchingProvince(full) ||
+    (params.lat && params.lng ? getProvinceFromCoords(params.lat, params.lng) : undefined) ||
+    'TP. Hồ Chí Minh';
+
+  // 1. Làm sạch rawDistrict
+  let rawDist = (params.district || '').trim();
+  const normDist = normalizeAdminName(rawDist);
+  const INVALID_DISTRICT_KEYWORDS = [
+    'saigon', 'sai gon', 'sai gòn', 'sài gòn',
+    'ho chi minh', 'hồ chí minh', 'tp ho chi minh', 'tp hcm', 'hcmc',
+    'ha noi', 'hà nội', 'da nang', 'đà nẵng', 'hai phong', 'hải phòng', 'can tho', 'cần thơ',
+    'vietnam', 'việt nam', 'vn'
+  ];
+  if (INVALID_DISTRICT_KEYWORDS.includes(normDist)) {
+    rawDist = '';
+  }
+
+  // 2. Làm sạch rawWard
+  let rawWard = (params.ward || '').trim();
+  const normWard = normalizeAdminName(rawWard);
+  // Loại bỏ các đơn vị phụ dưới cấp phường như 'Khu phố 30', 'Tổ 5', 'Ấp 3'
+  const isSubWardLevel = /^(khu pho|to dan pho|to|ap|thon|xom)\b/i.test(normWard);
+  if (isSubWardLevel) {
+    rawWard = '';
+  }
+
+  let resolvedDist = '';
+  let resolvedWard = rawWard;
+
+  // 3. Nếu rawDist thực chất là tên một Phường/Xã (ví dụ: 'Tăng Nhơn Phú', 'Thảo Điền', 'Đa Kao'):
+  if (rawDist) {
+    const matchedDist = findMatchingDistrict(rawDist, resolvedProv);
+    if (matchedDist) {
+      // Giữ nguyên cách viết của rawDist nếu cùng tên cốt lõi (ví dụ: 'Cầu Giấy' thay vì ép 'Quận Cầu Giấy')
+      // Ngược lại nếu khác nhau (ví dụ: 'Quận 9' -> 'Thành phố Thủ Đức'), lấy tên chuẩn matchedDist
+      if (normalizeAdminName(rawDist) === normalizeAdminName(matchedDist)) {
+        resolvedDist = rawDist;
+      } else {
+        resolvedDist = matchedDist;
+      }
+    } else {
+      // rawDist không phải Quận, kiểm tra xem có phải là Phường/Xã trực thuộc quận nào không
+      const parentDistFromWard = findDistrictByWard(resolvedProv, rawDist);
+      if (parentDistFromWard) {
+        resolvedDist = parentDistFromWard;
+        if (!resolvedWard) {
+          const wardsInParent = getWardsForDistrict(resolvedProv, parentDistFromWard);
+          const matchedWardInParent = wardsInParent.find((w) => {
+            const nw = normalizeAdminName(w);
+            return nw === normDist || nw.includes(normDist) || normDist.includes(nw);
+          });
+          resolvedWard = matchedWardInParent || `Phường ${rawDist}`;
+        }
+      }
+    }
+  }
+
+  // 4. Phân tích chuỗi fullText để trích xuất Quận/Huyện và Phường/Xã nếu chưa có
+  if (!resolvedDist || !resolvedWard) {
+    const parsed = parseAddressComponents(full);
+    if (!resolvedDist && parsed.district) {
+      resolvedDist = findMatchingDistrict(parsed.district, resolvedProv) || parsed.district;
+    }
+    if (!resolvedWard && parsed.ward) {
+      resolvedWard = parsed.ward;
+    }
+  }
+
+  // 5. Nếu chưa có quận nhưng đã có phường, tra cứu quận từ phường
+  if (!resolvedDist && resolvedWard) {
+    resolvedDist = findDistrictByWard(resolvedProv, resolvedWard) || '';
+  }
+
+  // 6. Nếu vẫn chưa có quận nhưng có tọa độ, suy đoán quận từ tọa độ
+  if (!resolvedDist && params.lat && params.lng) {
+    resolvedDist = getDistrictFromCoords(params.lat, params.lng, resolvedProv) || '';
+  }
+
+  // 7. Nếu có quận và chưa có phường:
+  if (!resolvedWard && resolvedProv && resolvedDist) {
+    const wardsInDist = getWardsForDistrict(resolvedProv, resolvedDist);
+    const matchedFromFull = wardsInDist.find((w) => {
+      const nw = normalizeAdminName(w);
+      return nw.length >= 4 && full.toLowerCase().includes(nw);
+    });
+    if (matchedFromFull) {
+      resolvedWard = matchedFromFull;
+    } else if (wardsInDist.length > 0) {
+      resolvedWard = wardsInDist[0];
+    }
+  }
+
+  return {
+    province: resolvedProv,
+    district: resolvedDist,
+    ward: resolvedWard,
+  };
 }
 
 /**

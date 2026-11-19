@@ -18,6 +18,8 @@ import {
   findDistrictByWard,
   getProvinceFromCoords,
   normalizeAdminName,
+  resolveAdminHierarchy,
+  findMatchingDistrict,
 } from '@/utils/vietnamAdministrative';
 import type { LocationCoords } from '@/components/checkout/CheckoutDeliveryMap';
 
@@ -195,25 +197,25 @@ export default function AddressModal({
             longitude: result.lng,
           });
 
-          // Tự động kiểm tra và đồng bộ lại Tỉnh/Thành nếu phát hiện không khớp
-          if (detected && form.getFieldValue('province') !== detected) {
-            form.setFieldsValue({ province: detected });
-          }
+          // Phân giải chuẩn thứ bậc hành chính để đồng bộ các trường
+          const resolved = resolveAdminHierarchy({
+            province: result.components?.province || form.getFieldValue('province'),
+            district: result.components?.district || form.getFieldValue('district'),
+            ward: result.components?.ward || form.getFieldValue('ward'),
+            fullText: [streetAddress, result.displayName].filter(Boolean).join(', '),
+            lat: result.lat,
+            lng: result.lng,
+          });
 
-          // Tự động điền Quận/Huyện nếu đang trống
-          if (!form.getFieldValue('district')) {
-            const detectedDist = result.components?.district || parseAddressComponents(streetAddress).district;
-            if (detectedDist) {
-              form.setFieldsValue({ district: detectedDist });
-            }
+          if (resolved.province && form.getFieldValue('province') !== resolved.province) {
+            prevProvinceRef.current = resolved.province;
+            form.setFieldsValue({ province: resolved.province });
           }
-
-          // Tự động điền Phường/Xã nếu đang trống
-          if (!form.getFieldValue('ward')) {
-            const detectedWard = result.components?.ward || parseAddressComponents(streetAddress).ward;
-            if (detectedWard) {
-              form.setFieldsValue({ ward: detectedWard });
-            }
+          if (resolved.district) {
+            form.setFieldsValue({ district: resolved.district });
+          }
+          if (resolved.ward) {
+            form.setFieldsValue({ ward: resolved.ward });
           }
 
           if (showToast) {
@@ -376,27 +378,25 @@ export default function AddressModal({
   // Chọn một gợi ý từ danh sách autocomplete
   const handleSelectStreetSuggestion = (s: AddressSuggestion) => {
     const chosenStreet = s.components?.streetAddress || s.title || s.place_name;
+
+    const resolved = resolveAdminHierarchy({
+      province: s.components?.province,
+      district: s.components?.district,
+      ward: s.components?.ward,
+      fullText: s.place_name,
+      lat: s.lat,
+      lng: s.lng,
+    });
+
+    prevProvinceRef.current = resolved.province;
     form.setFieldsValue({
       streetAddress: chosenStreet,
+      province: resolved.province,
+      district: resolved.district,
+      ward: resolved.ward,
       latitude: s.lat,
       longitude: s.lng,
     });
-
-    // Tự động điền Tỉnh/Thành nếu khớp
-    const matchProv = findMatchingProvince(s.components?.province || s.place_name);
-    if (matchProv) {
-      form.setFieldsValue({ province: matchProv });
-    }
-
-    // Tự động điền Quận/Huyện nếu có
-    if (s.components?.district) {
-      form.setFieldsValue({ district: s.components.district });
-    }
-
-    // Tự động điền Phường/Xã nếu có
-    if (s.components?.ward) {
-      form.setFieldsValue({ ward: s.components.ward });
-    }
 
     setSelectedCoords({
       lat: s.lat,
@@ -500,27 +500,15 @@ export default function AddressModal({
       setMapValidationError(null);
       hasUserOverriddenCoords.current = true;
 
-      // Suy đoán và đồng bộ đầy đủ các trường Tỉnh/Thành, Quận/Huyện, Phường/Xã, Địa chỉ cụ thể
-      const resolvedProv =
-        findMatchingProvince(details?.components?.province) ||
-        findMatchingProvince(fullPlaceName) ||
-        getProvinceFromCoords(latitude, longitude) ||
-        'TP. Hồ Chí Minh';
-
-      let resolvedWard = details?.components?.ward || parseAddressComponents(fullPlaceName).ward || '';
-      let resolvedDist = details?.components?.district || parseAddressComponents(fullPlaceName).district || '';
-
-      if (!resolvedDist && resolvedProv && resolvedWard) {
-        resolvedDist = findDistrictByWard(resolvedProv, resolvedWard) || '';
-      }
-
-      // Nếu chưa có phường nhưng có quận, lấy phường đầu tiên của quận để form không bị trống
-      if (!resolvedWard && resolvedProv && resolvedDist) {
-        const wardsInDist = getWardsForDistrict(resolvedProv, resolvedDist);
-        if (wardsInDist.length > 0) {
-          resolvedWard = wardsInDist[0];
-        }
-      }
+      // Suy đoán và chuẩn hóa toàn diện thứ bậc hành chính
+      const resolved = resolveAdminHierarchy({
+        province: details?.components?.province,
+        district: details?.components?.district,
+        ward: details?.components?.ward,
+        fullText: fullPlaceName,
+        lat: latitude,
+        lng: longitude,
+      });
 
       let resolvedStreet =
         details?.components?.streetAddress ||
@@ -529,11 +517,11 @@ export default function AddressModal({
         `Khu vực tọa độ (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
 
       // Gán đồng thời toàn bộ giá trị để cập nhật form tức thì, không bị thiếu sót trường nào
-      prevProvinceRef.current = resolvedProv;
+      prevProvinceRef.current = resolved.province;
       form.setFieldsValue({
-        province: resolvedProv,
-        district: resolvedDist,
-        ward: resolvedWard,
+        province: resolved.province,
+        district: resolved.district,
+        ward: resolved.ward,
         streetAddress: resolvedStreet,
         latitude,
         longitude,
@@ -603,17 +591,14 @@ export default function AddressModal({
       const fullPlaceName =
         details?.place_name || coords.displayName || `Vị trí (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)})`;
 
-      const resolvedProv =
-        findMatchingProvince(details?.components?.province) ||
-        findMatchingProvince(fullPlaceName) ||
-        getProvinceFromCoords(coords.lat, coords.lng);
-
-      let resolvedWard = details?.components?.ward || parseAddressComponents(fullPlaceName).ward || '';
-      let resolvedDist = details?.components?.district || parseAddressComponents(fullPlaceName).district || '';
-
-      if (!resolvedDist && resolvedProv && resolvedWard) {
-        resolvedDist = findDistrictByWard(resolvedProv, resolvedWard) || '';
-      }
+      const resolved = resolveAdminHierarchy({
+        province: details?.components?.province,
+        district: details?.components?.district,
+        ward: details?.components?.ward,
+        fullText: fullPlaceName,
+        lat: coords.lat,
+        lng: coords.lng,
+      });
 
       const currentStreet = form.getFieldValue('streetAddress');
       let finalStreet = currentStreet;
@@ -629,19 +614,12 @@ export default function AddressModal({
         latitude: coords.lat,
         longitude: coords.lng,
         streetAddress: finalStreet,
+        province: resolved.province,
+        district: resolved.district,
+        ward: resolved.ward,
       };
 
-      if (resolvedProv) {
-        prevProvinceRef.current = resolvedProv;
-        updateValues.province = resolvedProv;
-      }
-      if (resolvedDist) {
-        updateValues.district = resolvedDist;
-      }
-      if (resolvedWard) {
-        updateValues.ward = resolvedWard;
-      }
-
+      prevProvinceRef.current = resolved.province;
       form.setFieldsValue(updateValues);
     },
     [form]
