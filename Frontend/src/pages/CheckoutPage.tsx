@@ -553,7 +553,7 @@ export default function CheckoutPage() {
                 {/* Payment method */}
                 <div className="mt-4 rounded-xl bg-gray-50 p-3">
                   <span className="text-sm text-gray-700">
-                    {payment === 'cod' ? 'Thanh toán khi nhận hàng (COD)' : payment === 'bank-transfer' ? 'Chuyển khoản ngân hàng (VietQR)' : payment === 'e-wallet' ? 'Ví điện tử' : payment === 'credit-card' ? 'Thẻ tín dụng' : 'Thẻ ATM'}
+                    {payment === 'cod' ? 'Thanh toán khi nhận hàng (COD)' : 'Chuyển khoản ngân hàng (VietQR)'}
                   </span>
                 </div>
               </div>
