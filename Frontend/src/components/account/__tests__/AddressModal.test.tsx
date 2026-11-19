@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import AddressModal from '@/components/account/AddressModal';
 import type { AddressItem } from '@/types/api';
@@ -149,7 +149,14 @@ describe('AddressModal', () => {
     const user = userEvent.setup();
     const handleSubmit = vi.fn().mockResolvedValue(undefined);
 
-    render(<AddressModal open={true} onCancel={vi.fn()} onSubmit={handleSubmit} />);
+    render(
+      <AddressModal
+        open={true}
+        onCancel={vi.fn()}
+        onSubmit={handleSubmit}
+        initialData={{ province: 'Hà Nội' } as any}
+      />
+    );
 
     await user.type(screen.getByPlaceholderText('Nguyễn Văn A'), 'Phạm Thị D');
     await user.type(screen.getByPlaceholderText('0912345678'), '0912345678');
@@ -180,7 +187,14 @@ describe('AddressModal', () => {
     const user = userEvent.setup();
     const handleSubmit = vi.fn().mockResolvedValue(undefined);
 
-    render(<AddressModal open={true} onCancel={vi.fn()} onSubmit={handleSubmit} />);
+    render(
+      <AddressModal
+        open={true}
+        onCancel={vi.fn()}
+        onSubmit={handleSubmit}
+        initialData={{ province: 'Hà Nội' } as any}
+      />
+    );
 
     expect(screen.getByText(/Nhà riêng/)).toBeInTheDocument();
     expect(screen.getByText(/Văn phòng/)).toBeInTheDocument();
@@ -218,7 +232,14 @@ describe('AddressModal', () => {
     const { geocodeInitialAddress } = await import('@/components/checkout/checkoutGeocodingService');
     vi.mocked(geocodeInitialAddress).mockResolvedValueOnce(null);
 
-    render(<AddressModal open={true} onCancel={vi.fn()} onSubmit={handleSubmit} />);
+    render(
+      <AddressModal
+        open={true}
+        onCancel={vi.fn()}
+        onSubmit={handleSubmit}
+        initialData={{ province: 'Hà Nội' } as any}
+      />
+    );
 
     await user.type(screen.getByPlaceholderText('Nguyễn Văn A'), 'Người Dùng Test');
     await user.type(screen.getByPlaceholderText('0912345678'), '0912345678');
@@ -299,9 +320,14 @@ describe('AddressModal', () => {
     const user = userEvent.setup();
     const handleSubmit = vi.fn().mockResolvedValue(undefined);
 
-    render(<AddressModal open={true} onCancel={vi.fn()} onSubmit={handleSubmit} />);
-
-    // Default province is Hà Nội
+    render(
+      <AddressModal
+        open={true}
+        onCancel={vi.fn()}
+        onSubmit={handleSubmit}
+        initialData={{ province: 'Hà Nội' } as any}
+      />
+    );
     await user.type(screen.getByPlaceholderText('Nguyễn Văn A'), 'Test User');
     await user.type(screen.getByPlaceholderText('0912345678'), '0912345678');
     // Type a district that belongs to TP.HCM, not Hà Nội

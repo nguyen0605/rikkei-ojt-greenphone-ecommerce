@@ -305,7 +305,6 @@ export default function AddressModal({
       } else {
         form.resetFields();
         form.setFieldsValue({
-          province: 'Hà Nội',
           label: 'HOME',
           isDefault: false,
         });
@@ -713,7 +712,7 @@ export default function AddressModal({
         title={
           <div className="flex items-center gap-2 text-lg font-bold text-gray-900 border-b border-gray-100 pb-3">
             <EnvironmentOutlined className="text-green-600" />
-            <span>{initialData ? 'Chỉnh sửa địa chỉ nhận hàng' : 'Thêm địa chỉ nhận hàng mới'}</span>
+            <span>{initialData?.id ? 'Chỉnh sửa địa chỉ nhận hàng' : 'Thêm địa chỉ nhận hàng mới'}</span>
           </div>
         }
       open={open}
@@ -1138,7 +1137,7 @@ export default function AddressModal({
             loading={loading}
             className="!h-10 !rounded-xl !bg-green-600 !px-6 !font-semibold hover:!bg-green-700 shadow-sm"
           >
-            {initialData ? 'Cập nhật địa chỉ' : 'Thêm địa chỉ'}
+            {initialData?.id ? 'Cập nhật địa chỉ' : 'Thêm địa chỉ'}
           </Button>
         </div>
       </Form>

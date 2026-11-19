@@ -4,7 +4,7 @@ import { Button, Empty, App, Popconfirm, Checkbox } from 'antd';
 import { DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, ShoppingOutlined, TagOutlined, CloseOutlined, RightOutlined } from '@ant-design/icons';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { removeCartItem, updateCartItem, removeFromCart, updateQuantity, clearCart, moveItem as moveCartItem, clearCartRemote, applyVoucher, removeVoucher } from '@/store/slices/cartSlice';
-import { clearBuyNow, setCurrentStep } from '@/store/slices/checkoutSlice';
+import { clearBuyNow, setCurrentStep, resetShipping } from '@/store/slices/checkoutSlice';
 import { selectCartSummary } from '@/store/selectors/cartSelectors';
 import type { CartItem } from '@/types';
 import type { AvailablePromotionDTO } from '@/types/api';
@@ -244,6 +244,7 @@ export default function CartPage() {
               onClick={() => {
                 dispatch(clearBuyNow());
                 dispatch(setCurrentStep(1));
+                dispatch(resetShipping());
               }}
               className="mt-4 block"
             >

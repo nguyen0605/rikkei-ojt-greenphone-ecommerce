@@ -123,6 +123,9 @@ export default function ShippingForm() {
       const targetId = addr.id;
       setSelectedAddressId(targetId);
       selectedAddressIdRef.current = targetId;
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('gp_checkout_selected_address_id', String(targetId));
+      }
       const fullAddr = formatFullAddress(addr);
 
       setValue('fullName', addr.receiverName, { shouldValidate: true });
@@ -213,31 +216,22 @@ export default function ShippingForm() {
 
           if (addresses.length > 0) {
             const defaultAddr = addresses.find((a) => a.isDefault) || addresses[0];
-            if (!shipping.address && !shipping.fullName) {
+            const sessionSelectedId =
+              typeof window !== 'undefined'
+                ? sessionStorage.getItem('gp_checkout_selected_address_id')
+                : null;
+
+            const manuallySelectedAddr =
+              sessionSelectedId && sessionSelectedId !== 'custom'
+                ? addresses.find((a) => String(a.id) === sessionSelectedId)
+                : null;
+
+            if (sessionSelectedId === 'custom') {
+              setSelectedAddressId('custom');
+            } else if (manuallySelectedAddr) {
+              applyAddressSelection(manuallySelectedAddr);
+            } else if (defaultAddr) {
               applyAddressSelection(defaultAddr);
-            } else {
-              const matched = addresses.find(
-                (a) =>
-                  formatFullAddress(a) === shipping.address &&
-                  a.receiverPhone === shipping.phone
-              );
-              if (matched) {
-                setSelectedAddressId(matched.id);
-                if (
-                  typeof matched.latitude === 'number' &&
-                  typeof matched.longitude === 'number' &&
-                  Number.isFinite(matched.latitude) &&
-                  Number.isFinite(matched.longitude)
-                ) {
-                  setSelectedLocation({
-                    lat: matched.latitude,
-                    lng: matched.longitude,
-                    displayName: formatFullAddress(matched),
-                  });
-                }
-              } else {
-                setSelectedAddressId('custom');
-              }
             }
           } else {
             setSelectedAddressId('custom');
@@ -282,6 +276,9 @@ export default function ShippingForm() {
   // Chọn chế độ "Nhập địa chỉ khác"
   const handleSelectCustomAddress = () => {
     setSelectedAddressId('custom');
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('gp_checkout_selected_address_id', 'custom');
+    }
     setPinnedAddressSuggestion(null);
   };
 
@@ -343,6 +340,9 @@ export default function ShippingForm() {
     setFocusedSuggestionIndex(-1);
     if (selectedAddressId !== 'custom') {
       setSelectedAddressId('custom');
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('gp_checkout_selected_address_id', 'custom');
+      }
     }
 
     if (query.trim().length < 2) {
@@ -478,6 +478,9 @@ export default function ShippingForm() {
     dispatch(updateShipping({ [field]: value }));
     if (selectedAddressId !== 'custom') {
       setSelectedAddressId('custom');
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('gp_checkout_selected_address_id', 'custom');
+      }
     }
   };
 
