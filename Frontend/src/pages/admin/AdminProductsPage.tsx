@@ -620,7 +620,7 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
               </Form.Item>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Form.Item
                 name="price"
                 label="Giá gốc (₫)"
@@ -683,19 +683,25 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
                   parser={parseVariantNumber}
                 />
               </Form.Item>
+            </div>
 
-              <Form.Item>
-                <Space className="w-full">
-                  <Button type="primary" htmlType="submit" loading={varMut.isPending} className="!rounded-full !bg-primary-600">
-                    {varEdit ? 'Lưu thay đổi' : 'Thêm biến thể'}
-                  </Button>
-                  {varEdit && (
-                    <Button onClick={() => { setVarEdit(null); varForm.resetFields(); }} className="!rounded-full">
-                      Hủy
-                    </Button>
-                  )}
-                </Space>
-              </Form.Item>
+            <div className="mt-3 pt-3 border-t border-gray-200/80 flex items-center justify-end gap-2.5">
+              {varEdit && (
+                <Button
+                  onClick={() => { setVarEdit(null); varForm.resetFields(); }}
+                  className="!rounded-lg"
+                >
+                  Hủy bỏ
+                </Button>
+              )}
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={varMut.isPending}
+                className="!rounded-lg !bg-primary-600 px-5 font-medium shadow-sm hover:!bg-primary-700"
+              >
+                {varEdit ? 'Lưu thay đổi' : 'Thêm biến thể'}
+              </Button>
             </div>
           </Form>
         </div>}
