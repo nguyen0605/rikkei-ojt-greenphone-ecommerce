@@ -98,7 +98,7 @@ public class AdminBrandService {
         brandRepository.delete(brand);
     }
 
-    @CacheEvict(value = "brands", allEntries = true)
+    @CacheEvict(value = {"brands", "phones"}, allEntries = true)
     public BrandDTO updateStatus(Long id, String status) {
         if (!List.of("ACTIVE", "INACTIVE").contains(status)) {
             throw new BadRequestException("Trạng thái không hợp lệ: " + status + ". Chỉ chấp nhận ACTIVE hoặc INACTIVE.");
@@ -107,6 +107,14 @@ public class AdminBrandService {
                 .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", id));
         brand.setStatus(status);
         brand = brandRepository.save(brand);
-        return brandMapper.toDto(brand);
+
+        // Đồng bộ trạng thái toàn bộ sản phẩm thuộc thương hiệu này
+        int updatedPhonesCount = phoneRepository.updateStatusByBrandId(id, status);
+        log.info("Cập nhật trạng thái Thương hiệu id={} ('{}') sang {}. Đã đồng bộ {} sản phẩm liên quan.",
+                id, brand.getName(), status, updatedPhonesCount);
+
+        BrandDTO dto = brandMapper.toDto(brand);
+        brandService.resolveBrandLogo(dto);
+        return dto;
     }
 }

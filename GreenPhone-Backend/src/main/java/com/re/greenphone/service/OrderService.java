@@ -186,8 +186,9 @@ public class OrderService {
                     .orElseThrow(() -> new ResourceNotFoundException("PhoneVariant", "id", variantId));
 
             if ("INACTIVE".equalsIgnoreCase(variant.getStatus())
-                    || (variant.getPhone() != null && "INACTIVE".equalsIgnoreCase(variant.getPhone().getStatus()))) {
-                throw new BadRequestException("Sản phẩm #" + variant.getId() + " hiện không còn được bán. Vui lòng xóa khỏi giỏ hàng và thử lại.");
+                    || (variant.getPhone() != null && "INACTIVE".equalsIgnoreCase(variant.getPhone().getStatus()))
+                    || (variant.getPhone() != null && variant.getPhone().getBrand() != null && "INACTIVE".equalsIgnoreCase(variant.getPhone().getBrand().getStatus()))) {
+                throw new BadRequestException("Sản phẩm #" + variant.getId() + " hoặc thương hiệu hiện không còn được bán. Vui lòng xóa khỏi giỏ hàng và thử lại.");
             }
 
             int totalRequired = consolidatedQuantities.get(variantId);

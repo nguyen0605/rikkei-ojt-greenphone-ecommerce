@@ -161,6 +161,8 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-phones'] });
       qc.invalidateQueries({ queryKey: ['phones'] });
+      qc.invalidateQueries({ queryKey: ['phones-featured'] });
+      qc.invalidateQueries({ queryKey: ['phone'] });
       message.success('Đã cập nhật trạng thái');
     },
     onError: (e) => message.error(e instanceof Error ? e.message : 'Cập nhật thất bại'),
@@ -317,7 +319,7 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
       render: (s: string, r) => (
         <Switch
           checked={s === 'ACTIVE'}
-          loading={statusMut.isPending}
+          loading={statusMut.isPending && (statusMut.variables as { id: number; status: string } | undefined)?.id === r.id}
           onChange={(checked) => statusMut.mutate({ id: r.id, status: checked ? 'ACTIVE' : 'INACTIVE' })}
           checkedChildren="Bật"
           unCheckedChildren="Tắt"
