@@ -172,7 +172,7 @@ export default function WarrantyCard({ warranty }: WarrantyCardProps) {
             <div className="pt-1">
               <div className="mb-1.5 flex items-center justify-between text-xs">
                 <span className="font-medium text-gray-600">
-                  Tiến trình thời hạn bảo hành ({elapsedPercent}% đã sử dụng)
+                  Tiến trình thời hạn bảo hành
                 </span>
                 <span
                   className={
@@ -190,10 +190,6 @@ export default function WarrantyCard({ warranty }: WarrantyCardProps) {
                 size={{ height: 10 }}
               />
             </div>
-
-            {warranty.note && (
-              <p className="text-xs text-gray-500">Ghi chú: {warranty.note}</p>
-            )}
           </div>
         </div>
       </div>
