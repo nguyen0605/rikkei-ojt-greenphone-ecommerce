@@ -39,6 +39,8 @@ public class AdminStaffServiceImpl implements AdminStaffService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.re.greenphone.repository.UserDeviceSessionRepository userDeviceSessionRepository;
 
     private boolean isSuperAdmin(String username, User user) {
         if (username != null && SUPER_ADMIN_EMAIL.equalsIgnoreCase(username.trim())) {
@@ -188,6 +190,13 @@ public class AdminStaffServiceImpl implements AdminStaffService {
 
         targetUser.setStatus(upperStatus);
         targetUser = userRepository.save(targetUser);
+
+        if ("BLOCKED".equals(upperStatus) || "INACTIVE".equals(upperStatus)) {
+            if (userDeviceSessionRepository != null && targetUser.getId() != null) {
+                userDeviceSessionRepository.revokeAllSessionsByUserId(targetUser.getId());
+                log.info("Khóa tài khoản nhân sự id={}. Đã thu hồi toàn bộ phiên đăng nhập.", targetUser.getId());
+            }
+        }
         log.info("Cập nhật trạng thái nhân viên id={}: status={}, thực hiện bởi={}", id, upperStatus, currentUsername);
         return toDTO(targetUser);
     }

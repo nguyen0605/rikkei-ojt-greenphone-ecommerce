@@ -134,7 +134,7 @@ export const adminOrderService = {
 export const adminUserService = {
   list: (params?: Record<string, string>) => get<PageResponse<UserDTO>>('/admin/users', { params }),
   detail: (id: number) => get<UserDTO>('/admin/users/' + id),
-  updateStatus: (id: number, status: string) => put<UserDTO>('/admin/users/' + id + '/status', { status }),
+  updateStatus: (id: number, status: string, reason?: string) => put<UserDTO>('/admin/users/' + id + '/status', { status, reason }),
 };
 
 export const adminReviewService = {
