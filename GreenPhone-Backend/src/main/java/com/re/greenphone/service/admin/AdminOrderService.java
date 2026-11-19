@@ -22,6 +22,12 @@ import com.re.greenphone.repository.PromotionRepository;
 import com.re.greenphone.repository.UserPromotionRepository;
 import com.re.greenphone.service.EmailService;
 import com.re.greenphone.service.admin.InventoryStockHistoryService;
+import com.re.greenphone.entity.ReturnRequest;
+import com.re.greenphone.enums.ReturnStatus;
+import com.re.greenphone.enums.ReturnType;
+import com.re.greenphone.repository.ReturnRequestRepository;
+import com.re.greenphone.repository.UserRepository;
+import com.re.greenphone.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -54,6 +60,8 @@ public class AdminOrderService {
     private final InventoryStockHistoryService inventoryStockHistoryService;
     private final com.re.greenphone.service.WarehouseTransferService warehouseTransferService;
     private final com.re.greenphone.service.WarrantyService warrantyService;
+    private final ReturnRequestRepository returnRequestRepository;
+    private final UserRepository userRepository;
     private final jakarta.persistence.EntityManager entityManager;
 
     private boolean isValidTransition(String current, String next) {
@@ -260,6 +268,11 @@ public class AdminOrderService {
                 .changedBy("ADMIN")
                 .build());
 
+        // [TỰ ĐỘNG LIÊN THÔNG]: Khi admin xác nhận hoàn tiền (REFUNDED), tự động đồng bộ sang bảng return_request để trang Đổi trả & Hoàn tiền theo dõi
+        if ("REFUNDED".equalsIgnoreCase(paymentStatus)) {
+            syncToReturnRequestOnRefund(order);
+        }
+
         return orderMapper.toDto(order);
     }
 
@@ -349,6 +362,64 @@ public class AdminOrderService {
             }
         } catch (Exception e) {
             log.error("Failed to trigger delivered email for order {}", order.getId(), e);
+        }
+    }
+
+    /**
+     * Tự động đồng bộ phiếu sang bảng return_request khi đơn hàng được đánh dấu hoàn tiền (REFUNDED)
+     * Giúp trang Thẩm định Đổi trả & Hoàn tiền (/admin/doi-tra) ghi nhận được lịch sử hoàn tiền này.
+     */
+    private void syncToReturnRequestOnRefund(Order order) {
+        try {
+            // Kiểm tra xem đơn hàng này đã có phiếu hoàn tiền chưa để tránh trùng lặp
+            List<ReturnRequest> existingRequests = returnRequestRepository.findByOrderId(order.getId());
+            boolean alreadyHasRefund = existingRequests.stream()
+                    .anyMatch(r -> r.getType() == ReturnType.REFUND);
+
+            if (alreadyHasRefund) {
+                log.info("Đơn hàng #{} đã có bản ghi hoàn tiền trong return_request, bỏ qua tạo mới", order.getId());
+                return;
+            }
+
+            // Lấy PhoneVariant đại diện từ chi tiết đơn hàng (bắt buộc trong entity ReturnRequest)
+            PhoneVariant variant = null;
+            if (order.getOrderDetails() != null && !order.getOrderDetails().isEmpty()) {
+                variant = order.getOrderDetails().get(0).getPhoneVariant();
+            }
+
+            if (variant == null) {
+                log.warn("Đơn hàng #{} không tìm thấy PhoneVariant trong orderDetails để tạo ReturnRequest", order.getId());
+                return;
+            }
+
+            // Lấy thông tin admin hiện tại đang thao tác
+            Long currentUserId = SecurityUtils.getCurrentUser() != null ? SecurityUtils.getCurrentUser().getId() : null;
+            com.re.greenphone.entity.User adminUser = (currentUserId != null)
+                    ? userRepository.findById(currentUserId).orElse(null)
+                    : null;
+
+            String returnCode = "REF-" + order.getId() + "-" + java.util.UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+
+            ReturnRequest returnRequest = ReturnRequest.builder()
+                    .returnCode(returnCode)
+                    .order(order)
+                    .phoneVariant(variant)
+                    .user(order.getUser())
+                    .reason("Admin hoàn tiền cho đơn hàng (Quản lý đơn hàng)")
+                    .errorDescription("Hoàn tiền đơn hàng #" + order.getId() + " với số tiền " + order.getFinalAmount() + " VNĐ")
+                    .proofImagesJson("[]")
+                    .type(ReturnType.REFUND)
+                    .status(ReturnStatus.COMPLETED)
+                    .refundAmount(order.getFinalAmount() != null ? order.getFinalAmount() : java.math.BigDecimal.ZERO)
+                    .adminNote("Kế toán/Admin đã xác nhận hoàn tiền thành công")
+                    .reviewedBy(adminUser)
+                    .reviewedAt(LocalDateTime.now())
+                    .build();
+
+            returnRequestRepository.save(returnRequest);
+            log.info("Đã tự động tạo phiếu ReturnRequest hoàn tiền: code={}, orderId={}", returnCode, order.getId());
+        } catch (Exception ex) {
+            log.error("Lỗi khi tự động đồng bộ sang ReturnRequest cho đơn #{}: {}", order.getId(), ex.getMessage(), ex);
         }
     }
 }

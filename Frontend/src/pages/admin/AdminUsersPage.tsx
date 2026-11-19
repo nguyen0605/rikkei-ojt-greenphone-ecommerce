@@ -28,7 +28,14 @@ export default function AdminUsersPage() {
   });
 
   const columns: TableColumnsType<UserDTO> = [
-    { title: 'STT', width: 60, render: (_: unknown, __: UserDTO, index?: number) => <span className="text-ink-2">{(index ?? 0) + 1}</span> },
+    // Tính STT liên tục theo trang hiện tại (trang 2 bắt đầu từ 16)
+    {
+      title: 'STT',
+      width: 60,
+      render: (_: unknown, __: UserDTO, index?: number) => (
+        <span className="text-ink-2">{(page - 1) * 15 + (index ?? 0) + 1}</span>
+      ),
+    },
     {
       title: 'Khách hàng', dataIndex: 'fullName', render: (v: string, r) => (
         <div className="flex items-center gap-2.5">

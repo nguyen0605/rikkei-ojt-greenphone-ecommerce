@@ -210,8 +210,23 @@ export default function AdminVoucherPage() {
     {
       title: 'Trạng thái',
       dataIndex: 'status',
-      width: 100,
-      render: (s: string) => <StatusTag status={s} />,
+      width: 110,
+      render: (s: string, r) => {
+        // Tự động tính trạng thái voucher theo ngày giờ thực tế: Hết hạn, Sắp diễn ra hoặc Hoạt động
+        const isExpired = dayjs().isAfter(dayjs(r.endDate));
+        const isUpcoming = dayjs().isBefore(dayjs(r.startDate));
+
+        if (s === 'INACTIVE') {
+          return <StatusTag status="INACTIVE" />; // Bị admin chủ động tắt
+        }
+        if (isExpired) {
+          return <StatusTag status="EXPIRED" />; // Đã quá ngày kết thúc
+        }
+        if (isUpcoming) {
+          return <StatusTag status="UPCOMING" />; // Chưa đến ngày bắt đầu
+        }
+        return <StatusTag status="ACTIVE" />; // Đang trong hạn sử dụng
+      },
     },
     {
       title: 'Thao tác',

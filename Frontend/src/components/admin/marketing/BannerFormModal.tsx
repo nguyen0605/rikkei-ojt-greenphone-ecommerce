@@ -4,18 +4,6 @@ import { useEffect, useState, useRef } from 'react';
 import type { BannerDTO, BannerRequest, PhoneDTO } from '@/types/api';
 import adminMarketingService from '@/services/adminMarketingService';
 import { phoneService } from '@/services';
-import { ROUTES } from '@/routes/routePaths';
-
-// Danh sách các trang đích phổ biến để gợi ý chọn nhanh
-const COMMON_DESTINATIONS = [
-  { value: ROUTES.PRODUCTS, label: 'Trang danh sách sản phẩm (/san-pham)', tag: 'Sản phẩm' },
-  { value: ROUTES.VOUCHERS, label: 'Trang mã giảm giá & ưu đãi (/khuyen-mai)', tag: 'Khuyến mãi' },
-  { value: '/san-pham?brand=apple', label: 'Lọc sản phẩm Apple iPhone (/san-pham?brand=apple)', tag: 'Hãng' },
-  { value: '/san-pham?brand=samsung', label: 'Lọc sản phẩm Samsung (/san-pham?brand=samsung)', tag: 'Hãng' },
-  { value: '/san-pham?brand=xiaomi', label: 'Lọc sản phẩm Xiaomi (/san-pham?brand=xiaomi)', tag: 'Hãng' },
-  { value: ROUTES.PHONE_COMPARE, label: 'Trang so sánh điện thoại (/so-sanh)', tag: 'Tiện ích' },
-  { value: ROUTES.WARRANTY_CHECK, label: 'Trang tra cứu bảo hành (/tra-cuu-bao-hanh)', tag: 'Dịch vụ' },
-];
 
 interface BannerFormModalProps {
   open: boolean;
@@ -233,79 +221,54 @@ export default function BannerFormModal({
           }
           rules={[{ required: true, message: 'Nhập hoặc chọn link điều hướng' }]}
         >
+          {/* Tự động gợi ý sản phẩm khi gõ tìm kiếm, không fix cứng danh mục hệ thống */}
           <AutoComplete
             onSearch={handleSearchPhone}
-            placeholder="Gõ tên điện thoại (vd: iPhone 15, S24...) hoặc chọn trang đích..."
+            placeholder="Gõ tên điện thoại (vd: iPhone 15, S24...) hoặc dán đường dẫn..."
             allowClear
-            options={[
-              // Nhóm 1: Kết quả tìm kiếm điện thoại realtime
-              ...(phoneOptions.length > 0
+            options={
+              phoneOptions.length > 0
                 ? [
-                    {
+                  {
+                    label: (
+                      <div className="flex items-center justify-between text-xs font-semibold text-emerald-700 bg-emerald-50/70 px-2 py-1 rounded">
+                        <span className="flex items-center gap-1">
+                          <MobileOutlined /> Sản phẩm gợi ý phù hợp
+                        </span>
+                        {isSearchingPhone && <Spin size="small" />}
+                      </div>
+                    ),
+                    options: phoneOptions.map((phone) => ({
+                      value: `/san-pham/${phone.id}`,
                       label: (
-                        <div className="flex items-center justify-between text-xs font-semibold text-emerald-700 bg-emerald-50/70 px-2 py-1 rounded">
-                          <span className="flex items-center gap-1">
-                            <MobileOutlined /> Sản phẩm gợi ý phù hợp
-                          </span>
-                          {isSearchingPhone && <Spin size="small" />}
+                        <div className="flex items-center justify-between py-1 px-1 hover:bg-emerald-50/40 rounded transition">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            {phone.mainImageUrl ? (
+                              <img
+                                src={phone.mainImageUrl}
+                                alt={phone.name}
+                                className="h-7 w-7 rounded object-cover border border-gray-100 shrink-0"
+                              />
+                            ) : (
+                              <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center shrink-0">
+                                <MobileOutlined className="text-gray-400 text-xs" />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-semibold text-gray-900 truncate">{phone.name}</p>
+                              <p className="text-[10px] text-gray-400">/san-pham/{phone.id}</p>
+                            </div>
+                          </div>
+                          <Tag color="green" className="!mr-0 text-[10px] shrink-0">
+                            {phone.brandName || 'Điện thoại'}
+                          </Tag>
                         </div>
                       ),
-                      options: phoneOptions.map((phone) => ({
-                        value: `/san-pham/${phone.id}`,
-                        label: (
-                          <div className="flex items-center justify-between py-1 px-1 hover:bg-emerald-50/40 rounded transition">
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              {phone.mainImageUrl ? (
-                                <img
-                                  src={phone.mainImageUrl}
-                                  alt={phone.name}
-                                  className="h-7 w-7 rounded object-cover border border-gray-100 shrink-0"
-                                />
-                              ) : (
-                                <div className="h-7 w-7 rounded bg-gray-100 flex items-center justify-center shrink-0">
-                                  <MobileOutlined className="text-gray-400 text-xs" />
-                                </div>
-                              )}
-                              <div className="min-w-0 flex-1">
-                                <p className="text-xs font-semibold text-gray-900 truncate">{phone.name}</p>
-                                <p className="text-[10px] text-gray-400">/san-pham/{phone.id}</p>
-                              </div>
-                            </div>
-                            <Tag color="green" className="!mr-0 text-[10px] shrink-0">
-                              {phone.brandName || 'Điện thoại'}
-                            </Tag>
-                          </div>
-                        ),
-                      })),
-                    },
-                  ]
-                : []),
-
-              // Nhóm 2: Các trang điều hướng phổ biến
-              {
-                label: (
-                  <div className="text-xs font-semibold text-gray-500 bg-gray-50 px-2 py-1 rounded">
-                    Trang đích hệ thống
-                  </div>
-                ),
-                options: COMMON_DESTINATIONS.filter(
-                  (dest) =>
-                    !phoneSearchText ||
-                    dest.label.toLowerCase().includes(phoneSearchText.toLowerCase()) ||
-                    dest.value.toLowerCase().includes(phoneSearchText.toLowerCase())
-                ).map((dest) => ({
-                  value: dest.value,
-                  label: (
-                    <div className="flex items-center justify-between py-1 px-1">
-                      <span className="text-xs font-medium text-gray-800">{dest.label}</span>
-                      <Tag color="cyan" className="!mr-0 text-[10px]">
-                        {dest.tag}
-                      </Tag>
-                    </div>
-                  ),
-                })),
-              },
-            ]}
+                    })),
+                  },
+                ]
+                : []
+            }
           />
         </Form.Item>
 

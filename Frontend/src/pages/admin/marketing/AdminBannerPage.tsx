@@ -52,7 +52,8 @@ export default function AdminBannerPage() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-banners'] });
-      message.success('Đã cập nhật trạng thái banner');
+      // Dùng key cố định để khi bấm bật/tắt liên tục thì toast thông báo ghi đè nhau, không bị dồn hàng dài
+      message.success({ content: 'Đã cập nhật trạng thái banner', key: 'banner-status' });
     },
   });
 
