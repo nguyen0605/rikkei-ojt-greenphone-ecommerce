@@ -1,8 +1,9 @@
+import { useEffect, useMemo } from 'react';
 import { Modal, Form, Select, Button, message, Alert } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAppSelector } from '@/store/hooks';
 import { adminStaffService } from '@/services/adminStaffService';
 import type { StaffDTO } from '@/types/api';
-import { useEffect } from 'react';
 
 interface StaffRoleModalProps {
   staff: StaffDTO | null;
@@ -10,16 +11,20 @@ interface StaffRoleModalProps {
   onClose: () => void;
 }
 
-const ROLE_OPTIONS = [
-  { value: 'ROLE_SALES', label: 'Nhân viên kinh doanh & Đơn hàng' },
-  { value: 'ROLE_WAREHOUSE', label: 'Nhân viên thủ kho & Bảo hành' },
-  { value: 'ROLE_MARKETING', label: 'Nhân viên marketing & Sản phẩm' },
-  { value: 'ROLE_ADMIN', label: 'Quản trị viên tối cao' },
-];
-
 export default function StaffRoleModal({ staff, open, onClose }: StaffRoleModalProps) {
   const [form] = Form.useForm();
   const qc = useQueryClient();
+  const { user: currentUser } = useAppSelector((s) => s.auth);
+  const isSuperAdmin = currentUser?.id === 1 || currentUser?.email?.toLowerCase() === 'admin@greenphone.vn';
+
+  const roleOptions = useMemo(() => [
+    { value: 'ROLE_SALES', label: 'Nhân viên kinh doanh & Đơn hàng' },
+    { value: 'ROLE_WAREHOUSE', label: 'Nhân viên thủ kho & Bảo hành' },
+    { value: 'ROLE_MARKETING', label: 'Nhân viên marketing & Sản phẩm' },
+    ...(isSuperAdmin
+      ? [{ value: 'ROLE_ADMIN', label: 'Quản trị viên (Admin)' }]
+      : [{ value: 'ROLE_ADMIN', label: 'Quản trị viên (Chỉ Quản trị viên tối cao được cấp)', disabled: true }]),
+  ], [isSuperAdmin]);
 
   useEffect(() => {
     if (staff) {
@@ -74,7 +79,9 @@ export default function StaffRoleModal({ staff, open, onClose }: StaffRoleModalP
       <div className="pt-2">
         <Alert
           message="Lưu ý quyền hạn"
-          description={`Thay đổi vai trò của nhân viên "${staff?.fullName}" sẽ điều chỉnh ngay lập tức các quyền truy cập trên thanh menu và API quản trị.`}
+          description={`Thay đổi vai trò của nhân viên "${staff?.fullName}" sẽ điều chỉnh ngay lập tức các quyền truy cập trên thanh menu và API quản trị.${
+            !isSuperAdmin ? ' Bạn chỉ có quyền phân công các vai trò nhân sự nghiệp vụ (Kinh doanh, Thủ kho, Marketing).' : ''
+          }`}
           type="info"
           showIcon
           className="mb-4"
@@ -86,7 +93,7 @@ export default function StaffRoleModal({ staff, open, onClose }: StaffRoleModalP
             label="Chọn vai trò mới"
             rules={[{ required: true, message: 'Vui lòng chọn vai trò' }]}
           >
-            <Select options={ROLE_OPTIONS} />
+            <Select options={roleOptions} />
           </Form.Item>
         </Form>
       </div>

@@ -24,5 +24,8 @@ public interface UserMapper extends GenericMapper<User, UserDTO> {
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "status", ignore = true)
+    @Mapping(target = "blockedReason", ignore = true)
+    @Mapping(target = "blockedAt", ignore = true)
+    @Mapping(target = "blockedBy", ignore = true)
     User toEntity(UserDTO dto);
 }

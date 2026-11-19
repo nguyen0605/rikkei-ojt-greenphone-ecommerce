@@ -16,4 +16,7 @@ public class UserDTO {
     private String address;
     private String role;
     private String status;
+    private String blockedReason;
+    private java.time.LocalDateTime blockedAt;
+    private String blockedBy;
 }

@@ -41,6 +41,15 @@ public class User extends BaseEntity {
     @Column(name = "STATUS", nullable = false, length = 30)
     private String status = "ACTIVE";
 
+    @Column(name = "BLOCKED_REASON", length = 500)
+    private String blockedReason;
+
+    @Column(name = "BLOCKED_AT")
+    private java.time.LocalDateTime blockedAt;
+
+    @Column(name = "BLOCKED_BY", length = 100)
+    private String blockedBy;
+
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
     private Cart cart;
 
