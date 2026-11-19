@@ -112,6 +112,22 @@ export default function AdminDashboardPage() {
           <p className="dashboard-subtitle">Tổng quan hoạt động kinh doanh theo thời gian.</p>
         </div>
         <div className="dashboard-toolbar" role="group" aria-label="Bộ lọc và xuất báo cáo">
+          {/* Nút làm mới dữ liệu báo cáo tổng quan */}
+          <Button
+            aria-label="Làm mới báo cáo"
+            icon={<ReloadOutlined spin={loading} />}
+            loading={loading}
+            onClick={() => {
+              void orders.refetch();
+              void top.refetch();
+              if (isAdmin) void finance.refetch();
+              else if (canViewRevenue) void revenue.refetch();
+              message.success('Đã làm mới dữ liệu tổng quan');
+            }}
+            className="!rounded-full hover:!border-primary-500 hover:!text-primary-600"
+          >
+            Làm mới
+          </Button>
           <DatePicker
             aria-label="Tháng báo cáo"
             picker="month"
