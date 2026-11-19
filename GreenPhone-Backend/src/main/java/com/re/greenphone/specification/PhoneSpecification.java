@@ -29,8 +29,9 @@ public class PhoneSpecification {
         return (root, cq, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
-            // 1. Chỉ hiển thị sản phẩm ACTIVE trong store
+            // 1. Chỉ hiển thị sản phẩm ACTIVE và thương hiệu ACTIVE trong store
             predicates.add(cb.equal(root.get("status"), "ACTIVE"));
+            predicates.add(cb.equal(root.get("brand").get("status"), "ACTIVE"));
 
             // 2. Tìm kiếm theo tên sản phẩm (case-insensitive LIKE đa từ khóa)
             if (query != null && !query.isBlank()) {

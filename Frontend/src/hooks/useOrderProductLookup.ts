@@ -63,35 +63,48 @@ export function useOrderProductLookup() {
   }, [phones]);
 
   const resolveItem = (item: OrderDetailDTO): ResolvedProductInfo => {
-    const directPhoneId = (item as { phoneId?: number }).phoneId;
-    const directImageUrl = (item as { imageUrl?: string }).imageUrl;
+    const directPhoneId = item.phoneId ?? (item as { phoneId?: number }).phoneId;
+    const directImageUrl = item.imageUrl ?? (item as { imageUrl?: string }).imageUrl;
+    const directProductStatus = item.productStatus ?? (item as { productStatus?: string }).productStatus;
 
     let matchedPhone: PhoneDTO | undefined;
 
-    // 1. Match by direct phoneId if present
+    // 1. Match by direct phoneId if present in active catalog
     if (directPhoneId) {
       matchedPhone = phones.find((p) => p.id === directPhoneId);
     }
 
-    // 2. Match by productName
-    if (!matchedPhone && item.productName) {
+    // 2. Strict match by productName: only if NOT matched and NO direct imageUrl
+    if (!matchedPhone && !directImageUrl && item.productName) {
       const normalizedItem = normalizeText(item.productName);
 
       matchedPhone = sortedPhones.find((p) => {
         const normalizedP = normalizeText(p.name);
-        return (
-          normalizedItem === normalizedP ||
-          normalizedItem.startsWith(normalizedP)
-        );
+        if (normalizedItem === normalizedP) return true;
+        // Only allow word-boundary prefix match if the rest is NOT a sub-model differentiator (ultra, pro, max...)
+        if (normalizedItem.startsWith(normalizedP + ' ')) {
+          const rest = normalizedItem.slice(normalizedP.length + 1).trim();
+          const firstRestWord = rest.split(' ')[0];
+          const differentiators = ['ultra', 'pro', 'max', 'plus', 'fe', 'lite', 'flip', 'fold', 'se'];
+          if (differentiators.includes(firstRestWord)) {
+            return false; // e.g. "Xiaomi 14 Ultra" must NOT match "Xiaomi 14"
+          }
+          return true;
+        }
+        return false;
       });
     }
 
     const phoneId = directPhoneId || matchedPhone?.id;
+    // CRITICAL: Always prioritize directImageUrl snapshot from order detail.
+    // If phone is inactive / not in catalog, NEVER fallback to another phone's image!
     const imageUrl = directImageUrl || matchedPhone?.mainImageUrl;
 
-    // A product is inactive if explicitly marked INACTIVE in store catalog,
-    // or if the catalog has loaded and product was explicitly marked inactive.
-    const isInactive = matchedPhone ? matchedPhone.status === 'INACTIVE' : false;
+    // A product is inactive if directProductStatus is INACTIVE, or matched phone is INACTIVE,
+    // or if directPhoneId was provided but phone is not in active catalog
+    const isInactive =
+      directProductStatus === 'INACTIVE' ||
+      (matchedPhone ? matchedPhone.status === 'INACTIVE' : Boolean(directPhoneId && !matchedPhone));
 
     const slug = matchedPhone?.name
       ? generateProductSlug(matchedPhone.name)

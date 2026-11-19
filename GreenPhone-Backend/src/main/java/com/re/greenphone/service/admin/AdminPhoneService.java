@@ -200,7 +200,7 @@ public class AdminPhoneService {
         phoneRepository.delete(phone);
     }
 
-    @CacheEvict(value = "phones", key = "#id")
+    @CacheEvict(value = "phones", allEntries = true)
     public PhoneDTO updateStatus(Long id, String status) {
         if (!List.of("ACTIVE", "INACTIVE").contains(status)) {
             throw new BadRequestException("Trạng thái không hợp lệ: " + status + ". Chỉ chấp nhận ACTIVE hoặc INACTIVE.");

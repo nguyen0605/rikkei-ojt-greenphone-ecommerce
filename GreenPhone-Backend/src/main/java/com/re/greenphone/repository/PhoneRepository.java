@@ -8,6 +8,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -35,11 +36,12 @@ public interface PhoneRepository extends JpaRepository<Phone, Long>, JpaSpecific
 
     /**
      * Lightweight projection for filter dropdowns — only brand id + name,
-     * avoids loading full Phone entities.
+     * avoids loading full Phone entities. Only active brands with active phones.
      */
     @Query("""
         SELECT DISTINCT new com.re.greenphone.dto.response.BrandFilterDTO(p.brand.id, p.brand.name)
         FROM Phone p
+        WHERE p.status = 'ACTIVE' AND p.brand.status = 'ACTIVE'
         """)
     List<BrandFilterDTO> findDistinctBrands();
 
@@ -49,8 +51,9 @@ public interface PhoneRepository extends JpaRepository<Phone, Long>, JpaSpecific
     @Query("SELECT p FROM Phone p WHERE LOWER(p.description) LIKE LOWER(CONCAT('%', :value, '%'))")
     List<Phone> findByDescriptionContainingIgnoreCase(@Param("value") String value);
 
-    /** Detail page: only active phones are visible in the store. */
-    Optional<Phone> findByIdAndStatus(Long id, String status);
+    /** Detail page: only active phones with active brand are visible in the store. */
+    @Query("SELECT p FROM Phone p WHERE p.id = :id AND p.status = :status AND p.brand.status = 'ACTIVE'")
+    Optional<Phone> findByIdAndStatus(@Param("id") Long id, @Param("status") String status);
 
     /** Hard-delete guard: any phone still referencing this brand blocks deletion. */
     boolean existsByBrandId(Long brandId);
@@ -58,15 +61,18 @@ public interface PhoneRepository extends JpaRepository<Phone, Long>, JpaSpecific
     /**
      * MySQL Full-Text Search on name and description in BOOLEAN MODE.
      * Prevents full table scans and uses idx_phone_fulltext index.
+     * Only returns active phones from active brands.
      */
     @Query(value = """
-        SELECT * FROM phone p
-        WHERE p.STATUS = 'ACTIVE'
+        SELECT p.* FROM phone p
+        INNER JOIN brand b ON p.BRAND_ID = b.ID
+        WHERE p.STATUS = 'ACTIVE' AND b.STATUS = 'ACTIVE'
           AND MATCH(p.NAME, p.DESCRIPTION) AGAINST(:query IN BOOLEAN MODE)
         """,
         countQuery = """
         SELECT count(*) FROM phone p
-        WHERE p.STATUS = 'ACTIVE'
+        INNER JOIN brand b ON p.BRAND_ID = b.ID
+        WHERE p.STATUS = 'ACTIVE' AND b.STATUS = 'ACTIVE'
           AND MATCH(p.NAME, p.DESCRIPTION) AGAINST(:query IN BOOLEAN MODE)
         """,
         nativeQuery = true)
@@ -75,6 +81,7 @@ public interface PhoneRepository extends JpaRepository<Phone, Long>, JpaSpecific
     /**
      * Nạp tối ưu danh sách điện thoại để so sánh cấu hình:
      * JOIN FETCH brand và variants (kèm RAM, Storage, Color options) trong 1 truy vấn tránh N+1.
+     * Chỉ so sánh các máy đang ACTIVE thuộc thương hiệu ACTIVE.
      */
     @Query("""
         SELECT DISTINCT p FROM Phone p
@@ -83,7 +90,14 @@ public interface PhoneRepository extends JpaRepository<Phone, Long>, JpaSpecific
         LEFT JOIN FETCH v.ramItem
         LEFT JOIN FETCH v.storageItem
         LEFT JOIN FETCH v.colorItem
-        WHERE p.id IN :ids AND p.status = 'ACTIVE'
+        WHERE p.id IN :ids AND p.status = 'ACTIVE' AND p.brand.status = 'ACTIVE'
     """)
     List<Phone> findPhonesForComparison(@Param("ids") List<Long> ids);
+
+    /**
+     * Đồng bộ trạng thái toàn bộ sản phẩm theo thương hiệu (Cascade update khi bật/tắt Brand).
+     */
+    @Modifying
+    @Query("UPDATE Phone p SET p.status = :status WHERE p.brand.id = :brandId")
+    int updateStatusByBrandId(@Param("brandId") Long brandId, @Param("status") String status);
 }

@@ -278,6 +278,9 @@ export interface OrderRequest {
 export interface OrderDetailDTO {
   id: number;
   phoneVariantId: number;
+  phoneId?: number;
+  imageUrl?: string;
+  productStatus?: string;
   productName: string;
   ram: string;
   storage: string;
