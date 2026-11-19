@@ -11,5 +11,7 @@ public interface WarehouseTransferItemRepository extends JpaRepository<Warehouse
     List<WarehouseTransferItem> findByTransferId(Long transferId);
 
     List<WarehouseTransferItem> findByTransferIdIn(Collection<Long> transferIds);
+
+    boolean existsByPhoneVariantId(Long phoneVariantId);
 }
 
