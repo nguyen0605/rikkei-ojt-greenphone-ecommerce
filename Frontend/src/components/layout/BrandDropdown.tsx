@@ -4,6 +4,7 @@ import { ChevronDown, Smartphone } from 'lucide-react';
 import { useBrands } from '@/hooks/useProducts';
 import { useAppSelector } from '@/store/hooks';
 import { ROUTES } from '@/routes/routePaths';
+import { getBrandLogoUrl } from '@/utils/brandLogos';
 
 interface BrandDropdownProps {
   className?: string;
@@ -18,21 +19,24 @@ export default function BrandDropdown({ className }: BrandDropdownProps) {
   const items: MenuProps['items'] = [
     { key: 'all', label: <Link to={ROUTES.PRODUCTS}>Tất cả hãng</Link> },
     { type: 'divider' },
-    ...(brands ?? []).map((brand) => ({
-      key: String(brand.id),
-      label: (
-        <Link to={`${ROUTES.PRODUCTS}?brandId=${brand.id}`} className="flex items-center gap-2">
-          {brand.logoUrl && (
-            <img
-              src={brand.logoUrl}
-              alt=""
-              className="h-5 w-5 shrink-0 object-contain"
-            />
-          )}
-          <span>{brand.name}</span>
-        </Link>
-      ),
-    })),
+    ...(brands ?? []).map((brand) => {
+      const logo = getBrandLogoUrl(brand.name, brand.logoUrl);
+      return {
+        key: String(brand.id),
+        label: (
+          <Link to={`${ROUTES.PRODUCTS}?brandId=${brand.id}`} className="flex items-center gap-2">
+            {logo && (
+              <img
+                src={logo}
+                alt=""
+                className="h-5 w-5 shrink-0 object-contain"
+              />
+            )}
+            <span>{brand.name}</span>
+          </Link>
+        ),
+      };
+    }),
   ];
 
   return (
