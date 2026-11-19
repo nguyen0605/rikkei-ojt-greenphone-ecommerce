@@ -49,5 +49,28 @@ public interface WarehouseRoutingService {
      * @return Kế hoạch điều chuyển chi tiết (InterWarehouseTransferPlan)
      */
     com.re.greenphone.dto.response.InterWarehouseTransferPlan routeInterWarehouseFulfillment(Double lat, Double lng, List<OrderItemRequirement> items);
+
+    /**
+     * Tim kho hang gan nhat theo toa do hoac tinh thanh va tra ve so luong ton kha dung cua cac bien the.
+     *
+     * @param lat Vi do giao hang (nullable)
+     * @param lng Kinh do giao hang (nullable)
+     * @param province Ten tinh thanh giao hang (nullable)
+     * @param variantIds Danh sach ma bien the can kiem tra ton kho (nullable)
+     * @return NearestWarehouseStockResponse
+     */
+    com.re.greenphone.dto.response.NearestWarehouseStockResponse findNearestWarehouseStock(
+            Double lat, Double lng, String province, List<Long> variantIds);
+
+    /**
+     * Lay danh sach cac chi nhanh kho hang va so luong ton kho thuc te cua mot bien the san pham (PDP kieu CellphoneS).
+     *
+     * @param variantId Ma bien the san pham
+     * @param lat Vi do nguoi dung (nullable de tinh khoang cach)
+     * @param lng Kinh do nguoi dung (nullable de tinh khoang cach)
+     * @return Danh sach chi nhanh kem ton kho va thong tin lien he
+     */
+    List<com.re.greenphone.dto.response.WarehouseBranchStockResponse> getBranchStocksForVariant(
+            Long variantId, Double lat, Double lng);
 }
 

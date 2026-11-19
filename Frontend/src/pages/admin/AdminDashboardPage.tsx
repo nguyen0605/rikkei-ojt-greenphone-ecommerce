@@ -2,18 +2,32 @@ import { useEffect, useState } from 'react';
 import type { ComponentPropsWithRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, Button, Card, DatePicker, Empty, Skeleton, Table, message } from 'antd';
-import { AppstoreOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DollarOutlined, FileExcelOutlined, FilePdfOutlined, InboxOutlined, LoadingOutlined, ReloadOutlined, RollbackOutlined, ShoppingCartOutlined, TruckOutlined } from '@ant-design/icons';
+import {
+  AppstoreOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  CloseCircleOutlined,
+  DollarOutlined,
+  FileExcelOutlined,
+  FilePdfOutlined,
+  InboxOutlined,
+  LoadingOutlined,
+  ReloadOutlined,
+  RollbackOutlined,
+  ShoppingCartOutlined,
+  TruckOutlined,
+} from '@ant-design/icons';
 import DashboardMetricCard, { type MetricTone } from '@/components/admin/dashboard/DashboardMetricCard';
 import '@/components/admin/dashboard/dashboard.css';
 import dayjs, { type Dayjs } from 'dayjs';
+import { formatVND } from '@/utils';
 import { adminStatisticsService } from '@/services/adminStatisticsService';
 import { useAppSelector } from '@/store/hooks';
-import { formatVND } from '@/utils';
 import FinancialKpiCards from '@/components/admin/dashboard/FinancialKpiCards';
 import RevenueLineChart from '@/components/admin/dashboard/RevenueLineChart';
 import PaymentMethodPieChart from '@/components/admin/dashboard/PaymentMethodPieChart';
-import { exportFinancialExcel } from '@/utils/exportFinancialExcel';
-// Dynamic import cho exportFinancialPdf để giảm kích thước bundle chunk chính (< 500KB)
+import DashboardPdfPreviewModal from '@/components/admin/dashboard/DashboardPdfPreviewModal';
+import { exportDashboardExcel, downloadDashboardPdf } from '@/utils/dashboardExportUtils';
 
 function KeyboardAccessibleTable(props: ComponentPropsWithRef<'table'>) {
   return <table {...props} tabIndex={0} aria-label="Bảng sản phẩm bán chạy, dùng phím mũi tên để cuộn" />;
@@ -27,8 +41,8 @@ export default function AdminDashboardPage() {
   const staff = ['ADMIN', 'SALES', 'MARKETING', 'WAREHOUSE'].includes(role ?? '');
   const canViewRevenue = ['ADMIN', 'SALES', 'MARKETING'].includes(role ?? '');
   const [month, setMonth] = useState<Dayjs>(dayjs());
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
-  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const from = month.startOf('month').toISOString().replace('Z', '');
   const to = month.startOf('month').add(1, 'month').toISOString().replace('Z', '');
@@ -48,49 +62,69 @@ export default function AdminDashboardPage() {
   const loading = orders.isLoading || top.isLoading || (isAdmin && finance.isLoading) || (canViewRevenue && !isAdmin && revenue.isLoading);
   const failed = orders.isError || top.isError || (isAdmin && finance.isError) || (canViewRevenue && !isAdmin && revenue.isError);
 
-  // [ORD-34] Xuất báo cáo Excel đa sheet theo phân quyền RBAC
-  const handleExportExcel = () => {
+  const rows: { label: string; value: number | string; monetary?: boolean }[] = [
+    { label: 'Đơn hàng', value: orders.data?.totalOrders ?? 0 },
+    { label: 'Chờ đóng gói', value: orders.data?.processingOrders ?? 0 },
+    { label: 'Đang giao', value: orders.data?.shippingOrders ?? 0 },
+    { label: 'Đã giao', value: orders.data?.deliveredOrders ?? 0 },
+    { label: 'Chờ xác nhận', value: orders.data?.pendingOrders ?? 0 },
+    { label: 'Đã hủy', value: orders.data?.cancelledOrders ?? 0 },
+  ];
+  if (canViewRevenue) rows.unshift({ label: 'Doanh thu thuần', value: amount ?? 0, monetary: true });
+  if (financial) rows.push(
+    { label: 'Doanh thu gộp', value: financial.grossRevenue, monetary: true },
+    { label: 'Giảm giá', value: financial.discountAmount, monetary: true },
+    { label: 'Phí vận chuyển', value: financial.shippingFee, monetary: true },
+    { label: 'Giá vốn hàng bán (COGS)', value: financial.cogs ?? 'Chưa đủ dữ liệu', monetary: true },
+    { label: 'Lợi nhuận gộp', value: financial.grossProfit ?? 'Chưa đủ dữ liệu', monetary: true },
+    { label: 'Biên lợi nhuận', value: financial.profitMarginPercentage == null ? 'Chưa đủ dữ liệu' : `${financial.profitMarginPercentage}%` },
+    { label: 'Tiền hoàn trả', value: financial.refundAmount, monetary: true },
+  );
+  const filename = `dashboard-${month.format('YYYY-MM')}`;
+
+  function exportExcel() {
     if (isExportingExcel) return;
+    setIsExportingExcel(true);
     try {
-      setIsExportingExcel(true);
-      exportFinancialExcel({
-        monthStr: month.format('MM-YYYY'),
-        userRole: user?.role,
+      exportDashboardExcel({
+        month,
+        filename,
+        role,
+        userFullName: user?.fullName,
+        rows,
+        topProducts: top.data ?? [],
         financial,
-        orders: orders.data,
-        topSelling: top.data ?? [],
-        revenueTotal: amount ?? 0,
+        points,
+        isAdmin,
+        canViewRevenue,
       });
       message.success('Xuất file Excel báo cáo thành công!');
-    } catch (err: any) {
-      message.error(err?.message || 'Có lỗi xảy ra khi xuất file Excel');
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi xuất file Excel';
+      message.error(errMsg);
     } finally {
       setIsExportingExcel(false);
     }
-  };
+  }
 
-  // [ORD-34] Xuất báo cáo PDF chuẩn doanh nghiệp (dùng Dynamic Import để tối ưu kích thước bundle < 500KB)
-  const handleExportPdf = async () => {
-    if (isExportingPdf) return;
-    try {
-      setIsExportingPdf(true);
-      // Tải động file PDF và font chữ khi người dùng bấm nút (tránh làm nặng trang ban đầu)
-      const { exportFinancialPdf } = await import('@/utils/exportFinancialPdf');
-      exportFinancialPdf({
-        monthStr: month.format('MM-YYYY'),
-        userRole: user?.role,
-        financial,
-        orders: orders.data,
-        topSelling: top.data ?? [],
-        revenueTotal: amount ?? 0,
-      });
-      message.success('Xuất file PDF báo cáo thành công!');
-    } catch (err: any) {
-      message.error(err?.message || 'Có lỗi xảy ra khi xuất file PDF');
-    } finally {
-      setIsExportingPdf(false);
-    }
-  };
+  function downloadPdf() {
+    downloadDashboardPdf({
+      month,
+      filename,
+      role,
+      userFullName: user?.fullName,
+      rows,
+      topProducts: top.data ?? [],
+      financial,
+      points,
+      isAdmin,
+      canViewRevenue,
+    });
+  }
+
+  function exportPdf() {
+    setPdfPreviewOpen(true);
+  }
 
   if (!staff) return <Alert type="warning" title="Bạn không có quyền xem thống kê" />;
 
@@ -112,6 +146,21 @@ export default function AdminDashboardPage() {
           <p className="dashboard-subtitle">Tổng quan hoạt động kinh doanh theo thời gian.</p>
         </div>
         <div className="dashboard-toolbar" role="group" aria-label="Bộ lọc và xuất báo cáo">
+          <Button
+            aria-label="Làm mới báo cáo"
+            icon={<ReloadOutlined spin={loading} />}
+            loading={loading}
+            onClick={() => {
+              void orders.refetch();
+              void top.refetch();
+              if (isAdmin) void finance.refetch();
+              else if (canViewRevenue) void revenue.refetch();
+              message.success('Đã làm mới dữ liệu tổng quan');
+            }}
+            className="!rounded-full hover:!border-primary-500 hover:!text-primary-600"
+          >
+            Làm mới
+          </Button>
           <DatePicker
             aria-label="Tháng báo cáo"
             picker="month"
@@ -126,16 +175,15 @@ export default function AdminDashboardPage() {
             icon={isExportingExcel ? <LoadingOutlined /> : <FileExcelOutlined />}
             loading={isExportingExcel}
             disabled={loading || failed}
-            onClick={handleExportExcel}
+            onClick={exportExcel}
           >
             Xuất Excel
           </Button>
           <Button
             aria-label="Xuất PDF"
-            icon={isExportingPdf ? <LoadingOutlined /> : <FilePdfOutlined />}
-            loading={isExportingPdf}
+            icon={<FilePdfOutlined />}
             disabled={loading || failed}
-            onClick={handleExportPdf}
+            onClick={exportPdf}
           >
             Xuất PDF
           </Button>
@@ -277,6 +325,18 @@ export default function AdminDashboardPage() {
           ]}
         />
       </Card>
+      <DashboardPdfPreviewModal
+        open={pdfPreviewOpen}
+        onClose={() => setPdfPreviewOpen(false)}
+        onDownload={downloadPdf}
+        month={month}
+        rows={rows}
+        topProducts={top.data ?? []}
+        financial={financial}
+        role={role}
+        userFullName={user?.fullName}
+        filename={filename}
+      />
     </div>
   );
 }

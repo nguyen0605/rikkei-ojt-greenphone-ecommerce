@@ -18,6 +18,8 @@ import {
   findDistrictByWard,
   getProvinceFromCoords,
   normalizeAdminName,
+  resolveAdminHierarchy,
+  findMatchingDistrict,
 } from '@/utils/vietnamAdministrative';
 import type { LocationCoords } from '@/components/checkout/CheckoutDeliveryMap';
 
@@ -195,25 +197,25 @@ export default function AddressModal({
             longitude: result.lng,
           });
 
-          // Tự động kiểm tra và đồng bộ lại Tỉnh/Thành nếu phát hiện không khớp
-          if (detected && form.getFieldValue('province') !== detected) {
-            form.setFieldsValue({ province: detected });
-          }
+          // Phân giải chuẩn thứ bậc hành chính để đồng bộ các trường
+          const resolved = resolveAdminHierarchy({
+            province: result.components?.province || form.getFieldValue('province'),
+            district: result.components?.district || form.getFieldValue('district'),
+            ward: result.components?.ward || form.getFieldValue('ward'),
+            fullText: [streetAddress, result.displayName].filter(Boolean).join(', '),
+            lat: result.lat,
+            lng: result.lng,
+          });
 
-          // Tự động điền Quận/Huyện nếu đang trống
-          if (!form.getFieldValue('district')) {
-            const detectedDist = result.components?.district || parseAddressComponents(streetAddress).district;
-            if (detectedDist) {
-              form.setFieldsValue({ district: detectedDist });
-            }
+          if (resolved.province && form.getFieldValue('province') !== resolved.province) {
+            prevProvinceRef.current = resolved.province;
+            form.setFieldsValue({ province: resolved.province });
           }
-
-          // Tự động điền Phường/Xã nếu đang trống
-          if (!form.getFieldValue('ward')) {
-            const detectedWard = result.components?.ward || parseAddressComponents(streetAddress).ward;
-            if (detectedWard) {
-              form.setFieldsValue({ ward: detectedWard });
-            }
+          if (resolved.district) {
+            form.setFieldsValue({ district: resolved.district });
+          }
+          if (resolved.ward) {
+            form.setFieldsValue({ ward: resolved.ward });
           }
 
           if (showToast) {
@@ -376,27 +378,25 @@ export default function AddressModal({
   // Chọn một gợi ý từ danh sách autocomplete
   const handleSelectStreetSuggestion = (s: AddressSuggestion) => {
     const chosenStreet = s.components?.streetAddress || s.title || s.place_name;
+
+    const resolved = resolveAdminHierarchy({
+      province: s.components?.province,
+      district: s.components?.district,
+      ward: s.components?.ward,
+      fullText: s.place_name,
+      lat: s.lat,
+      lng: s.lng,
+    });
+
+    prevProvinceRef.current = resolved.province;
     form.setFieldsValue({
       streetAddress: chosenStreet,
+      province: resolved.province,
+      district: resolved.district,
+      ward: resolved.ward,
       latitude: s.lat,
       longitude: s.lng,
     });
-
-    // Tự động điền Tỉnh/Thành nếu khớp
-    const matchProv = findMatchingProvince(s.components?.province || s.place_name);
-    if (matchProv) {
-      form.setFieldsValue({ province: matchProv });
-    }
-
-    // Tự động điền Quận/Huyện nếu có
-    if (s.components?.district) {
-      form.setFieldsValue({ district: s.components.district });
-    }
-
-    // Tự động điền Phường/Xã nếu có
-    if (s.components?.ward) {
-      form.setFieldsValue({ ward: s.components.ward });
-    }
 
     setSelectedCoords({
       lat: s.lat,
@@ -439,104 +439,100 @@ export default function AddressModal({
       return;
     }
 
-    // Kiểm tra nhanh quyền bằng Permissions API nếu trình duyệt hỗ trợ
-    if (typeof navigator !== 'undefined' && 'permissions' in navigator) {
-      try {
-        const permStatus = await navigator.permissions.query({ name: 'geolocation' });
-        if (permStatus.state === 'denied') {
-          setShowPermissionGuideModal(true);
-          message.warning('Vui lòng bật quyền truy cập vị trí trên trình duyệt (ở biểu tượng ổ khóa bên trái thanh URL) để tự động điền địa chỉ.');
-          return;
-        }
-      } catch {
-        // Permissions API query not supported or failed, fallback to standard getCurrentPosition
-      }
-    }
-
     setIsLocatingCurrentGps(true);
     setMapValidationError(null);
 
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
+    const getPosition = (options: PositionOptions): Promise<GeolocationPosition> => {
+      return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+      });
+    };
+
+    let pos: GeolocationPosition | null = null;
+    try {
+      // Buoc 1: Thu lay toa do GPS do chinh xac cao (GPS phan cung neu co)
+      pos = await getPosition({ enableHighAccuracy: true, timeout: 6000, maximumAge: 30000 });
+    } catch (firstErr: unknown) {
+      const err = firstErr as GeolocationPositionError;
+      // Neu loi timeout (code 3) hoac khong kha dung (code 2), thu fallback sang do chinh xac tieu chuan (WiFi / IP)
+      if (err?.code === 2 || err?.code === 3) {
         try {
-          const { latitude, longitude } = pos.coords;
-          if (!isValidCoordinate(latitude, longitude)) {
-            message.error('Tọa độ vị trí hiện tại không hợp lệ.');
-            return;
-          }
-
-          // Phân tích chi tiết địa chỉ từ tọa độ GPS
-          const details = await reverseGeocodeDetails(latitude, longitude);
-          const fullPlaceName = details?.place_name || `Vị trí (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
-
-          setSelectedCoords({
-            lat: latitude,
-            lng: longitude,
-            displayName: fullPlaceName,
-          });
-          setIsEstimateLocation(false);
-          setMapValidationError(null);
-          hasUserOverriddenCoords.current = true;
-
-          // Suy đoán và đồng bộ đầy đủ các trường Tỉnh/Thành, Quận/Huyện, Phường/Xã, Địa chỉ cụ thể
-          const resolvedProv =
-            findMatchingProvince(details?.components?.province) ||
-            findMatchingProvince(fullPlaceName) ||
-            getProvinceFromCoords(latitude, longitude) ||
-            'TP. Hồ Chí Minh';
-
-          let resolvedWard = details?.components?.ward || parseAddressComponents(fullPlaceName).ward || '';
-          let resolvedDist = details?.components?.district || parseAddressComponents(fullPlaceName).district || '';
-
-          if (!resolvedDist && resolvedProv && resolvedWard) {
-            resolvedDist = findDistrictByWard(resolvedProv, resolvedWard) || '';
-          }
-
-          // Nếu chưa có phường nhưng có quận, lấy phường đầu tiên của quận để form không bị trống
-          if (!resolvedWard && resolvedProv && resolvedDist) {
-            const wardsInDist = getWardsForDistrict(resolvedProv, resolvedDist);
-            if (wardsInDist.length > 0) {
-              resolvedWard = wardsInDist[0];
-            }
-          }
-
-          let resolvedStreet =
-            details?.components?.streetAddress ||
-            (details?.title && !details.title.startsWith('Vị trí') ? details.title : '') ||
-            (fullPlaceName && !fullPlaceName.startsWith('Vị trí') ? fullPlaceName.split(',')[0] : '') ||
-            `Khu vực tọa độ (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
-
-          // Gán đồng thời toàn bộ giá trị để cập nhật form tức thì, không bị thiếu sót trường nào
-          prevProvinceRef.current = resolvedProv;
-          form.setFieldsValue({
-            province: resolvedProv,
-            district: resolvedDist,
-            ward: resolvedWard,
-            streetAddress: resolvedStreet,
-            latitude,
-            longitude,
-          });
-
-          message.success('Đã xác định vị trí hiện tại và tự động điền đầy đủ địa chỉ!');
+          pos = await getPosition({ enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 });
         } catch {
-          message.warning('Đã xác định tọa độ nhưng không thể phân tích địa chỉ chi tiết.');
-        } finally {
-          setIsLocatingCurrentGps(false);
+          pos = null;
         }
-      },
-      (err) => {
+      }
+
+      if (!pos) {
         setIsLocatingCurrentGps(false);
-        if (err.code === 1 || err.code === (window.GeolocationPositionError?.PERMISSION_DENIED ?? 1)) {
+        if (err?.code === 1 || err?.code === (window.GeolocationPositionError?.PERMISSION_DENIED ?? 1)) {
           setShowPermissionGuideModal(true);
           message.warning('Vui lòng bật quyền truy cập vị trí trên trình duyệt (ở biểu tượng ổ khóa bên trái thanh URL) để tự động điền địa chỉ.');
-        } else if (err.code === 3 || err.code === (window.GeolocationPositionError?.TIMEOUT ?? 3)) {
+        } else if (err?.code === 3 || err?.code === (window.GeolocationPositionError?.TIMEOUT ?? 3)) {
           message.warning('Hết thời gian chờ định vị GPS. Vui lòng thử lại.');
         } else {
           message.warning('Không thể xác định vị trí hiện tại của thiết bị.');
         }
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
-    );
+        return;
+      }
+    }
+
+    try {
+      const { latitude, longitude } = pos.coords;
+      if (!isValidCoordinate(latitude, longitude)) {
+        message.error('Tọa độ vị trí hiện tại không hợp lệ.');
+        return;
+      }
+
+      // Tat modal huong dan neu dang mo
+      setShowPermissionGuideModal(false);
+
+      // Phân tích chi tiết địa chỉ từ tọa độ GPS
+      const details = await reverseGeocodeDetails(latitude, longitude);
+      const fullPlaceName = details?.place_name || `Vị trí (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
+
+      setSelectedCoords({
+        lat: latitude,
+        lng: longitude,
+        displayName: fullPlaceName,
+      });
+      setIsEstimateLocation(false);
+      setMapValidationError(null);
+      hasUserOverriddenCoords.current = true;
+
+      // Suy đoán và chuẩn hóa toàn diện thứ bậc hành chính
+      const resolved = resolveAdminHierarchy({
+        province: details?.components?.province,
+        district: details?.components?.district,
+        ward: details?.components?.ward,
+        fullText: fullPlaceName,
+        lat: latitude,
+        lng: longitude,
+      });
+
+      let resolvedStreet =
+        details?.components?.streetAddress ||
+        (details?.title && !details.title.startsWith('Vị trí') ? details.title : '') ||
+        (fullPlaceName && !fullPlaceName.startsWith('Vị trí') ? fullPlaceName.split(',')[0] : '') ||
+        `Khu vực tọa độ (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
+
+      // Gán đồng thời toàn bộ giá trị để cập nhật form tức thì, không bị thiếu sót trường nào
+      prevProvinceRef.current = resolved.province;
+      form.setFieldsValue({
+        province: resolved.province,
+        district: resolved.district,
+        ward: resolved.ward,
+        streetAddress: resolvedStreet,
+        latitude,
+        longitude,
+      });
+
+      message.success('Đã xác định vị trí hiện tại và tự động điền đầy đủ địa chỉ!');
+    } catch {
+      message.warning('Đã xác định tọa độ nhưng không thể phân tích địa chỉ chi tiết.');
+    } finally {
+      setIsLocatingCurrentGps(false);
+    }
   }, [form]);
 
   // Lắng nghe thay đổi trạng thái quyền vị trí từ trình duyệt theo thời gian thực qua Permissions API
@@ -546,17 +542,18 @@ export default function AddressModal({
     let permObj: PermissionStatus | null = null;
     let isCancelled = false;
 
+    const handlePermChange = () => {
+      if (permObj && permObj.state === 'granted') {
+        setShowPermissionGuideModal(false);
+        handleUseCurrentLocation();
+      }
+    };
+
     navigator.permissions
       .query({ name: 'geolocation' })
       .then((status) => {
         if (isCancelled) return;
         permObj = status;
-        const handlePermChange = () => {
-          if (status.state === 'granted') {
-            setShowPermissionGuideModal(false);
-            handleUseCurrentLocation();
-          }
-        };
         status.addEventListener('change', handlePermChange);
       })
       .catch(() => {});
@@ -564,10 +561,22 @@ export default function AddressModal({
     return () => {
       isCancelled = true;
       if (permObj) {
-        permObj.onchange = null;
+        permObj.removeEventListener('change', handlePermChange);
       }
     };
   }, [handleUseCurrentLocation]);
+
+  // Khi người dùng bấm Tải lại trang (F5) từ modal hướng dẫn, tự động định vị lại sau khi mở modal
+  useEffect(() => {
+    if (!open) return;
+    if (typeof window !== 'undefined' && sessionStorage.getItem('gp_auto_locate_on_reload') === 'true') {
+      sessionStorage.removeItem('gp_auto_locate_on_reload');
+      const timer = setTimeout(() => {
+        handleUseCurrentLocation();
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [open, handleUseCurrentLocation]);
 
   // Xử lý khi người dùng tương tác trực tiếp trên bản đồ (click hoặc kéo marker)
   const handleMapLocationSelect = useCallback(
@@ -582,17 +591,14 @@ export default function AddressModal({
       const fullPlaceName =
         details?.place_name || coords.displayName || `Vị trí (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)})`;
 
-      const resolvedProv =
-        findMatchingProvince(details?.components?.province) ||
-        findMatchingProvince(fullPlaceName) ||
-        getProvinceFromCoords(coords.lat, coords.lng);
-
-      let resolvedWard = details?.components?.ward || parseAddressComponents(fullPlaceName).ward || '';
-      let resolvedDist = details?.components?.district || parseAddressComponents(fullPlaceName).district || '';
-
-      if (!resolvedDist && resolvedProv && resolvedWard) {
-        resolvedDist = findDistrictByWard(resolvedProv, resolvedWard) || '';
-      }
+      const resolved = resolveAdminHierarchy({
+        province: details?.components?.province,
+        district: details?.components?.district,
+        ward: details?.components?.ward,
+        fullText: fullPlaceName,
+        lat: coords.lat,
+        lng: coords.lng,
+      });
 
       const currentStreet = form.getFieldValue('streetAddress');
       let finalStreet = currentStreet;
@@ -608,19 +614,12 @@ export default function AddressModal({
         latitude: coords.lat,
         longitude: coords.lng,
         streetAddress: finalStreet,
+        province: resolved.province,
+        district: resolved.district,
+        ward: resolved.ward,
       };
 
-      if (resolvedProv) {
-        prevProvinceRef.current = resolvedProv;
-        updateValues.province = resolvedProv;
-      }
-      if (resolvedDist) {
-        updateValues.district = resolvedDist;
-      }
-      if (resolvedWard) {
-        updateValues.ward = resolvedWard;
-      }
-
+      prevProvinceRef.current = resolved.province;
       form.setFieldsValue(updateValues);
     },
     [form]
@@ -1224,24 +1223,41 @@ export default function AddressModal({
               </span>
             </div>
           </div>
-          <p className="text-[11px] text-gray-600 pl-6">
-            Sau khi bấm, hệ thống sẽ <strong>tự động nhận diện và điền địa chỉ tức thì</strong> mà không cần tải lại trang.
-          </p>
+          <div className="rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-[11px] text-amber-800 leading-normal">
+            <strong>Mẹo áp dụng ngay:</strong> Trên Google Chrome, sau khi gạt Bật ở ổ khóa, trình duyệt cần <strong>tải lại trang (F5)</strong> để áp dụng quyền mới. Hãy bấm nút <strong>Tải lại trang (F5)</strong> bên dưới để hệ thống tự động tải lại và lấy vị trí ngay. Nếu dùng máy tính bàn/laptop Windows, hãy kiểm tra thêm mục <em>Cài đặt Windows &gt; Quyền riêng tư (Privacy) &gt; Vị trí (Location)</em> cũng đang được Bật.
+          </div>
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center justify-end gap-2 pt-1 border-t border-gray-100">
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100">
           <Button onClick={() => setShowPermissionGuideModal(false)} className="!rounded-xl text-xs">
             Đóng
           </Button>
-          <Button
-            type="primary"
-            loading={isLocatingCurrentGps}
-            onClick={() => handleUseCurrentLocation()}
-            className="!rounded-xl !bg-blue-600 hover:!bg-blue-700 text-xs font-semibold"
-          >
-            Tôi đã bật, định vị ngay
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  sessionStorage.setItem('gp_auto_locate_on_reload', 'true');
+                  sessionStorage.setItem('gp_auto_open_address_modal', 'true');
+                  window.location.reload();
+                }
+              }}
+              className="!rounded-xl text-xs font-semibold !text-blue-600 !border-blue-300 hover:!bg-blue-50"
+            >
+              Tải lại trang (F5)
+            </Button>
+            <Button
+              type="primary"
+              loading={isLocatingCurrentGps}
+              onClick={async () => {
+                setShowPermissionGuideModal(false);
+                await handleUseCurrentLocation();
+              }}
+              className="!rounded-xl !bg-blue-600 hover:!bg-blue-700 text-xs font-semibold"
+            >
+              Tôi đã bật, định vị ngay
+            </Button>
+          </div>
         </div>
       </div>
     </Modal>

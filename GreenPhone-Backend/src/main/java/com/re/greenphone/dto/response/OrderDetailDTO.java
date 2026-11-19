@@ -13,6 +13,9 @@ public class OrderDetailDTO {
 
     private Long id;
     private Long phoneVariantId;
+    private Long phoneId;
+    private String imageUrl;
+    private String productStatus;
     private String productName;
     private String ram;
     private String storage;

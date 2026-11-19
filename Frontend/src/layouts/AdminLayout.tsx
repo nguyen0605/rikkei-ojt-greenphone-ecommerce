@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import './admin-layout.css';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useQueryClient, useIsFetching } from '@tanstack/react-query';
 import {
   DashboardOutlined, PhoneOutlined, TagOutlined, ShoppingCartOutlined,
   UserOutlined, StarOutlined, GiftOutlined, PictureOutlined,
   LogoutOutlined, MenuFoldOutlined, MenuUnfoldOutlined, SettingOutlined,
   MenuOutlined, TagsOutlined, DatabaseOutlined, TeamOutlined,
-  SwapOutlined, SafetyCertificateOutlined, GlobalOutlined,
+  SwapOutlined, SafetyCertificateOutlined, GlobalOutlined, ReloadOutlined,
 } from '@ant-design/icons';
-import { Button, Tag } from 'antd';
+import { Button, Tag, message } from 'antd';
 import RequireAuth from '@/components/auth/RequireAuth';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { logout } from '@/store/slices/authSlice';
@@ -119,6 +120,22 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
+  const queryClient = useQueryClient();
+  const isFetchingCount = useIsFetching();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Làm mới toàn bộ dữ liệu cache của tất cả trang Admin
+  const handleGlobalRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      await queryClient.refetchQueries();
+      message.success('Đã làm mới dữ liệu toàn hệ thống');
+    } catch {
+      message.error('Lỗi khi làm mới dữ liệu');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const userRole = user?.role
     ? user.role.startsWith('ROLE_')
@@ -164,14 +181,25 @@ export default function AdminLayout() {
               <span className="text-sm font-bold text-ink">GreenPhone Admin</span>
             </div>
           </div>
-          <button
-            onClick={() => navigate('/')}
-            className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
-            title="Về trang cửa hàng"
-          >
-            <GlobalOutlined />
-            <span>Cửa hàng</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleGlobalRefresh}
+              disabled={isRefreshing || isFetchingCount > 0}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-60"
+              title="Làm mới dữ liệu"
+            >
+              <ReloadOutlined className={isRefreshing || isFetchingCount > 0 ? 'animate-spin' : ''} />
+              <span>Làm mới</span>
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+              title="Về trang cửa hàng"
+            >
+              <GlobalOutlined />
+              <span>Cửa hàng</span>
+            </button>
+          </div>
         </div>
 
         {/* Mobile overlay */}
@@ -225,6 +253,16 @@ export default function AdminLayout() {
 
           {/* Footer */}
           <div className="border-t border-rule p-3 space-y-1">
+            <button
+              aria-label="Làm mới toàn bộ dữ liệu"
+              title={collapsed ? 'Làm mới dữ liệu' : undefined}
+              disabled={isRefreshing || isFetchingCount > 0}
+              onClick={handleGlobalRefresh}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-2 transition-colors duration-200 hover:bg-primary-50 hover:text-primary-700 disabled:opacity-60"
+            >
+              <ReloadOutlined className={`text-[15px] leading-none ${isRefreshing || isFetchingCount > 0 ? 'animate-spin text-primary-600' : ''}`} />
+              {!collapsed && (isRefreshing || isFetchingCount > 0 ? 'Đang làm mới...' : 'Làm mới dữ liệu')}
+            </button>
             <button
               aria-label="Về trang người dùng"
               title={collapsed ? 'Xem trang cửa hàng' : undefined}

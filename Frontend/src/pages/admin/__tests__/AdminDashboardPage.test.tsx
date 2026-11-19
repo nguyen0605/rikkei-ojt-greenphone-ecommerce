@@ -36,10 +36,10 @@ vi.mock('jspdf', () => ({
   }
 }));
 vi.mock('jspdf-autotable', () => ({
-  default: vi.fn((doc, options) => {
+  default: vi.fn((_doc, options) => {
     if (options?.body) {
-      options.body.forEach((row: any[]) => {
-        row.forEach((cell: any) => fillText(String(cell)));
+      options.body.forEach((row: unknown[]) => {
+        row.forEach((cell: unknown) => fillText(String(cell)));
       });
     }
   }),
@@ -102,8 +102,22 @@ describe('Dashboard role security', () => {
   it.each(['ROLE_ADMIN', 'ROLE_SALES', 'ROLE_MARKETING', 'ROLE_WAREHOUSE'])('PDF for %s uses authorized data only', async (role) => {
     state.auth.user.role = role;
     fillText.mockClear();
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      fillText: (content: string) => fillText(content),
+      fillRect: vi.fn(),
+      beginPath: vi.fn(),
+      stroke: vi.fn(),
+      roundRect: vi.fn(),
+      arc: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      measureText: vi.fn(() => ({ width: 50 })),
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,demo');
     mount(); await waitFor(() => expect(screen.getByRole('button', { name: 'Xuất PDF' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Xuất PDF' }));
+    expect(await screen.findByText('Xem trước báo cáo PDF')).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Tải xuống PDF' }));
     await waitFor(() => expect(pdf.save).toHaveBeenCalledOnce());
     const text = JSON.stringify(fillText.mock.calls);
     if (role === 'ROLE_ADMIN') expect(text).toContain('COGS');

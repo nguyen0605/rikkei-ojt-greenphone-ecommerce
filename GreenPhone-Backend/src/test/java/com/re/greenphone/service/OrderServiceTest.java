@@ -49,6 +49,8 @@ class OrderServiceTest {
     @Mock private InventoryStockHistoryService inventoryStockHistoryService;
     @Mock private WarehouseRoutingService warehouseRoutingService;
     @Mock private WarehouseTransferService warehouseTransferService;
+    @Mock private WarehouseStockRepository warehouseStockRepository;
+    @Mock private WarehouseRepository warehouseRepository;
     @Mock private jakarta.persistence.EntityManager entityManager;
     @Mock private RedisTemplate<String, Object> redisTemplate;
     @Mock private ValueOperations<String, Object> valueOperations;
@@ -68,6 +70,21 @@ class OrderServiceTest {
         mockWarehouse.setCode("WH-HN-MAIN");
         mockWarehouse.setName("Kho Tổng Hà Nội");
         lenient().when(warehouseRoutingService.routeWarehouseForOrder(any(), any(), any())).thenReturn(mockWarehouse);
+        lenient().when(warehouseRepository.findById(any())).thenReturn(Optional.of(mockWarehouse));
+        lenient().when(warehouseRepository.findByCode(any())).thenReturn(Optional.of(mockWarehouse));
+
+        com.re.greenphone.dto.response.NearestWarehouseStockResponse mockNearest = com.re.greenphone.dto.response.NearestWarehouseStockResponse.builder()
+                .warehouseId(1L)
+                .warehouseCode("WH-HN-MAIN")
+                .warehouseName("Kho Tổng Hà Nội")
+                .stocks(java.util.Map.of(1L, 100))
+                .build();
+        lenient().when(warehouseRoutingService.findNearestWarehouseStock(any(), any(), any(), any())).thenReturn(mockNearest);
+
+        WarehouseStock mockWs = new WarehouseStock();
+        mockWs.setQuantity(100);
+        mockWs.setReservedQuantity(0);
+        lenient().when(warehouseStockRepository.findByWarehouseIdAndPhoneVariantIdForUpdate(any(), any())).thenReturn(Optional.of(mockWs));
 
         com.re.greenphone.dto.response.InterWarehouseTransferPlan mockPlan = com.re.greenphone.dto.response.InterWarehouseTransferPlan.builder()
                 .destinationWarehouse(mockWarehouse)

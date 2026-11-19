@@ -42,7 +42,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("select function('date', function('convert_tz', o.createdAt, '+00:00', '+07:00')), sum(o.totalAmount), sum(coalesce(o.discountAmount,0)), sum(coalesce(o.shippingFee,0)), count(o) from Order o where o.paymentStatus='PAID' and o.createdAt>=:from and o.createdAt<:to group by function('date', function('convert_tz', o.createdAt, '+00:00', '+07:00'))")
     List<Object[]> financialDaily(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
-    @Query("select o.paymentMethod, sum(o.totalAmount-coalesce(o.discountAmount,0)) from Order o where o.paymentStatus='PAID' and o.createdAt>=:from and o.createdAt<:to group by o.paymentMethod")
+    @Query("select o.paymentMethod, sum(o.totalAmount-coalesce(o.discountAmount,0)), count(o) from Order o where o.paymentStatus='PAID' and o.orderStatus != 'CANCELLED' and o.createdAt>=:from and o.createdAt<:to group by o.paymentMethod")
     List<Object[]> paymentBreakdown(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
     long countByOrderStatus(String orderStatus);

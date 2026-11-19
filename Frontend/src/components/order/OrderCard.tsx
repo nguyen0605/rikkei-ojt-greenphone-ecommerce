@@ -9,7 +9,7 @@ import {
   XCircle,
   Eye,
 } from 'lucide-react';
-import { message } from 'antd';
+import { message, Tooltip } from 'antd';
 import type { OrderDTO, OrderDetailDTO } from '@/types/api';
 import { formatVND, formatDate } from '@/utils';
 import { useAppDispatch } from '@/store/hooks';
@@ -31,6 +31,8 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onCancelRequest }) 
   const [isReordering, setIsReordering] = useState(false);
 
   const statusConfig = getStatusBadgeConfig(order.orderStatus, order.paymentStatus);
+
+  const isOrderActive = ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPING'].includes(order.orderStatus);
 
   // Điều kiện nút hành động theo nghiệp vụ chặt chẽ: PENDING hoặc CONFIRMED đều có thể yêu cầu hủy
   const canCancel = order.orderStatus === 'PENDING' || order.orderStatus === 'CONFIRMED';
@@ -158,12 +160,23 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onCancelRequest }) 
                       {item.productName}
                     </h4>
                     {resolved.isInactive && (
-                      <span
-                        data-testid="product-inactive-badge"
-                        className="rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600"
-                      >
-                        Sản phẩm hiện đã ngừng kinh doanh
-                      </span>
+                      isOrderActive ? (
+                        <Tooltip title="Đơn hàng của bạn đang được đóng gói và giao bình thường theo đúng cam kết. Cửa hàng hiện tạm dừng nhận thêm đơn mới cho sản phẩm này.">
+                          <span
+                            data-testid="product-inactive-badge"
+                            className="cursor-help rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
+                          >
+                            Đang xử lý giao hàng • Tạm dừng nhận đặt mới
+                          </span>
+                        </Tooltip>
+                      ) : (
+                        <span
+                          data-testid="product-inactive-badge"
+                          className="rounded-md border border-gray-200 bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600"
+                        >
+                          Sản phẩm hiện đã ngừng kinh doanh
+                        </span>
+                      )
                     )}
                   </div>
                 )}

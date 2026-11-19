@@ -22,6 +22,12 @@ import com.re.greenphone.repository.PromotionRepository;
 import com.re.greenphone.repository.UserPromotionRepository;
 import com.re.greenphone.service.EmailService;
 import com.re.greenphone.service.admin.InventoryStockHistoryService;
+import com.re.greenphone.entity.ReturnRequest;
+import com.re.greenphone.enums.ReturnStatus;
+import com.re.greenphone.enums.ReturnType;
+import com.re.greenphone.repository.ReturnRequestRepository;
+import com.re.greenphone.repository.UserRepository;
+import com.re.greenphone.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -54,6 +60,8 @@ public class AdminOrderService {
     private final InventoryStockHistoryService inventoryStockHistoryService;
     private final com.re.greenphone.service.WarehouseTransferService warehouseTransferService;
     private final com.re.greenphone.service.WarrantyService warrantyService;
+    private final ReturnRequestRepository returnRequestRepository;
+    private final UserRepository userRepository;
     private final jakarta.persistence.EntityManager entityManager;
 
     private boolean isValidTransition(String current, String next) {
@@ -68,6 +76,21 @@ public class AdminOrderService {
             case "SHIPPING" -> "DELIVERED".equals(next) || "CANCELLED".equals(next) || "COMPLETED".equals(next);
             case "DELIVERED" -> "COMPLETED".equals(next);
             case "CANCELLED", "COMPLETED" -> false; // Terminal states
+            default -> false;
+        };
+    }
+
+    private boolean isValidPaymentTransition(String current, String next) {
+        if (next == null) return false;
+        String cur = (current != null ? current : "UNPAID").toUpperCase();
+        String nxt = next.toUpperCase();
+        if (cur.equals(nxt)) return true;
+
+        return switch (cur) {
+            case "UNPAID" -> "PAID".equals(nxt);
+            case "PAID" -> "REFUND_PENDING".equals(nxt);
+            case "REFUND_PENDING" -> "REFUNDED".equals(nxt) || "PAID".equals(nxt);
+            case "REFUNDED" -> false; // Terminal state: đã hoàn tiền không thể chuyển đổi
             default -> false;
         };
     }
@@ -236,12 +259,46 @@ public class AdminOrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
 
-        if (!List.of("UNPAID", "PAID", "REFUND_PENDING", "REFUNDED").contains(paymentStatus)) {
+        if (paymentStatus == null || !List.of("UNPAID", "PAID", "REFUND_PENDING", "REFUNDED").contains(paymentStatus.toUpperCase())) {
             throw new BadRequestException("Trạng thái thanh toán không hợp lệ: " + paymentStatus);
         }
 
-        String previousPaymentStatus = order.getPaymentStatus();
-        if ("REFUNDED".equalsIgnoreCase(paymentStatus)) {
+        String targetStatus = paymentStatus.toUpperCase();
+        String previousPaymentStatus = order.getPaymentStatus() != null ? order.getPaymentStatus().toUpperCase() : "UNPAID";
+
+        if (!isValidPaymentTransition(previousPaymentStatus, targetStatus)) {
+            throw new BadRequestException(String.format(
+                    "Vi phạm quy trình: Không thể chuyển trạng thái thanh toán từ %s sang %s",
+                    previousPaymentStatus, targetStatus));
+        }
+
+        if (previousPaymentStatus.equals(targetStatus)) {
+            return orderMapper.toDto(order);
+        }
+
+        // Đồng bộ bản ghi Payment khi chuyển sang PAID
+        if ("PAID".equals(targetStatus)) {
+            List<Payment> payments = paymentRepository.findByOrderIdOrderByIdAsc(order.getId());
+            if (payments.isEmpty()) {
+                Payment payment = Payment.builder()
+                        .order(order)
+                        .paymentProvider(order.getPaymentMethod() != null ? order.getPaymentMethod() : "MANUAL_ADMIN")
+                        .transactionCode("MANUAL-" + order.getId() + "-" + System.currentTimeMillis())
+                        .amount(order.getFinalAmount() != null ? order.getFinalAmount() : order.getTotalAmount())
+                        .paidAt(LocalDateTime.now())
+                        .build();
+                paymentRepository.save(payment);
+            } else {
+                for (Payment payment : payments) {
+                    if (payment.getPaidAt() == null) {
+                        payment.setPaidAt(LocalDateTime.now());
+                        paymentRepository.save(payment);
+                    }
+                }
+            }
+        }
+
+        if ("REFUNDED".equals(targetStatus)) {
             String existingNote = order.getNote() != null ? order.getNote().trim() : "";
             String refundTag = "[Kế toán đã hoàn tiền thành công lúc " + java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").format(LocalDateTime.now()) + "]";
             if (!existingNote.contains("[Kế toán đã hoàn tiền")) {
@@ -249,16 +306,21 @@ public class AdminOrderService {
             }
         }
 
-        order.setPaymentStatus(paymentStatus);
+        order.setPaymentStatus(targetStatus);
         order = orderRepository.save(order);
 
         orderHistoryRepository.save(com.re.greenphone.entity.OrderHistory.builder()
                 .order(order)
                 .fromStatus(previousPaymentStatus)
-                .toStatus(paymentStatus)
-                .note("REFUNDED".equalsIgnoreCase(paymentStatus) ? "Kế toán đã hoàn tiền thành công" : "Cập nhật trạng thái thanh toán sang " + paymentStatus)
+                .toStatus(targetStatus)
+                .note("REFUNDED".equals(targetStatus) ? "Kế toán đã hoàn tiền thành công" : "Cập nhật trạng thái thanh toán sang " + targetStatus)
                 .changedBy("ADMIN")
                 .build());
+
+        // [TỰ ĐỘNG LIÊN THÔNG]: Khi admin xác nhận hoàn tiền (REFUNDED), tự động đồng bộ sang bảng return_request để trang Đổi trả & Hoàn tiền theo dõi
+        if ("REFUNDED".equalsIgnoreCase(paymentStatus)) {
+            syncToReturnRequestOnRefund(order);
+        }
 
         return orderMapper.toDto(order);
     }
@@ -349,6 +411,64 @@ public class AdminOrderService {
             }
         } catch (Exception e) {
             log.error("Failed to trigger delivered email for order {}", order.getId(), e);
+        }
+    }
+
+    /**
+     * Tự động đồng bộ phiếu sang bảng return_request khi đơn hàng được đánh dấu hoàn tiền (REFUNDED)
+     * Giúp trang Thẩm định Đổi trả & Hoàn tiền (/admin/doi-tra) ghi nhận được lịch sử hoàn tiền này.
+     */
+    private void syncToReturnRequestOnRefund(Order order) {
+        try {
+            // Kiểm tra xem đơn hàng này đã có phiếu hoàn tiền chưa để tránh trùng lặp
+            List<ReturnRequest> existingRequests = returnRequestRepository.findByOrderId(order.getId());
+            boolean alreadyHasRefund = existingRequests.stream()
+                    .anyMatch(r -> r.getType() == ReturnType.REFUND);
+
+            if (alreadyHasRefund) {
+                log.info("Đơn hàng #{} đã có bản ghi hoàn tiền trong return_request, bỏ qua tạo mới", order.getId());
+                return;
+            }
+
+            // Lấy PhoneVariant đại diện từ chi tiết đơn hàng (bắt buộc trong entity ReturnRequest)
+            PhoneVariant variant = null;
+            if (order.getOrderDetails() != null && !order.getOrderDetails().isEmpty()) {
+                variant = order.getOrderDetails().get(0).getPhoneVariant();
+            }
+
+            if (variant == null) {
+                log.warn("Đơn hàng #{} không tìm thấy PhoneVariant trong orderDetails để tạo ReturnRequest", order.getId());
+                return;
+            }
+
+            // Lấy thông tin admin hiện tại đang thao tác
+            Long currentUserId = SecurityUtils.getCurrentUser() != null ? SecurityUtils.getCurrentUser().getId() : null;
+            com.re.greenphone.entity.User adminUser = (currentUserId != null)
+                    ? userRepository.findById(currentUserId).orElse(null)
+                    : null;
+
+            String returnCode = "REF-" + order.getId() + "-" + java.util.UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+
+            ReturnRequest returnRequest = ReturnRequest.builder()
+                    .returnCode(returnCode)
+                    .order(order)
+                    .phoneVariant(variant)
+                    .user(order.getUser())
+                    .reason("Admin hoàn tiền cho đơn hàng (Quản lý đơn hàng)")
+                    .errorDescription("Hoàn tiền đơn hàng #" + order.getId() + " với số tiền " + order.getFinalAmount() + " VNĐ")
+                    .proofImagesJson("[]")
+                    .type(ReturnType.REFUND)
+                    .status(ReturnStatus.COMPLETED)
+                    .refundAmount(order.getFinalAmount() != null ? order.getFinalAmount() : java.math.BigDecimal.ZERO)
+                    .adminNote("Kế toán/Admin đã xác nhận hoàn tiền thành công")
+                    .reviewedBy(adminUser)
+                    .reviewedAt(LocalDateTime.now())
+                    .build();
+
+            returnRequestRepository.save(returnRequest);
+            log.info("Đã tự động tạo phiếu ReturnRequest hoàn tiền: code={}, orderId={}", returnCode, order.getId());
+        } catch (Exception ex) {
+            log.error("Lỗi khi tự động đồng bộ sang ReturnRequest cho đơn #{}: {}", order.getId(), ex.getMessage(), ex);
         }
     }
 }

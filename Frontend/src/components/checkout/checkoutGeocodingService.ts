@@ -5,7 +5,12 @@
  */
 
 import { findMatchingProvince, parseAddressComponents } from '@/utils/provinces';
-import { findDistrictByWard, getProvinceFromCoords } from '@/utils/vietnamAdministrative';
+import {
+  findDistrictByWard,
+  getProvinceFromCoords,
+  resolveAdminHierarchy,
+  findMatchingDistrict,
+} from '@/utils/vietnamAdministrative';
 
 export interface AddressSuggestion {
   id: string;
@@ -120,13 +125,22 @@ export const KNOWN_VN_LOCATIONS: KnownLocation[] = [
     ward: 'Phường Long Bình',
   },
   {
-    name: '97 Man Thiện, Phường Tăng Nhơn Phú, TP. Thủ Đức, TP. Hồ Chí Minh',
-    keywords: ['97 man thien', '97 man thiện', '97', 'man thien', 'man thiện', 'tang nhon phu', 'tăng nhơn phú'],
+    name: '97 Man Thiện, Phường Tăng Nhơn Phú A, TP. Thủ Đức, TP. Hồ Chí Minh',
+    keywords: ['97 man thien', '97 man thiện', '97', 'man thien', 'man thiện', 'tang nhon phu', 'tăng nhơn phú', 'hoc vien cong nghe buu chinh vien thong', 'ptit'],
     lat: 10.8477,
     lng: 106.7857,
     province: 'TP. Hồ Chí Minh',
     district: 'Thành phố Thủ Đức',
     ward: 'Phường Tăng Nhơn Phú A',
+  },
+  {
+    name: 'Passio Coffee Nguyễn Đình Chiểu, Phường Đa Kao, Quận 1, TP. Hồ Chí Minh',
+    keywords: ['passio coffee nguyen dinh chieu', 'passio coffee', 'passio nguyen dinh chieu', 'passio', 'nguyen dinh chieu'],
+    lat: 10.7897,
+    lng: 106.7010,
+    province: 'TP. Hồ Chí Minh',
+    district: 'Quận 1',
+    ward: 'Phường Đa Kao',
   },
   {
     name: 'Khu Công Nghệ Cao (SHTP), Đường D1, Long Thạnh Mỹ, TP. Thủ Đức, TP. Hồ Chí Minh',
@@ -625,8 +639,18 @@ function mapPhotonFeatureToSuggestion(f: PhotonFeature): AddressSuggestion | nul
     title = district || city || 'Địa chỉ được chọn';
   }
 
+  // Phân giải chuẩn thứ bậc hành chính (loại bỏ 'Saigon', ánh xạ 'Tăng Nhơn Phú' -> Quận 'Thành phố Thủ Đức', Phường 'Tăng Nhơn Phú A')
+  const resolved = resolveAdminHierarchy({
+    province: city || props.state,
+    district: district,
+    ward: locality,
+    fullText: [title, street, name, locality, district, city, props.state].filter(Boolean).join(', '),
+    lat,
+    lng,
+  });
+
   // Xác định phụ đề hành chính (Subtitle)
-  const subParts = [locality, district, city, country].filter(
+  const subParts = [resolved.ward, resolved.district, resolved.province, country].filter(
     (p, i, arr) => p && arr.indexOf(p) === i && !title.includes(p)
   );
   const subtitle = subParts.join(', ') || 'Việt Nam';
@@ -644,10 +668,10 @@ function mapPhotonFeatureToSuggestion(f: PhotonFeature): AddressSuggestion | nul
     lng,
     source: 'photon',
     components: {
-      province: city || props.state,
-      district: district,
-      ward: locality,
-      streetAddress: houseNumber && street ? `${houseNumber} ${street}` : title,
+      province: resolved.province,
+      district: resolved.district,
+      ward: resolved.ward,
+      streetAddress: houseNumber && street ? `${houseNumber} ${street}` : (street || title),
     },
   };
 }
@@ -790,26 +814,14 @@ export async function reverseGeocodeDetails(
         const rawDistrict = addr.city_district || addr.district || addr.county || addr.town || '';
         const rawProvince = addr.city || addr.province || addr.state || '';
 
-        const resolvedProv =
-          findMatchingProvince(rawProvince) ||
-          findMatchingProvince(data.display_name) ||
-          getProvinceFromCoords(lat, lng) ||
-          'TP. Hồ Chí Minh';
-
-        let resolvedWard = rawWard;
-        let resolvedDist = rawDistrict;
-
-        // Nếu thiếu quận/huyện nhưng có phường/xã, tự tra cứu quận/huyện trực thuộc
-        if (!resolvedDist && resolvedProv && resolvedWard) {
-          resolvedDist = findDistrictByWard(resolvedProv, resolvedWard) || '';
-        }
-
-        // Nếu thiếu phường/xã hoặc quận/huyện, phân tích display_name
-        if (!resolvedDist || !resolvedWard) {
-          const parsed = parseAddressComponents(data.display_name || '');
-          if (!resolvedDist && parsed.district) resolvedDist = parsed.district;
-          if (!resolvedWard && parsed.ward) resolvedWard = parsed.ward;
-        }
+        const resolved = resolveAdminHierarchy({
+          province: rawProvince,
+          district: rawDistrict,
+          ward: rawWard,
+          fullText: data.display_name,
+          lat,
+          lng,
+        });
 
         let streetAddress = '';
         if (houseNumber && road) {
@@ -820,7 +832,7 @@ export async function reverseGeocodeDetails(
           streetAddress = road;
         } else if (residential) {
           streetAddress = residential;
-        } else if (data.name && data.name !== resolvedWard && data.name !== resolvedDist) {
+        } else if (data.name && data.name !== resolved.ward && data.name !== resolved.district) {
           streetAddress = data.name;
         } else {
           streetAddress = data.display_name?.split(',')[0] || '';
@@ -829,15 +841,15 @@ export async function reverseGeocodeDetails(
         return {
           id: `nominatim-${data.place_id || `${lat}-${lng}`}`,
           place_name: data.display_name,
-          title: streetAddress || resolvedWard || resolvedDist || 'Vị trí hiện tại',
-          subtitle: [resolvedWard, resolvedDist, resolvedProv].filter(Boolean).join(', ') || 'Việt Nam',
+          title: streetAddress || resolved.ward || resolved.district || 'Vị trí hiện tại',
+          subtitle: [resolved.ward, resolved.district, resolved.province].filter(Boolean).join(', ') || 'Việt Nam',
           lat,
           lng,
           source: 'nominatim',
           components: {
-            province: resolvedProv,
-            district: resolvedDist,
-            ward: resolvedWard,
+            province: resolved.province,
+            district: resolved.district,
+            ward: resolved.ward,
             streetAddress,
           },
         };
@@ -866,23 +878,6 @@ export async function reverseGeocodeDetails(
       if (Array.isArray(data.features) && data.features.length > 0) {
         const suggestion = mapPhotonFeatureToSuggestion(data.features[0]);
         if (suggestion) {
-          const resolvedProv =
-            findMatchingProvince(suggestion.components?.province) ||
-            findMatchingProvince(suggestion.place_name) ||
-            getProvinceFromCoords(lat, lng);
-
-          let resolvedDist = suggestion.components?.district || '';
-          const resolvedWard = suggestion.components?.ward || '';
-
-          if (!resolvedDist && resolvedProv && resolvedWard) {
-            resolvedDist = findDistrictByWard(resolvedProv, resolvedWard) || '';
-          }
-
-          if (suggestion.components) {
-            suggestion.components.province = resolvedProv || suggestion.components.province;
-            suggestion.components.district = resolvedDist || suggestion.components.district;
-          }
-
           return suggestion;
         }
       }

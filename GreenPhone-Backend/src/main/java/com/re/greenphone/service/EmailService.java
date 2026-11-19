@@ -480,6 +480,75 @@ public class EmailService {
             """.formatted(fullName);
     }
 
+    @Async("mailTaskExecutor")
+    public void sendAccountBlockedEmail(String toEmail, String fullName, String reason, java.time.LocalDateTime blockedAt, String ticketId) {
+        String subject = "Thông báo tạm ngưng/khóa tài khoản - GreenPhone [Mã hồ sơ: " + ticketId + "]";
+        String body = buildAccountBlockedEmail(toEmail, fullName, reason, blockedAt, ticketId);
+        send(toEmail, subject, body);
+    }
+
+    private String buildAccountBlockedEmail(String toEmail, String fullName, String reason, java.time.LocalDateTime blockedAt, String ticketId) {
+        String formattedTime = blockedAt != null ? blockedAt.format(DATE_FORMATTER) : java.time.LocalDateTime.now().format(DATE_FORMATTER);
+        String safeName = fullName != null && !fullName.isBlank() ? fullName : "Quý khách";
+        String safeReason = reason != null && !reason.isBlank() ? reason : "Vi phạm chính sách và điều khoản bảo mật của GreenPhone";
+
+        return """
+            <!DOCTYPE html>
+            <html lang="vi">
+            <head><meta charset="UTF-8"></head>
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f9fafb; margin: 0; padding: 24px 0;">
+                <div style="max-width: 560px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb; padding: 28px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="border-bottom: 2px solid #ef4444; padding-bottom: 16px; margin-bottom: 20px;">
+                        <h2 style="color: #dc2626; margin: 0; font-size: 20px;">GreenPhone Security Alert</h2>
+                        <p style="margin: 4px 0 0; color: #6b7280; font-size: 13px;">Hệ thống Quản trị & Bảo mật GreenPhone</p>
+                    </div>
+
+                    <p style="font-size: 15px; color: #111827; margin: 0 0 12px;">
+                        Xin chào <strong>%s</strong>,
+                    </p>
+                    <p style="font-size: 14px; color: #374151; line-height: 1.6; margin: 0 0 16px;">
+                        Chúng tôi xin thông báo: Tài khoản gắn với địa chỉ email <strong>%s</strong> trên hệ thống GreenPhone đã bị <strong>tạm ngưng / khóa quyền truy cập</strong> bởi Quản trị viên.
+                    </p>
+
+                    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; margin: 16px 0;">
+                        <table style="width: 100%%; font-size: 13px; color: #374151; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 4px 0; color: #6b7280; width: 140px;">Mã số hồ sơ:</td>
+                                <td style="padding: 4px 0; font-family: monospace; font-weight: bold; color: #991b1b;">%s</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px 0; color: #6b7280;">Thời gian thực hiện:</td>
+                                <td style="padding: 4px 0; font-weight: 600;">%s</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px 0; color: #6b7280; vertical-align: top;">Lý do chi tiết:</td>
+                                <td style="padding: 4px 0; color: #b91c1c; font-weight: 600; line-height: 1.5;">%s</td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 16px 0; font-size: 13px; color: #475569; line-height: 1.6;">
+                        <p style="margin: 0 0 8px; font-weight: bold; color: #0f172a;">Kênh Tiếp Nhận Khiếu Nại & Hỗ Trợ Giải Trình:</p>
+                        <ul style="margin: 0; padding-left: 18px;">
+                            <li>Email tiếp nhận giải trình: <a href="mailto:hotro@greenphone.com" style="color: #2563eb; text-decoration: none; font-weight: 600;">hotro@greenphone.com</a></li>
+                            <li>Tổng đài Chăm sóc khách hàng: <strong style="color: #0f172a;">1900 1234</strong> (8:00 - 21:00 hàng ngày)</li>
+                            <li>Thời hạn tiếp nhận phản hồi khiếu nại: Trong vòng <strong>7 ngày làm việc</strong> kể từ thời điểm nhận được thông báo này.</li>
+                        </ul>
+                    </div>
+
+                    <p style="font-size: 13px; color: #6b7280; line-height: 1.5; margin: 16px 0 0;">
+                        Nếu bạn cho rằng quyết định này có sự nhầm lẫn hoặc cần cung cấp thêm bằng chứng giải trình, vui lòng gửi email về hòm thư hỗ trợ kèm theo Mã số hồ sơ nêu trên.
+                    </p>
+
+                    <div style="border-top: 1px solid #e5e7eb; margin-top: 24px; padding-top: 16px; text-align: center; font-size: 12px; color: #9ca3af;">
+                        <p style="margin: 0;">GreenPhone E-Commerce System • An Toàn & Bảo Mật Khách Hàng</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """.formatted(safeName, toEmail, ticketId, formattedTime, safeReason);
+    }
+
     private String buildOrderDeliveredEmail(String orderId, String receiverName, List<String> productNames) {
         String frontendUrl = getEnv("FRONTEND_URL", "http://localhost:5173");
         String reviewUrl = frontendUrl + "/tai-khoan/danh-gia";

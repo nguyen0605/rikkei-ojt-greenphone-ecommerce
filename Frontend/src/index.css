@@ -118,6 +118,31 @@ body {
   background: #94a3b8;
 }
 
+/* Order status tabs custom scrollbar */
+.order-tabs-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.order-tabs-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.order-tabs-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 9999px;
+}
+
+.order-tabs-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+  transition: background 0.2s ease;
+}
+
+.order-tabs-scroll::-webkit-scrollbar-thumb:hover {
+  background: #059669;
+}
+
 /* Remove default link styles */
 a {
   color: inherit;

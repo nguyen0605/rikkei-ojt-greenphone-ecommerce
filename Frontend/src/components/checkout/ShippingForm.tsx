@@ -63,6 +63,14 @@ export default function ShippingForm() {
   const [isAddressSelectorModalOpen, setIsAddressSelectorModalOpen] = useState(false);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
 
+  // Tự động mở lại modal nếu vừa bấm tải lại trang từ hướng dẫn vị trí
+  useEffect(() => {
+    if (typeof window !== 'undefined' && sessionStorage.getItem('gp_auto_open_address_modal') === 'true') {
+      sessionStorage.removeItem('gp_auto_open_address_modal');
+      setIsAddressModalOpen(true);
+    }
+  }, []);
+
   // Trạng thái tìm kiếm và bản đồ
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);

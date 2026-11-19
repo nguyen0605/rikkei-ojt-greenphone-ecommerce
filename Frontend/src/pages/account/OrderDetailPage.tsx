@@ -117,6 +117,7 @@ export const OrderDetailPage: React.FC = () => {
   const remainingSeconds = usePaymentCountdown(qrData?.expiresAt);
 
   // Điều kiện nút hành động: PENDING hoặc CONFIRMED đều có thể gửi yêu cầu hủy đơn
+  const isOrderActive = order ? ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPING'].includes(order.orderStatus) : false;
   const canCancel = order?.orderStatus === 'PENDING' || order?.orderStatus === 'CONFIRMED';
   const canReview = order?.orderStatus === 'DELIVERED';
   const canReorder = order?.orderDetails && order.orderDetails.length > 0;
@@ -525,12 +526,23 @@ export const OrderDetailPage: React.FC = () => {
                         {item.productName}
                       </h4>
                       {resolved.isInactive && (
-                        <span
-                          data-testid="product-inactive-badge"
-                          className="rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600"
-                        >
-                          Sản phẩm hiện đã ngừng kinh doanh
-                        </span>
+                        isOrderActive ? (
+                          <Tooltip title="Đơn hàng của bạn đang được đóng gói và giao bình thường theo đúng cam kết. Cửa hàng hiện tạm dừng nhận thêm đơn mới cho sản phẩm này.">
+                            <span
+                              data-testid="product-inactive-badge"
+                              className="cursor-help rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
+                            >
+                              Đang xử lý giao hàng • Tạm dừng nhận đặt mới
+                            </span>
+                          </Tooltip>
+                        ) : (
+                          <span
+                            data-testid="product-inactive-badge"
+                            className="rounded-md border border-gray-200 bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600"
+                          >
+                            Sản phẩm hiện đã ngừng kinh doanh
+                          </span>
+                        )
                       )}
                     </div>
                   )}

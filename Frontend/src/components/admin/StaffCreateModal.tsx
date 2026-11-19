@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import { Modal, Form, Input, Select, Button, message } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAppSelector } from '@/store/hooks';
 import { adminStaffService } from '@/services/adminStaffService';
 import type { CreateStaffRequest } from '@/types/api';
 
@@ -8,16 +10,20 @@ interface StaffCreateModalProps {
   onClose: () => void;
 }
 
-const ROLE_OPTIONS = [
-  { value: 'ROLE_SALES', label: 'Nhân viên kinh doanh & Đơn hàng' },
-  { value: 'ROLE_WAREHOUSE', label: 'Nhân viên thủ kho & Bảo hành' },
-  { value: 'ROLE_MARKETING', label: 'Nhân viên marketing & Sản phẩm' },
-  { value: 'ROLE_ADMIN', label: 'Quản trị viên tối cao' },
-];
-
 export default function StaffCreateModal({ open, onClose }: StaffCreateModalProps) {
   const [form] = Form.useForm();
   const qc = useQueryClient();
+  const { user: currentUser } = useAppSelector((s) => s.auth);
+  const isSuperAdmin = currentUser?.id === 1 || currentUser?.email?.toLowerCase() === 'admin@greenphone.vn';
+
+  const roleOptions = useMemo(() => [
+    { value: 'ROLE_SALES', label: 'Nhân viên kinh doanh & Đơn hàng' },
+    { value: 'ROLE_WAREHOUSE', label: 'Nhân viên thủ kho & Bảo hành' },
+    { value: 'ROLE_MARKETING', label: 'Nhân viên marketing & Sản phẩm' },
+    ...(isSuperAdmin
+      ? [{ value: 'ROLE_ADMIN', label: 'Quản trị viên (Admin)' }]
+      : [{ value: 'ROLE_ADMIN', label: 'Quản trị viên (Chỉ Quản trị viên tối cao được cấp)', disabled: true }]),
+  ], [isSuperAdmin]);
 
   const createMutation = useMutation({
     mutationFn: (data: CreateStaffRequest) => adminStaffService.create(data),
@@ -110,7 +116,7 @@ export default function StaffCreateModal({ open, onClose }: StaffCreateModalProp
           rules={[{ required: true, message: 'Vui lòng chọn vai trò' }]}
           initialValue="ROLE_SALES"
         >
-          <Select options={ROLE_OPTIONS} />
+          <Select options={roleOptions} />
         </Form.Item>
       </Form>
     </Modal>

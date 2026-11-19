@@ -28,6 +28,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final StringRedisTemplate redisTemplate;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.re.greenphone.repository.UserDeviceSessionRepository userDeviceSessionRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.re.greenphone.service.TokenRedisService tokenRedisService;
 
     public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider, UserRepository userRepository, StringRedisTemplate redisTemplate) {
         this(jwtTokenProvider, userRepository, redisTemplate, null);
@@ -82,9 +84,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String jwt = extractToken(request);
             if (StringUtils.hasText(jwt)) {
-                // 1. Check blacklist in Redis (revoked tokens) with graceful degradation if Redis is offline
+                // 1. Check blacklist in Redis (revoked tokens / JTI) with graceful degradation if Redis is offline
                 try {
-                    if (Boolean.TRUE.equals(redisTemplate.hasKey(BLACKLIST_TOKEN_PREFIX + jwt))) {
+                    String jti = jwtTokenProvider.getJtiFromToken(jwt);
+                    boolean isBlacklisted = (tokenRedisService != null && tokenRedisService.isAccessTokenBlacklisted(jti, jwt))
+                            || Boolean.TRUE.equals(redisTemplate.hasKey(BLACKLIST_TOKEN_PREFIX + jwt))
+                            || (jti != null && Boolean.TRUE.equals(redisTemplate.hasKey("blacklist:access:" + jti)));
+
+                    if (isBlacklisted) {
                         response.setContentType("application/json");
                         response.setCharacterEncoding("UTF-8");
                         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -118,11 +125,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     if (userOpt.isPresent()) {
                         User user = userOpt.get();
 
-                        if (!"ACTIVE".equals(user.getStatus())) {
+                        String userStatus = user.getStatus() != null ? user.getStatus().trim().toUpperCase() : "";
+                        if ("BLOCKED".equals(userStatus) || "LOCKED".equals(userStatus)) {
                             response.setContentType("application/json");
                             response.setCharacterEncoding("UTF-8");
                             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                            response.getWriter().write("{\"code\":403,\"message\":\"Tài khoản đã bị khóa hoặc không hoạt động. Vui lòng liên hệ với quản trị viên để được hỗ trợ.\",\"data\":null}");
+                            String reason = user.getBlockedReason() != null && !user.getBlockedReason().isBlank()
+                                    ? user.getBlockedReason().replace("\"", "\\\"")
+                                    : "Phát hiện hành vi vi phạm chính sách và điều khoản bảo mật của GreenPhone.";
+                            String json = String.format(
+                                    "{\"code\":\"ACCOUNT_BLOCKED\",\"message\":\"Tài khoản của bạn đã bị khóa bởi Quản trị viên.\",\"reason\":\"%s\",\"supportEmail\":\"hotro@greenphone.com\",\"supportHotline\":\"1900 1234\"}",
+                                    reason
+                            );
+                            response.getWriter().write(json);
+                            return;
+                        }
+
+                        if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
+                            response.setContentType("application/json");
+                            response.setCharacterEncoding("UTF-8");
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.getWriter().write("{\"code\":401,\"message\":\"Tài khoản không hoạt động. Phiên đăng nhập đã bị chấm dứt.\",\"data\":null}");
                             return;
                         }
 

@@ -52,6 +52,17 @@ class WarehouseInventoryIT extends MySQLTestContainer {
                     .storageItem(option("STORAGE", "128GB")).colorItem(option("COLOR", "Black"))
                     .stockQuantity(60).price(BigDecimal.TEN).sku(suffix).status("ACTIVE").build();
             em.persist(variant); em.flush(); variantId = variant.getId();
+            stocks.findByWarehouseIdAndPhoneVariantId(main, variantId).ifPresentOrElse(
+                    s -> { s.setQuantity(60); stocks.save(s); },
+                    () -> {
+                        WarehouseStock s = new WarehouseStock();
+                        s.setWarehouse(hn);
+                        s.setPhoneVariant(variant);
+                        s.setQuantity(60);
+                        s.setReservedQuantity(0);
+                        stocks.save(s);
+                    }
+            );
             Role role = em.createQuery("from Role where name='CUSTOMER'", Role.class).getResultStream().findFirst().orElseGet(() -> {
                 Role created = new Role(); created.setName("CUSTOMER"); em.persist(created); return created;
             });

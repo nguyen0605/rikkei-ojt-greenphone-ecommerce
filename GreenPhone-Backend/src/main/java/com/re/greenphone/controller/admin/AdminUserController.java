@@ -2,14 +2,14 @@ package com.re.greenphone.controller.admin;
 
 import com.re.greenphone.common.dto.ApiResponse;
 import com.re.greenphone.common.pagination.PageRequest;
+import com.re.greenphone.dto.request.UpdateUserStatusRequest;
 import com.re.greenphone.service.admin.AdminUserService;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/users")
@@ -33,7 +33,11 @@ public class AdminUserController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}/status")
-    public ResponseEntity<ApiResponse<?>> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(ApiResponse.success(adminUserService.updateUserStatus(id, body.get("status"))));
+    public ResponseEntity<ApiResponse<?>> updateStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateUserStatusRequest request,
+            org.springframework.security.core.Authentication authentication) {
+        String currentUsername = authentication != null ? authentication.getName() : null;
+        return ResponseEntity.ok(ApiResponse.success(adminUserService.updateUserStatus(id, request, currentUsername)));
     }
 }

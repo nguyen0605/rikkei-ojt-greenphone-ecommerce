@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Table, Button, Modal, Form, Input, InputNumber, Select, message, Space,
-  Upload, Image, Popconfirm, Progress, Divider, Switch, type TableColumnsType,
+  Upload, Image, Popconfirm, Progress, Divider, Switch, Tag, type TableColumnsType,
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, PictureOutlined, AppstoreOutlined, ArrowUpOutlined, ArrowDownOutlined, HistoryOutlined, RightOutlined } from '@ant-design/icons';
 import { useState, type Key } from 'react';
@@ -31,7 +31,7 @@ function QuickAddSelect({
   onChange: (v: number) => void;
   items: OptionItemDTO[];
   placeholder?: string;
-  width?: number;
+  width?: number | string;
 }) {
   const qc = useQueryClient();
   const [newValue, setNewValue] = useState('');
@@ -57,7 +57,7 @@ function QuickAddSelect({
       onChange={onChange}
       placeholder={optionId ? placeholder : `Chưa có danh mục ${type}`}
       disabled={!optionId}
-      style={{ width: width ?? 140 }}
+      style={{ width: width ?? '100%' }}
       options={items.map((i) => ({ value: i.id, label: i.value }))}
       dropdownRender={(menu) => (
         <>
@@ -95,12 +95,14 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
   const keyword = useDebouncedValue(search.trim(), 300);
   const [brandFilter, setBrandFilter] = useState<string | undefined>();
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
+  const [warehouseFilter, setWarehouseFilter] = useState<string | undefined>();
   const [lowStockOnly, setLowStockOnly] = useState(false);
 
   const params: Record<string, string> = { page: String(page - 1), size: '15' };
   if (keyword) params.keyword = keyword;
   if (brandFilter) params.brandId = brandFilter;
   if (statusFilter) params.status = statusFilter;
+  if (inventoryMode && warehouseFilter) params.warehouseId = warehouseFilter;
   if (inventoryMode && lowStockOnly) params.lowStock = 'true';
 
   const { data: phones, isLoading } = useQuery({
@@ -114,8 +116,6 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
     (allOptions || []).find((c) => c.type === type);
   const itemsByType = (type: string): OptionItemDTO[] =>
     categoryOf(type)?.items || [];
-  const itemIdsByType = (type: string): number[] =>
-    itemsByType(type).map((i) => i.id);
 
   // ── Modal thông tin sản phẩm ──
   const [open, setOpen] = useState(false);
@@ -147,7 +147,20 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
 
   const createMut = useMutation({
     mutationFn: (v: PhoneRequest) => edit ? adminPhoneService.update(edit.id, v) : adminPhoneService.create(v),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-phones'] }); setOpen(false); setEdit(null); form.resetFields(); message.success(edit ? 'Cập nhật thành công' : 'Tạo thành công'); },
+    onSuccess: (savedPhone) => {
+      qc.invalidateQueries({ queryKey: ['admin-phones'] });
+      setOpen(false);
+      form.resetFields();
+      if (edit) {
+        setEdit(null);
+        message.success('Cập nhật thành công');
+      } else {
+        message.success('Tạo sản phẩm thành công! Hãy cấu hình biến thể (RAM, ROM, Màu, Giá).');
+        if (savedPhone) {
+          openVariantModal(savedPhone);
+        }
+      }
+    },
   });
 
   const deleteMut = useMutation({
@@ -161,6 +174,8 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-phones'] });
       qc.invalidateQueries({ queryKey: ['phones'] });
+      qc.invalidateQueries({ queryKey: ['phones-featured'] });
+      qc.invalidateQueries({ queryKey: ['phone'] });
       message.success('Đã cập nhật trạng thái');
     },
     onError: (e) => message.error(e instanceof Error ? e.message : 'Cập nhật thất bại'),
@@ -198,9 +213,15 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
       return varEdit ? adminPhoneService.updateVariant(variantPhone.id, varEdit.id, v) : adminPhoneService.addVariant(variantPhone.id, v);
     },
     onSuccess: async () => {
-      message.success(varEdit ? 'Cập nhật biến thể' : 'Thêm biến thể');
-      setVarEdit(null); varForm.resetFields();
+      message.success(varEdit ? 'Cập nhật biến thể thành công' : 'Thêm biến thể thành công');
+      setVarEdit(null);
+      varForm.resetFields();
+      qc.invalidateQueries({ queryKey: ['admin-phones'] });
+      qc.invalidateQueries({ queryKey: ['phones'] });
       if (variantPhone) setVariants(await adminPhoneService.variants(variantPhone.id));
+    },
+    onError: (e) => {
+      message.error(e instanceof Error ? e.message : 'Thao tác biến thể thất bại');
     },
   });
 
@@ -292,7 +313,16 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
       render: (v: string, r) => (
         <div className="flex items-center gap-2.5">
           {r.mainImageUrl ? <Image src={r.mainImageUrl} width={40} height={40} className="!rounded-lg !object-cover" preview={false} /> : <div className="h-10 w-10 rounded-lg bg-bg-muted" />}
-          <span className="font-medium text-ink">{v}</span>
+          <div>
+            <div className="font-medium text-ink">{v}</div>
+            <div className="text-xs">
+              {r.variantCount && r.variantCount > 0 ? (
+                <span className="text-ink-2">{r.variantCount} biến thể</span>
+              ) : (
+                <span className="font-medium text-amber-600">Chưa có biến thể</span>
+              )}
+            </div>
+          </div>
         </div>
       ),
     },
@@ -307,7 +337,16 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
       render: (v: string, r) => (
         <div className="flex items-center gap-2.5">
           {r.mainImageUrl ? <Image src={r.mainImageUrl} width={40} height={40} className="!rounded-lg !object-cover" preview={false} /> : <div className="h-10 w-10 rounded-lg bg-bg-muted" />}
-          <span className="font-medium text-ink">{v}</span>
+          <div>
+            <div className="font-medium text-ink">{v}</div>
+            <div className="text-xs">
+              {r.variantCount && r.variantCount > 0 ? (
+                <span className="text-ink-2">{r.variantCount} biến thể</span>
+              ) : (
+                <span className="font-medium text-amber-600">Chưa có biến thể</span>
+              )}
+            </div>
+          </div>
         </div>
       ),
     },
@@ -317,7 +356,7 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
       render: (s: string, r) => (
         <Switch
           checked={s === 'ACTIVE'}
-          loading={statusMut.isPending}
+          loading={statusMut.isPending && (statusMut.variables as { id: number; status: string } | undefined)?.id === r.id}
           onChange={(checked) => statusMut.mutate({ id: r.id, status: checked ? 'ACTIVE' : 'INACTIVE' })}
           checkedChildren="Bật"
           unCheckedChildren="Tắt"
@@ -329,7 +368,7 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
       render: (_, r) => (
         <Space>
           <Button size="small" icon={<EditOutlined />} onClick={() => openForm(r)} className="!rounded-full">Sửa</Button>
-          <Button size="small" icon={<AppstoreOutlined />} onClick={() => openVariantModal(r)} className="!rounded-full">{inventoryMode ? 'Tồn kho' : 'Giá'}</Button>
+          <Button size="small" icon={<AppstoreOutlined />} onClick={() => openVariantModal(r)} className="!rounded-full">{inventoryMode ? 'Tồn kho' : 'Biến thể & Giá'}</Button>
           <Button size="small" icon={<PictureOutlined />} onClick={() => openImageModal(r)} className="!rounded-full">Ảnh</Button>
           <Popconfirm
             title="Xóa vĩnh viễn sản phẩm này?"
@@ -455,6 +494,19 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
             ]}
           />
           {inventoryMode && (
+            <Select
+              placeholder="Tất cả chi nhánh"
+              allowClear
+              value={warehouseFilter}
+              onChange={(v) => { setWarehouseFilter(v); setPage(1); }}
+              className="!w-48"
+              options={[
+                { value: undefined, label: 'Tất cả chi nhánh' },
+                ...(warehouseQuery.data?.filter((w) => w.status === 'ACTIVE').map((w) => ({ value: String(w.id), label: w.name })) || [])
+              ]}
+            />
+          )}
+          {inventoryMode && (
             <Button
               danger={lowStockOnly}
               type={lowStockOnly ? 'primary' : 'default'}
@@ -540,34 +592,143 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
         width={760}
       >
         <Table<PhoneVariantDTO> columns={variantColumns} dataSource={variants} rowKey="id" loading={varLoading} size="small" pagination={false} className="mb-4" />
-        {!inventoryMode && <div className="rounded-xl border border-dashed border-gray-200 bg-bg-soft p-4">
-          <div className="mb-3 text-sm font-semibold text-ink">{varEdit ? 'Sửa biến thể' : 'Thêm biến thể mới'}</div>
-          <Form form={varForm} layout="inline" onFinish={(v) => varMut.mutate(v)}>
-            <Form.Item name="ramItemId" rules={[{ required: true, message: 'RAM' }]}>
-              <QuickAddSelect optionId={categoryOf('RAM')?.id} type="RAM" value={varForm.getFieldValue('ramItemId')} onChange={(v) => varForm.setFieldValue('ramItemId', v)} items={itemsByType('RAM')} placeholder="RAM" width={90} />
-            </Form.Item>
-            <Form.Item name="storageItemId" rules={[{ required: true, message: 'ROM' }]}>
-              <QuickAddSelect optionId={categoryOf('STORAGE')?.id} type="STORAGE" value={varForm.getFieldValue('storageItemId')} onChange={(v) => varForm.setFieldValue('storageItemId', v)} items={itemsByType('STORAGE')} placeholder="ROM" width={100} />
-            </Form.Item>
-            <Form.Item name="colorItemId" rules={[{ required: true, message: 'Màu' }]}>
-              <QuickAddSelect optionId={categoryOf('COLOR')?.id} type="COLOR" value={varForm.getFieldValue('colorItemId')} onChange={(v) => varForm.setFieldValue('colorItemId', v)} items={itemsByType('COLOR')} placeholder="Màu" width={130} />
-            </Form.Item>
-            <Form.Item name="price" rules={[{ required: true, message: 'Giá' }]}>
-              <InputNumber placeholder="Giá (₫)" style={{ width: 140 }} min={0}
-                formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
-                parser={parseVariantNumber} />
-            </Form.Item>
-            <Form.Item name="discountPrice">
-              <InputNumber placeholder="Giá KM" style={{ width: 120 }} min={0}
-                formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
-                parser={parseVariantNumber} />
-            </Form.Item>
-            <Form.Item>
-              <Space>
-                <Button type="primary" htmlType="submit" loading={varMut.isPending} className="!rounded-full !bg-primary-600">{varEdit ? 'Lưu' : 'Thêm'}</Button>
-                {varEdit && <Button onClick={() => { setVarEdit(null); varForm.resetFields(); }} className="!rounded-full">Hủy</Button>}
-              </Space>
-            </Form.Item>
+        {!inventoryMode && <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+          <div className="mb-3.5 flex items-center justify-between">
+            <span className="text-sm font-semibold text-ink">{varEdit ? 'Sửa biến thể' : 'Thêm biến thể mới'}</span>
+            {varEdit && <Tag color="blue" className="!mr-0">Đang sửa biến thể #{varEdit.id}</Tag>}
+          </div>
+          <Form form={varForm} layout="vertical" onFinish={(v) => varMut.mutate(v)}>
+            <div className="grid grid-cols-12 gap-x-4 gap-y-1">
+              <div className="col-span-12 sm:col-span-3">
+                <Form.Item name="ramItemId" label="RAM" rules={[{ required: true, message: 'Chọn RAM' }]}>
+                  <QuickAddSelect optionId={categoryOf('RAM')?.id} type="RAM" value={varForm.getFieldValue('ramItemId')} onChange={(v) => varForm.setFieldValue('ramItemId', v)} items={itemsByType('RAM')} placeholder="Chọn RAM" width="100%" />
+                </Form.Item>
+              </div>
+
+              <div className="col-span-12 sm:col-span-3">
+                <Form.Item name="storageItemId" label="Bộ nhớ (ROM)" rules={[{ required: true, message: 'Chọn ROM' }]}>
+                  <QuickAddSelect optionId={categoryOf('STORAGE')?.id} type="STORAGE" value={varForm.getFieldValue('storageItemId')} onChange={(v) => varForm.setFieldValue('storageItemId', v)} items={itemsByType('STORAGE')} placeholder="Chọn ROM" width="100%" />
+                </Form.Item>
+              </div>
+
+              <div className="col-span-12 sm:col-span-6">
+                <Form.Item
+                  name="colorItemId"
+                  label="Màu sắc"
+                  dependencies={['ramItemId', 'storageItemId']}
+                  rules={[
+                    { required: true, message: 'Chọn màu sắc' },
+                    ({ getFieldValue }) => ({
+                      validator(_, value) {
+                        if (!value) return Promise.resolve();
+                        const ram = getFieldValue('ramItemId');
+                        const rom = getFieldValue('storageItemId');
+                        if (ram && rom) {
+                          const isDuplicate = variants.some(
+                            (v) => (!varEdit || v.id !== varEdit.id) &&
+                                   v.ramItemId === ram &&
+                                   v.storageItemId === rom &&
+                                   v.colorItemId === value
+                          );
+                          if (isDuplicate) {
+                            return Promise.reject(new Error('Cấu hình RAM/ROM/Màu này đã tồn tại'));
+                          }
+                        }
+                        return Promise.resolve();
+                      },
+                    }),
+                  ]}
+                >
+                  <QuickAddSelect optionId={categoryOf('COLOR')?.id} type="COLOR" value={varForm.getFieldValue('colorItemId')} onChange={(v) => varForm.setFieldValue('colorItemId', v)} items={itemsByType('COLOR')} placeholder="Chọn màu" width="100%" />
+                </Form.Item>
+              </div>
+
+              <div className="col-span-12 sm:col-span-6">
+                <Form.Item
+                  name="price"
+                  label="Giá gốc (₫)"
+                  rules={[
+                    { required: true, message: 'Vui lòng nhập giá gốc' },
+                    {
+                      validator(_, value) {
+                        if (value === undefined || value === null || value === '') {
+                          return Promise.resolve();
+                        }
+                        const num = Number(value);
+                        if (num <= 0) {
+                          return Promise.reject(new Error('Giá gốc phải lớn hơn 0'));
+                        }
+                        if (num < 1000) {
+                          return Promise.reject(new Error('Giá gốc tối thiểu 1.000₫'));
+                        }
+                        return Promise.resolve();
+                      },
+                    },
+                  ]}
+                >
+                  <InputNumber
+                    placeholder="VD: 34.990.000"
+                    className="w-full"
+                    min={1000}
+                    formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
+                    parser={parseVariantNumber}
+                  />
+                </Form.Item>
+              </div>
+
+              <div className="col-span-12 sm:col-span-6">
+                <Form.Item
+                  name="discountPrice"
+                  label="Giá khuyến mãi (₫)"
+                  dependencies={['price']}
+                  rules={[
+                    ({ getFieldValue }) => ({
+                      validator(_, value) {
+                        if (value === undefined || value === null || value === '') {
+                          return Promise.resolve();
+                        }
+                        const numDiscount = Number(value);
+                        if (numDiscount <= 0) {
+                          return Promise.reject(new Error('Giá khuyến mãi phải lớn hơn 0'));
+                        }
+                        const price = getFieldValue('price');
+                        if (price !== undefined && price !== null && numDiscount >= Number(price)) {
+                          return Promise.reject(new Error('Giá KM phải nhỏ hơn giá gốc'));
+                        }
+                        return Promise.resolve();
+                      },
+                    }),
+                  ]}
+                >
+                  <InputNumber
+                    placeholder="Để trống nếu không giảm giá"
+                    className="w-full"
+                    min={1000}
+                    formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
+                    parser={parseVariantNumber}
+                  />
+                </Form.Item>
+              </div>
+            </div>
+
+            <div className="mt-2 pt-3 border-t border-slate-200/80 flex items-center justify-end gap-2.5">
+              {varEdit && (
+                <Button
+                  onClick={() => { setVarEdit(null); varForm.resetFields(); }}
+                  className="!rounded-lg"
+                >
+                  Hủy bỏ
+                </Button>
+              )}
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={varMut.isPending}
+                className="!rounded-lg !bg-primary-600 px-6 font-medium shadow-sm hover:!bg-primary-700 h-9"
+              >
+                {varEdit ? 'Lưu thay đổi' : 'Thêm biến thể'}
+              </Button>
+            </div>
           </Form>
         </div>}
       </Modal>

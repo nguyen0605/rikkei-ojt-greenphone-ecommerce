@@ -339,86 +339,90 @@ export default function AccountProfilePage() {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
-          className="max-w-xl"
+          className="w-full"
           requiredMark="optional"
         >
-          {/* Email (Readonly - Backend business rule) */}
-          <Form.Item
-            label={
-              <span className="text-sm font-medium text-gray-700">
-                Email <span className="text-xs text-gray-400 font-normal">(Không thể thay đổi)</span>
-              </span>
-            }
-          >
-            <Input
-              value={user.email}
-              disabled
-              prefix={<MailOutlined className="text-gray-400" />}
-              size="large"
-              className="!rounded-xl bg-gray-50 text-gray-500"
-            />
-          </Form.Item>
-
-          {/* Full Name */}
-          <Form.Item
-            name="fullName"
-            label={<span className="text-sm font-medium text-gray-700">Họ và tên</span>}
-            rules={[
-              { required: true, message: 'Vui lòng nhập họ tên của bạn' },
-              {
-                validator: (_, value) => {
-                  if (value && value.trim().length < 2) {
-                    return Promise.reject(new Error('Họ tên phải có ít nhất 2 ký tự'));
-                  }
-                  if (value && value.trim().length > 100) {
-                    return Promise.reject(new Error('Họ tên không được vượt quá 100 ký tự'));
-                  }
-                  return Promise.resolve();
+          <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
+            {/* Full Name */}
+            <Form.Item
+              name="fullName"
+              label={<span className="text-sm font-medium text-gray-700">Họ và tên</span>}
+              rules={[
+                { required: true, message: 'Vui lòng nhập họ tên của bạn' },
+                {
+                  validator: (_, value) => {
+                    if (value && value.trim().length < 2) {
+                      return Promise.reject(new Error('Họ tên phải có ít nhất 2 ký tự'));
+                    }
+                    if (value && value.trim().length > 100) {
+                      return Promise.reject(new Error('Họ tên không được vượt quá 100 ký tự'));
+                    }
+                    return Promise.resolve();
+                  },
                 },
-              },
-            ]}
-          >
-            <Input
-              prefix={<UserOutlined className="text-gray-400" />}
-              size="large"
-              className="!rounded-xl"
-              placeholder="Ví dụ: Nguyễn Văn A"
-            />
-          </Form.Item>
+              ]}
+            >
+              <Input
+                prefix={<UserOutlined className="text-gray-400" />}
+                size="large"
+                className="!rounded-xl"
+                placeholder="Ví dụ: Nguyễn Văn A"
+              />
+            </Form.Item>
 
-          {/* Phone */}
-          <Form.Item
-            name="phone"
-            label={<span className="text-sm font-medium text-gray-700">Số điện thoại</span>}
-            rules={[
-              { required: true, message: 'Vui lòng nhập số điện thoại' },
-              {
-                pattern: /^0\d{9,10}$/,
-                message: 'Số điện thoại không hợp lệ (10-11 chữ số, bắt đầu bằng số 0)',
-              },
-            ]}
-          >
-            <Input
-              prefix={<PhoneOutlined className="text-gray-400" />}
-              size="large"
-              className="!rounded-xl"
-              placeholder="Ví dụ: 0912345678"
-            />
-          </Form.Item>
+            {/* Phone */}
+            <Form.Item
+              name="phone"
+              label={<span className="text-sm font-medium text-gray-700">Số điện thoại</span>}
+              rules={[
+                { required: true, message: 'Vui lòng nhập số điện thoại' },
+                {
+                  pattern: /^0\d{9,10}$/,
+                  message: 'Số điện thoại không hợp lệ (10-11 chữ số, bắt đầu bằng số 0)',
+                },
+              ]}
+            >
+              <Input
+                prefix={<PhoneOutlined className="text-gray-400" />}
+                size="large"
+                className="!rounded-xl"
+                placeholder="Ví dụ: 0912345678"
+              />
+            </Form.Item>
 
-          {/* Default Address */}
-          <Form.Item
-            name="address"
-            label={<span className="text-sm font-medium text-gray-700">Địa chỉ chính</span>}
-            tooltip="Địa chỉ mặc định sẽ tự động đồng bộ khi bạn chọn địa chỉ mặc định trong Sổ địa chỉ"
-          >
-            <Input.TextArea
-              rows={3}
-              className="!rounded-xl"
-              placeholder="Số nhà, tên đường, Phường/Xã, Quận/Huyện, Tỉnh/Thành phố"
-              style={{ resize: 'none' }}
-            />
-          </Form.Item>
+            {/* Email (Readonly - Backend business rule) */}
+            <Form.Item
+              className="sm:col-span-2"
+              label={
+                <span className="text-sm font-medium text-gray-700">
+                  Email <span className="text-xs text-gray-400 font-normal">(Không thể thay đổi)</span>
+                </span>
+              }
+            >
+              <Input
+                value={user.email}
+                disabled
+                prefix={<MailOutlined className="text-gray-400" />}
+                size="large"
+                className="!rounded-xl bg-gray-50 text-gray-500"
+              />
+            </Form.Item>
+
+            {/* Default Address */}
+            <Form.Item
+              className="sm:col-span-2"
+              name="address"
+              label={<span className="text-sm font-medium text-gray-700">Địa chỉ chính</span>}
+              tooltip="Địa chỉ mặc định sẽ tự động đồng bộ khi bạn chọn địa chỉ mặc định trong Sổ địa chỉ"
+            >
+              <Input.TextArea
+                rows={3}
+                className="!rounded-xl"
+                placeholder="Số nhà, tên đường, Phường/Xã, Quận/Huyện, Tỉnh/Thành phố"
+                style={{ resize: 'none' }}
+              />
+            </Form.Item>
+          </div>
 
           <div className="pt-2">
             <Button

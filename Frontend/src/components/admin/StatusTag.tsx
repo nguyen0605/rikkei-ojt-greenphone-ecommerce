@@ -20,6 +20,10 @@ const COLOR: Record<string, string> = {
   LOCKED: 'red',
   BLOCKED: 'red',
   INACTIVE: 'default',
+  // Màu hiển thị tag trạng thái hạn dùng voucher
+  EXPIRED: 'volcano',
+  UPCOMING: 'blue',
+  UNVERIFIED: 'orange',
   // roles
   ROLE_ADMIN: 'purple',
   ROLE_SALES: 'blue',
@@ -46,6 +50,10 @@ const LABEL: Record<string, string> = {
   LOCKED: 'Khóa',
   BLOCKED: 'Bị khóa',
   INACTIVE: 'Ngừng hoạt động',
+  // Nhãn tiếng Việt hiển thị tag thời hạn voucher
+  EXPIRED: 'Hết hạn',
+  UPCOMING: 'Sắp diễn ra',
+  UNVERIFIED: 'Chưa kích hoạt',
   // roles
   ROLE_ADMIN: 'Quản trị viên',
   ROLE_SALES: 'Kinh doanh',

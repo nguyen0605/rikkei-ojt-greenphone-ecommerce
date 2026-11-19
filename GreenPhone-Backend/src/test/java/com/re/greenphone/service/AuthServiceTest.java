@@ -225,12 +225,13 @@ class AuthServiceTest {
 
     @Test void login_AccountBlocked() {
         testUser.setStatus("BLOCKED");
+        testUser.setBlockedReason("Vi phạm chính sách");
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
         when(passwordEncoder.matches("password123", "encoded_password")).thenReturn(true);
 
         assertThatThrownBy(() -> authService.login(loginReq))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("Tài khoản đã bị khóa. Vui lòng liên hệ với quản trị viên để được hỗ trợ.");
+                .isInstanceOf(com.re.greenphone.common.exception.AccountBlockedException.class)
+                .hasMessageContaining("Tài khoản của bạn đã bị khóa");
     }
 
     // === VERIFY OTP ===

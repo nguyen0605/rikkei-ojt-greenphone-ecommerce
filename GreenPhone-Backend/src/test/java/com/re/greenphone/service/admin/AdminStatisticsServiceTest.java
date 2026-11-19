@@ -53,4 +53,24 @@ class AdminStatisticsServiceTest {
         var result=service.getRevenueStats("month",from,to); assertThat(result.getTotalRevenue()).isEqualByComparingTo("9"); assertThat(result.getTimeSeriesData()).hasSize(2);
         verifyNoInteractions(details,refunds);
     }
+    @Test void computesPaymentBreakdownWithCountsAndPercentages() {
+        when(orders.financialDaily(from,to)).thenReturn(Collections.emptyList());
+        when(orders.paymentBreakdown(from,to)).thenReturn(List.of(
+                new Object[]{"VIETQR", new BigDecimal("700"), 7L},
+                new Object[]{"COD", new BigDecimal("300"), 3L}
+        ));
+        var report = service.getFinancialReport("month", from, to);
+        assertThat(report.paymentMethodStats()).hasSize(2);
+        var vietqr = report.paymentMethodStats().get(0);
+        assertThat(vietqr.paymentMethod()).isEqualTo("VIETQR");
+        assertThat(vietqr.revenue()).isEqualByComparingTo("700");
+        assertThat(vietqr.transactionCount()).isEqualTo(7L);
+        assertThat(vietqr.percentage()).isEqualByComparingTo("70.00");
+
+        var cod = report.paymentMethodStats().get(1);
+        assertThat(cod.paymentMethod()).isEqualTo("COD");
+        assertThat(cod.revenue()).isEqualByComparingTo("300");
+        assertThat(cod.transactionCount()).isEqualTo(3L);
+        assertThat(cod.percentage()).isEqualByComparingTo("30.00");
+    }
 }

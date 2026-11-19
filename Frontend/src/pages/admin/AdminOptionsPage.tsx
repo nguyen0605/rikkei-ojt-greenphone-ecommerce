@@ -140,12 +140,12 @@ export default function AdminOptionsPage() {
     { title: '', width: 110, render: (_, r) => <Space><Button size="small" icon={<EditOutlined />} onClick={() => openItemForm(r)} className="!rounded-full" /><Button size="small" danger icon={<DeleteOutlined />} onClick={() => handleDeleteItem(r)} className="!rounded-full" /></Space> },
   ];
 
+  // Cột bảng danh sách danh mục (đã bỏ cột Hiển thị switch không bấm được)
   const catColumns: TableColumnsType<OptionDTO> = [
     { title: 'STT', width: 60, render: (_: unknown, __: OptionDTO, index?: number) => <span className="text-ink-2">{(index ?? 0) + 1}</span> },
     { title: 'Type', dataIndex: 'type', width: 100, render: (v: string) => <span className="rounded bg-primary-50 px-2 py-0.5 font-mono text-xs font-semibold text-primary-700">{v}</span> },
     { title: 'Tên hiển thị', dataIndex: 'label', render: (v: string) => <span className="font-medium text-ink">{v}</span> },
     { title: 'Hiện tối đa', dataIndex: 'maxItems', width: 110, align: 'right' as const },
-    { title: 'Hiển thị', dataIndex: 'enabled', width: 90, render: (v: boolean) => <Switch size="small" checked={v} disabled /> },
     { title: 'Thứ tự', dataIndex: 'sortOrder', width: 80, align: 'right' as const },
     { title: '', width: 110, render: (_, r) => <Space><Button size="small" icon={<EditOutlined />} onClick={() => openCatForm(r)} className="!rounded-full" /><Button size="small" danger icon={<DeleteOutlined />} onClick={() => { Modal.confirm({ title: 'Xoá danh mục?', content: `Xoá danh mục "${r.label}"? Chỉ xoá được khi không còn items.`, okText: 'Xoá', okType: 'danger', cancelText: 'Hủy', okButtonProps: { className: '!rounded-full' }, cancelButtonProps: { className: '!rounded-full' }, onOk: () => catDelMut.mutate(r.id) }); }} className="!rounded-full" /></Space> },
   ];

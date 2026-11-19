@@ -18,6 +18,12 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(AccountBlockedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccountBlocked(AccountBlockedException ex) {
+        log.warn("Account blocked intercepted: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ex.toResponseMap());
+    }
+
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ApiResponse<Void>> handleAppException(AppException ex) {
         log.error("AppException: {} - {} (errorCode: {})", ex.getStatus(), ex.getMessage(), ex.getErrorCode());
@@ -51,6 +57,15 @@ public class GlobalExceptionHandler {
         ApiResponse<Void> response = ApiResponse.error(
                 HttpStatus.PAYLOAD_TOO_LARGE.value(), "File quá lớn (tối đa 10MB)");
         return new ResponseEntity<>(response, HttpStatus.PAYLOAD_TOO_LARGE);
+    }
+
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation(org.springframework.dao.DataIntegrityViolationException ex) {
+        log.warn("Data integrity violation: {}", ex.getMessage());
+        ApiResponse<Void> response = ApiResponse.error(
+                HttpStatus.CONFLICT.value(),
+                "Không thể xóa dữ liệu do đã có giao dịch hoặc liên kết ràng buộc trong hệ thống (Đơn hàng, Đơn nhập hàng PO, Tồn kho). Vui lòng tắt trạng thái sản phẩm thay vì xóa vĩnh viễn.");
+        return new ResponseEntity<>(response, HttpStatus.CONFLICT);
     }
 
     @ExceptionHandler(Exception.class)
