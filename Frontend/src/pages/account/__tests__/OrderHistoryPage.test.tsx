@@ -284,5 +284,22 @@ describe('OrderHistoryPage', () => {
     expect(testClient.getQueryData(['order', 101])).toEqual(mockOrders[0]);
     expect(testClient.getQueryData(['order', '102'])).toEqual(mockOrders[1]);
   });
+
+  it('renders order tabs container with custom scrollbar class and handles scroll buttons', async () => {
+    vi.mocked(orderService.list).mockResolvedValue({
+      content: mockOrders,
+      totalElements: 3,
+      totalPages: 1,
+      page: 0,
+      size: 10,
+      last: true,
+    });
+
+    renderWithClient('/tai-khoan/don-hang');
+
+    const tabList = screen.getByRole('tablist', { name: /bộ lọc trạng thái đơn hàng/i });
+    expect(tabList).toHaveClass('order-tabs-scroll');
+    expect(tabList).toHaveClass('overflow-x-auto');
+  });
 });
 
