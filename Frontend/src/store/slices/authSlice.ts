@@ -11,6 +11,7 @@ interface AuthState {
   loading: boolean;
   error: string | null;
   errorCode: string | null;
+  blockedReason?: string | null;
   rememberedEmail: string | null;
 }
 
@@ -44,12 +45,25 @@ const initialState: AuthState = {
   loading: false,
   error: null,
   errorCode: null,
+  blockedReason: null,
   rememberedEmail,
 };
 
-export const loginThunk = createAsyncThunk('auth/login', async (data: LoginRequest & { remember?: boolean }) => {
-  const res = await authService.login(data);
-  return { ...res, remember: data.remember };
+export const loginThunk = createAsyncThunk<
+  import('@/types/api').AuthResponse & { remember?: boolean },
+  LoginRequest & { remember?: boolean },
+  { rejectValue: { message: string; errorCode?: string; reason?: string } }
+>('auth/login', async (data, { rejectWithValue }) => {
+  try {
+    const res = await authService.login(data);
+    return { ...res, remember: data.remember };
+  } catch (err: any) {
+    const responseData = err.response?.data;
+    const message = responseData?.message || err.message || 'Đăng nhập thất bại';
+    const errorCode = responseData?.code || responseData?.errorCode || err.errorCode;
+    const reason = responseData?.reason;
+    return rejectWithValue({ message, errorCode, reason });
+  }
 });
 
 export const registerThunk = createAsyncThunk<
@@ -93,6 +107,7 @@ const authSlice = createSlice({
     clearError(state) {
       state.error = null;
       state.errorCode = null;
+      state.blockedReason = null;
     },
     updateUserProfile(state, action: PayloadAction<{ fullName?: string; phone?: string; address?: string; avatar?: string }>) {
       if (state.user) {
@@ -106,12 +121,14 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.error = null;
       state.errorCode = null;
+      state.blockedReason = null;
       clearClientStorage();
     },
     setCredentials(state, action: PayloadAction<{ user: { id: number; email: string; fullName: string; role: string }; token: string }>) {
       state.loading = false;
       state.error = null;
       state.errorCode = null;
+      state.blockedReason = null;
       state.user = action.payload.user;
       state.token = action.payload.token;
       state.isAuthenticated = true;
@@ -121,12 +138,18 @@ const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(loginThunk.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(loginThunk.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.errorCode = null;
+        state.blockedReason = null;
+      })
       .addCase(loginThunk.fulfilled, (state, action) => {
         state.loading = false;
         state.user = { id: action.payload.userId, email: action.payload.email, fullName: action.payload.fullName, role: action.payload.role };
         state.token = action.payload.token;
         state.isAuthenticated = true;
+        state.blockedReason = null;
         localStorage.setItem('greenphone.token', action.payload.token);
         localStorage.setItem('greenphone.user', JSON.stringify(state.user));
         if (action.payload.remember) {
@@ -134,7 +157,16 @@ const authSlice = createSlice({
           localStorage.setItem('greenphone.rememberedEmail', state.rememberedEmail || '');
         }
       })
-      .addCase(loginThunk.rejected, (state, action) => { state.loading = false; state.error = action.error.message || 'Login failed'; })
+      .addCase(loginThunk.rejected, (state, action) => {
+        state.loading = false;
+        if (action.payload) {
+          state.error = action.payload.message;
+          state.errorCode = action.payload.errorCode || null;
+          state.blockedReason = action.payload.reason || null;
+        } else {
+          state.error = action.error.message || 'Login failed';
+        }
+      })
       .addCase(registerThunk.pending, (state) => { state.loading = true; state.error = null; })
       .addCase(registerThunk.fulfilled, (state) => { state.loading = false; })
       .addCase(registerThunk.rejected, (state, action) => {

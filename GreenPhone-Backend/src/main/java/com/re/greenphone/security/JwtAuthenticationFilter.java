@@ -118,11 +118,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     if (userOpt.isPresent()) {
                         User user = userOpt.get();
 
+                        String userStatus = user.getStatus() != null ? user.getStatus().trim().toUpperCase() : "";
+                        if ("BLOCKED".equals(userStatus) || "LOCKED".equals(userStatus)) {
+                            response.setContentType("application/json");
+                            response.setCharacterEncoding("UTF-8");
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            String reason = user.getBlockedReason() != null && !user.getBlockedReason().isBlank()
+                                    ? user.getBlockedReason().replace("\"", "\\\"")
+                                    : "Phát hiện hành vi vi phạm chính sách và điều khoản bảo mật của GreenPhone.";
+                            String json = String.format(
+                                    "{\"code\":\"ACCOUNT_BLOCKED\",\"message\":\"Tài khoản của bạn đã bị khóa bởi Quản trị viên.\",\"reason\":\"%s\",\"supportEmail\":\"hotro@greenphone.com\",\"supportHotline\":\"1900 1234\"}",
+                                    reason
+                            );
+                            response.getWriter().write(json);
+                            return;
+                        }
+
                         if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
                             response.setContentType("application/json");
                             response.setCharacterEncoding("UTF-8");
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.getWriter().write("{\"code\":401,\"message\":\"Tài khoản của bạn đã bị khóa hoặc không còn hoạt động. Phiên đăng nhập đã bị chấm dứt.\",\"data\":null}");
+                            response.getWriter().write("{\"code\":401,\"message\":\"Tài khoản không hoạt động. Phiên đăng nhập đã bị chấm dứt.\",\"data\":null}");
                             return;
                         }
 

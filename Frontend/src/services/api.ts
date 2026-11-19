@@ -47,30 +47,40 @@ api.interceptors.response.use(
   (res) => res,
   (error) => {
     const status = error.response?.status;
-    const backendMessage = error.response?.data?.message || '';
+    const responseData = error.response?.data;
+    const backendMessage = responseData?.message || '';
+    const errorCode = responseData?.code || responseData?.errorCode || '';
 
-    // Logout on 401 hoặc tài khoản bị khóa (403): Xóa sạch toàn bộ dấu vết PII và phiên trên client
-    const isAccountBlocked =
-      status === 401 ||
+    // Kiểm tra tài khoản bị Admin khóa tức thì (HTTP 403 Forbidden hoặc code ACCOUNT_BLOCKED)
+    const isExplicitlyBlocked =
+      errorCode === 'ACCOUNT_BLOCKED' ||
       (status === 403 &&
-        (backendMessage.toLowerCase().includes('khóa') ||
-          backendMessage.toLowerCase().includes('không hoạt động') ||
+        (backendMessage.toLowerCase().includes('bị khóa') ||
           backendMessage.toUpperCase().includes('BLOCKED') ||
           backendMessage.toUpperCase().includes('LOCKED')));
 
-    if (isAccountBlocked) {
+    if (isExplicitlyBlocked) {
       clearClientStorage();
-      if (typeof window !== 'undefined' && window.location.pathname !== '/dang-nhap') {
-        if (
-          backendMessage.toLowerCase().includes('khóa') ||
-          backendMessage.toUpperCase().includes('BLOCKED') ||
-          backendMessage.toUpperCase().includes('LOCKED')
-        ) {
-          sessionStorage.setItem(
-            'greenphone.blocked_message',
-            'Tài khoản của bạn đã bị khóa hoặc phiên đăng nhập đã hết hiệu lực. Vui lòng liên hệ với quản trị viên để được hỗ trợ.'
+      if (typeof window !== 'undefined') {
+        // Nếu không phải đang ở trang đăng nhập, phát sự kiện mở Modal khóa màn hình cố định (Bước 2)
+        if (window.location.pathname !== '/dang-nhap') {
+          window.dispatchEvent(
+            new CustomEvent('greenphone:account-blocked', {
+              detail: {
+                code: 'ACCOUNT_BLOCKED',
+                message: backendMessage || 'Tài khoản của bạn đã bị khóa bởi Quản trị viên.',
+                reason: responseData?.reason || 'Phát hiện hành vi vi phạm chính sách và điều khoản bảo mật của GreenPhone.',
+                supportEmail: responseData?.supportEmail || 'hotro@greenphone.com',
+                supportHotline: responseData?.supportHotline || '1900 1234',
+              },
+            })
           );
         }
+      }
+    } else if (status === 401) {
+      // 401 Token hết hạn hoặc không hợp lệ -> xóa storage và điều hướng về trang đăng nhập
+      clearClientStorage();
+      if (typeof window !== 'undefined' && window.location.pathname !== '/dang-nhap') {
         window.location.href = '/dang-nhap';
       }
     }
