@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 380" width="100%" height="100%" fill="none">
+  <defs>
+    <!-- Shadow filter for prompt box -->
+    <filter id="prompt-shadow" x="-10%" y="-10%" width="125%" height="125%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.3" />
+    </filter>
+    <!-- Shadow for red arrow -->
+    <filter id="arrow-shadow" x="-20%" y="-20%" width="140%" height="140%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="2" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- Background subtle container -->
+  <rect width="540" height="380" rx="16" fill="#f1f5f9" />
+
+  <!-- Mini browser address bar on top -->
+  <g transform="translate(25, 18)">
+    <rect width="490" height="38" rx="8" fill="#1e293b" />
+    <!-- Lock icon & URL text -->
+    <g transform="translate(14, 11)">
+      <rect x="0" y="4" width="12" height="10" rx="2" fill="#94a3b8" />
+      <path d="M3 4V2.5a3 3 0 0 1 6 0V4" stroke="#94a3b8" stroke-width="1.6" fill="none" />
+      <circle cx="6" cy="9" r="1.2" fill="#1e293b" />
+    </g>
+    <text x="36" y="24" fill="#f8fafc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="500">
+      https://greenphone.duckdns.org/thanh-toan
+    </text>
+  </g>
+
+  <!-- Chrome Native Permission Dialog (Dark Theme) -->
+  <g transform="translate(25, 68)" filter="url(#prompt-shadow)">
+    <!-- Main dialog card -->
+    <rect width="350" height="280" rx="14" fill="#202124" stroke="#3c4043" stroke-width="1.2" />
+
+    <!-- Dialog Header -->
+    <text x="20" y="32" fill="#e8eaed" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="600">
+      greenphone.duckdns.org wants to
+    </text>
+
+    <!-- Close 'x' icon -->
+    <g transform="translate(318, 20)">
+      <circle cx="6" cy="6" r="10" fill="transparent" />
+      <path d="M2 2L10 10M10 2L2 10" stroke="#9aa0a6" stroke-width="1.8" stroke-linecap="round" />
+    </g>
+
+    <!-- Subtitle: Know your location -->
+    <g transform="translate(20, 48)">
+      <!-- Map pin icon -->
+      <path d="M8 1.5C4.96 1.5 2.5 3.96 2.5 7c0 4.2 5.5 8.5 5.5 8.5s5.5-4.3 5.5-8.5c0-3.04-2.46-5.5-5.5-5.5zm0 7.5a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" fill="#8ab4f8" />
+      <text x="22" y="13" fill="#e8eaed" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="500">
+        Know your location <tspan fill="#9aa0a6" font-size="11" font-weight="normal">(Biết vị trí của bạn)</tspan>
+      </text>
+    </g>
+
+    <!-- BUTTON 1: TARGET "Allow while visiting the site" -->
+    <!-- Red highlighted container (Just like example image) -->
+    <rect x="15" y="80" width="320" height="52" rx="10" fill="#dc2626" fill-opacity="0.08" stroke="#dc2626" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+
+    <!-- Inside Button 1 -->
+    <rect x="20" y="85" width="310" height="42" rx="21" fill="#0b57d0" />
+    <text x="175" y="106" text-anchor="middle" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="600">
+      Allow while visiting the site
+    </text>
+    <text x="175" y="120" text-anchor="middle" fill="#d3e3fd" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10.5" font-weight="500">
+      (Cho phép mỗi khi truy cập)
+    </text>
+
+    <!-- BUTTON 2: "Allow this time" -->
+    <rect x="20" y="148" width="310" height="38" rx="19" fill="#1f2b42" />
+    <text x="175" y="172" text-anchor="middle" fill="#a8c7fa" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12.5" font-weight="500">
+      Allow this time <tspan fill="#7ba0e0" font-size="10.5">(Cho phép lần này)</tspan>
+    </text>
+
+    <!-- BUTTON 3: "Never allow" -->
+    <rect x="20" y="196" width="310" height="38" rx="19" fill="#1f2b42" />
+    <text x="175" y="220" text-anchor="middle" fill="#a8c7fa" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12.5" font-weight="500">
+      Never allow <tspan fill="#7ba0e0" font-size="10.5">(Không bao giờ cho phép)</tspan>
+    </text>
+  </g>
+
+  <!-- BIG RED ARROW POINTING DIRECTLY TO BUTTON 1 (Just like example image) -->
+  <g filter="url(#arrow-shadow)">
+    <!-- Red Pointer Arrow -->
+    <path d="M345 174 L385 158 L465 240 L440 262 L364 184 L346 200 Z" fill="#dc2626" />
+    <polygon points="330,172 372,142 360,195" fill="#ef4444" />
+  </g>
+
+  <!-- Red Action Callout Tag -->
+  <g transform="translate(382, 185)" filter="url(#arrow-shadow)">
+    <rect width="138" height="48" rx="10" fill="#dc2626" />
+    <text x="69" y="22" text-anchor="middle" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="bold">
+      BẤM VÀO ĐÂY
+    </text>
+    <text x="69" y="38" text-anchor="middle" fill="#fee2e2" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="600">
+      Chọn "Allow"
+    </text>
+  </g>
+</svg>

@@ -4,14 +4,27 @@ import userEvent from '@testing-library/user-event';
 import LocationGuideModal from '../LocationGuideModal';
 
 describe('LocationGuideModal', () => {
-  it('renders all 3 steps with visual instructions when open', () => {
+  it('renders visual guide image with arrow pointing to allow button by default', () => {
     render(<LocationGuideModal open={true} onClose={vi.fn()} />);
 
     expect(screen.getByText('Hướng dẫn bật quyền vị trí')).toBeInTheDocument();
-    expect(screen.getByText(/Bấm biểu tượng Ổ khóa trên thanh địa chỉ/i)).toBeInTheDocument();
-    expect(screen.getByText(/Bật "Vị trí" hoặc bấm "Đặt lại quyền"/i)).toBeInTheDocument();
-    expect(screen.getByText(/Bấm "Cho phép" trên thông báo trình duyệt/i)).toBeInTheDocument();
-    expect(screen.getAllByText('greenphone.duckdns.org').length).toBeGreaterThan(0);
+    expect(screen.getByText('Bấm Allow khi hỏi')).toBeInTheDocument();
+    expect(screen.getByText('Mở lại ở Ổ khóa nếu đã chặn')).toBeInTheDocument();
+
+    const allowImg = screen.getByAltText('Hướng dẫn bấm Allow để cấp quyền vị trí');
+    expect(allowImg).toBeInTheDocument();
+  });
+
+  it('switches to unlock guide image when switching tabs', async () => {
+    const user = userEvent.setup();
+    render(<LocationGuideModal open={true} onClose={vi.fn()} />);
+
+    const unlockTab = screen.getByText('Mở lại ở Ổ khóa nếu đã chặn');
+    await user.click(unlockTab);
+
+    expect(
+      screen.getByAltText('Hướng dẫn mở quyền vị trí ở biểu tượng ổ khóa')
+    ).toBeInTheDocument();
   });
 
   it('calls onClose when close button is clicked', async () => {
