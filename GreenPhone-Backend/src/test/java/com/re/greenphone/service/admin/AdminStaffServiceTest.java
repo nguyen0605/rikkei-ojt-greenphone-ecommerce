@@ -114,7 +114,7 @@ class AdminStaffServiceTest {
 
         when(userRepository.save(any(User.class))).thenReturn(savedUser);
 
-        StaffDTO dto = service.createStaff(request);
+        StaffDTO dto = service.createStaff(request, "admin@greenphone.vn");
 
         assertThat(dto).isNotNull();
         assertThat(dto.getId()).isEqualTo(11L);
@@ -135,7 +135,7 @@ class AdminStaffServiceTest {
 
         when(userRepository.existsByEmail("sales@greenphone.vn")).thenReturn(true);
 
-        assertThatThrownBy(() -> service.createStaff(request))
+        assertThatThrownBy(() -> service.createStaff(request, "admin@greenphone.vn"))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Email đã tồn tại");
 
@@ -156,7 +156,7 @@ class AdminStaffServiceTest {
         when(userRepository.existsByEmail("kho@greenphone.vn")).thenReturn(false);
         when(userRepository.existsByPhone("0901234567")).thenReturn(true);
 
-        assertThatThrownBy(() -> service.createStaff(request))
+        assertThatThrownBy(() -> service.createStaff(request, "admin@greenphone.vn"))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Số điện thoại đã được đăng ký");
 
@@ -164,7 +164,34 @@ class AdminStaffServiceTest {
     }
 
     @Test
-    @DisplayName("Cập nhật vai trò nhân viên thành công")
+    @DisplayName("Admin thường không thể tạo tài khoản có vai trò ADMIN")
+    void createStaff_RegularAdminCannotCreateAdmin() {
+        CreateStaffRequest request = CreateStaffRequest.builder()
+                .fullName("New Sub Admin")
+                .email("subadmin@greenphone.vn")
+                .phone("0909999999")
+                .password("password123")
+                .role("ROLE_ADMIN")
+                .build();
+
+        when(userRepository.existsByEmail("subadmin@greenphone.vn")).thenReturn(false);
+        when(userRepository.existsByPhone("0909999999")).thenReturn(false);
+
+        User normalAdmin = new User();
+        normalAdmin.setId(99L);
+        normalAdmin.setEmail("normal.admin@greenphone.vn");
+        normalAdmin.setRole(roleAdmin);
+        when(userRepository.findByEmail("normal.admin@greenphone.vn")).thenReturn(Optional.of(normalAdmin));
+
+        assertThatThrownBy(() -> service.createStaff(request, "normal.admin@greenphone.vn"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Chỉ Quản trị viên tối cao mới có quyền tạo tài khoản Quản trị viên mới");
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Cập nhật vai trò nhân viên thành công bởi Super Admin")
     void updateStaffRole_Success() {
         when(userRepository.findById(10L)).thenReturn(Optional.of(staffSales));
         when(roleRepository.findByName("ADMIN")).thenReturn(Optional.of(roleAdmin));
@@ -191,6 +218,67 @@ class AdminStaffServiceTest {
     }
 
     @Test
+    @DisplayName("Ngăn chặn thay đổi vai trò của Quản trị viên tối cao")
+    void updateStaffRole_SuperAdminCannotBeDemoted() {
+        User superAdmin = new User();
+        superAdmin.setId(1L);
+        superAdmin.setEmail("admin@greenphone.vn");
+        superAdmin.setRole(roleAdmin);
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(superAdmin));
+
+        UpdateStaffRoleRequest request = new UpdateStaffRoleRequest("ROLE_SALES");
+        assertThatThrownBy(() -> service.updateStaffRole(1L, request, "other.admin@greenphone.vn"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Tài khoản Quản trị viên tối cao là bất khả xâm phạm, không thể thay đổi vai trò");
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Admin thường không thể điều chỉnh vai trò của Admin khác")
+    void updateStaffRole_RegularAdminCannotDemoteAnotherAdmin() {
+        User adminTarget = new User();
+        adminTarget.setId(20L);
+        adminTarget.setEmail("second.admin@greenphone.vn");
+        adminTarget.setRole(roleAdmin);
+
+        User normalAdmin = new User();
+        normalAdmin.setId(99L);
+        normalAdmin.setEmail("normal.admin@greenphone.vn");
+        normalAdmin.setRole(roleAdmin);
+
+        when(userRepository.findById(20L)).thenReturn(Optional.of(adminTarget));
+        when(userRepository.findByEmail("normal.admin@greenphone.vn")).thenReturn(Optional.of(normalAdmin));
+
+        UpdateStaffRoleRequest request = new UpdateStaffRoleRequest("ROLE_WAREHOUSE");
+        assertThatThrownBy(() -> service.updateStaffRole(20L, request, "normal.admin@greenphone.vn"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Chỉ Quản trị viên tối cao mới có quyền điều chỉnh vai trò của Quản trị viên khác");
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Admin thường không thể nâng quyền người khác lên ADMIN")
+    void updateStaffRole_RegularAdminCannotPromoteToAdmin() {
+        User normalAdmin = new User();
+        normalAdmin.setId(99L);
+        normalAdmin.setEmail("normal.admin@greenphone.vn");
+        normalAdmin.setRole(roleAdmin);
+
+        when(userRepository.findById(10L)).thenReturn(Optional.of(staffSales));
+        when(userRepository.findByEmail("normal.admin@greenphone.vn")).thenReturn(Optional.of(normalAdmin));
+
+        UpdateStaffRoleRequest request = new UpdateStaffRoleRequest("ROLE_ADMIN");
+        assertThatThrownBy(() -> service.updateStaffRole(10L, request, "normal.admin@greenphone.vn"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Chỉ Quản trị viên tối cao mới có quyền nâng cấp tài khoản lên Quản trị viên");
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("Ngăn chặn tự khóa tài khoản của chính mình")
     void updateStaffStatus_SelfLock_ThrowsBadRequest() {
         when(userRepository.findById(10L)).thenReturn(Optional.of(staffSales));
@@ -200,5 +288,65 @@ class AdminStaffServiceTest {
                 .hasMessageContaining("Không thể tự thay đổi trạng thái hoặc khóa tài khoản của chính mình");
 
         verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Tài khoản Quản trị viên tối cao là bất khả xâm phạm, không thể bị khóa bởi bất kỳ ai")
+    void updateStaffStatus_SuperAdminCannotBeLocked() {
+        User superAdmin = new User();
+        superAdmin.setId(1L);
+        superAdmin.setEmail("admin@greenphone.vn");
+        superAdmin.setRole(roleAdmin);
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(superAdmin));
+
+        // Tài khoản admin khác cố tình gọi khóa super admin
+        assertThatThrownBy(() -> service.updateStaffStatus(1L, "BLOCKED", "other.admin@greenphone.vn"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Tài khoản Quản trị viên tối cao là bất khả xâm phạm, không thể bị khóa");
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Admin thường không thể khóa hoặc mở khóa tài khoản của Admin khác")
+    void updateStaffStatus_RegularAdminCannotBlockAnotherAdmin() {
+        User targetAdmin = new User();
+        targetAdmin.setId(22L);
+        targetAdmin.setEmail("target.admin@greenphone.vn");
+        targetAdmin.setRole(roleAdmin);
+
+        User normalAdmin = new User();
+        normalAdmin.setId(99L);
+        normalAdmin.setEmail("normal.admin@greenphone.vn");
+        normalAdmin.setRole(roleAdmin);
+
+        when(userRepository.findById(22L)).thenReturn(Optional.of(targetAdmin));
+        when(userRepository.findByEmail("normal.admin@greenphone.vn")).thenReturn(Optional.of(normalAdmin));
+
+        assertThatThrownBy(() -> service.updateStaffStatus(22L, "BLOCKED", "normal.admin@greenphone.vn"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Chỉ Quản trị viên tối cao mới có quyền khóa hoặc mở khóa tài khoản Quản trị viên khác");
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Super Admin có quyền khóa tài khoản của Admin cấp dưới vi phạm")
+    void updateStaffStatus_SuperAdminCanBlockSubAdmin() {
+        User targetAdmin = new User();
+        targetAdmin.setId(22L);
+        targetAdmin.setEmail("target.admin@greenphone.vn");
+        targetAdmin.setRole(roleAdmin);
+        targetAdmin.setStatus("ACTIVE");
+
+        when(userRepository.findById(22L)).thenReturn(Optional.of(targetAdmin));
+        when(userRepository.save(any(User.class))).thenReturn(targetAdmin);
+
+        StaffDTO dto = service.updateStaffStatus(22L, "BLOCKED", "admin@greenphone.vn");
+
+        assertThat(dto).isNotNull();
+        assertThat(targetAdmin.getStatus()).isEqualTo("BLOCKED");
+        verify(userRepository).save(targetAdmin);
     }
 }

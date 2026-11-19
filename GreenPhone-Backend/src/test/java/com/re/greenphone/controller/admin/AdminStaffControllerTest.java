@@ -137,7 +137,7 @@ class AdminStaffControllerTest {
                 .status("ACTIVE")
                 .build();
 
-        when(adminStaffService.createStaff(any(CreateStaffRequest.class))).thenReturn(created);
+        when(adminStaffService.createStaff(any(CreateStaffRequest.class), any())).thenReturn(created);
 
         String json = "{\"fullName\":\"Nguyen Van Sales\",\"email\":\"sales@greenphone.vn\",\"phone\":\"0912345678\",\"password\":\"password123\",\"role\":\"ROLE_SALES\"}";
 

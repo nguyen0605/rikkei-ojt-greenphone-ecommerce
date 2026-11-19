@@ -42,9 +42,12 @@ public class AdminStaffController {
 
     @PostMapping
     @Operation(summary = "Tạo mới tài khoản nhân viên và gán vai trò nghiệp vụ")
-    public ResponseEntity<ApiResponse<?>> createStaff(@Valid @RequestBody CreateStaffRequest request) {
+    public ResponseEntity<ApiResponse<?>> createStaff(
+            @Valid @RequestBody CreateStaffRequest request,
+            Authentication authentication) {
+        String currentUsername = authentication != null ? authentication.getName() : null;
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.created(adminStaffService.createStaff(request)));
+                .body(ApiResponse.created(adminStaffService.createStaff(request, currentUsername)));
     }
 
     @PutMapping("/{id}/role")
