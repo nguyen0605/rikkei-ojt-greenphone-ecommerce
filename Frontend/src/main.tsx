@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { Provider as ReduxProvider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { BrowserRouter } from 'react-router-dom';
-import { ConfigProvider, App as AntApp } from 'antd';
+import { ConfigProvider, App as AntApp, message } from 'antd';
 import { QueryClientProvider } from '@tanstack/react-query';
 import vi_VN from 'antd/locale/vi_VN';
 
@@ -16,6 +16,12 @@ import App from './App';
 import { store, persistor } from './store';
 import { antdTheme } from './lib/antdTheme';
 import { queryClient } from './lib/queryClient';
+
+// Cấu hình giới hạn số lượng thông báo message trên màn hình tối đa 2 thông báo cùng lúc
+message.config({
+  maxCount: 2,
+  duration: 2.5,
+});
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   (window as unknown as { __store__: typeof store }).__store__ = store;

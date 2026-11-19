@@ -41,6 +41,7 @@ export default function AdminUsersPage() {
   });
 
   const columns: TableColumnsType<UserDTO> = [
+    // Tính STT liên tục theo trang hiện tại (chuẩn phân trang)
     {
       title: 'STT',
       width: 60,

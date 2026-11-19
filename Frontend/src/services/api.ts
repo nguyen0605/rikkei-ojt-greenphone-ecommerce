@@ -44,7 +44,11 @@ export function clearClientStorage(): void {
 const api: AxiosInstance = axios.create({
   baseURL: BASE_URL,
   timeout: 15000,
-  headers: { 'Content-Type': 'application/json' },
+  headers: {
+    'Content-Type': 'application/json',
+    // Gửi User-Agent chính xác từ trình duyệt client phục vụ định danh thiết bị
+    'X-Client-User-Agent': typeof navigator !== 'undefined' ? navigator.userAgent : '',
+  },
   withCredentials: true, // BẮT BUỘC để trình duyệt tự gửi kèm HttpOnly Cookie
 });
 
