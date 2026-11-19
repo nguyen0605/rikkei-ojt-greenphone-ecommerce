@@ -116,33 +116,18 @@ public class AdminPhoneService {
                 wsPreds.add(cb.equal(wJoin.get("status"), "ACTIVE"));
                 wsPreds.add(cb.lessThanOrEqualTo(wsRoot.get("quantity"), threshold));
 
-                if (warehouseId != null && warehouseId > 0) {
-                    wsPreds.add(cb.equal(wJoin.get("id"), warehouseId));
-                    wsSubquery.select(wsRoot.get("id")).where(cb.and(wsPreds.toArray(new jakarta.persistence.criteria.Predicate[0])));
-                    predicates.add(cb.exists(wsSubquery));
-                } else {
-                    wsSubquery.select(wsRoot.get("id")).where(cb.and(wsPreds.toArray(new jakarta.persistence.criteria.Predicate[0])));
-
-                    // Fallback tương thích nếu dữ liệu chưa phân bổ sang warehouse_stock
-                    jakarta.persistence.criteria.Subquery<Long> anyWsSubquery = cq.subquery(Long.class);
-                    jakarta.persistence.criteria.Root<WarehouseStock> anyWsRoot = anyWsSubquery.from(WarehouseStock.class);
-                    anyWsSubquery.select(anyWsRoot.get("id"))
-                            .where(cb.equal(anyWsRoot.get("phoneVariant").get("phone"), root));
-
-                    var variantsJoin = root.join("variants", jakarta.persistence.criteria.JoinType.LEFT);
-                    var fallbackPred = cb.and(
-                            cb.not(cb.exists(anyWsSubquery)),
-                            cb.lessThanOrEqualTo(variantsJoin.get("stockQuantity"), threshold)
-                    );
-                    predicates.add(cb.or(cb.exists(wsSubquery), fallbackPred));
-                }
+                wsPreds.add(cb.greaterThan(wsRoot.get("quantity"), 0));
+                if (warehouseId != null) wsPreds.add(cb.equal(wJoin.get("id"), warehouseId));
+                wsSubquery.select(wsRoot.get("id")).where(cb.and(wsPreds.toArray(new jakarta.persistence.criteria.Predicate[0])));
+                predicates.add(cb.exists(wsSubquery));
                 cq.distinct(true);
             } else if (warehouseId != null && warehouseId > 0) {
                 jakarta.persistence.criteria.Subquery<Long> wsSubquery = cq.subquery(Long.class);
                 jakarta.persistence.criteria.Root<WarehouseStock> wsRoot = wsSubquery.from(WarehouseStock.class);
                 wsSubquery.select(wsRoot.get("id")).where(
                         cb.equal(wsRoot.get("phoneVariant").get("phone"), root),
-                        cb.equal(wsRoot.get("warehouse").get("id"), warehouseId)
+                        cb.equal(wsRoot.get("warehouse").get("id"), warehouseId),
+                        cb.equal(wsRoot.get("warehouse").get("status"), "ACTIVE")
                 );
                 predicates.add(cb.exists(wsSubquery));
                 cq.distinct(true);
@@ -151,8 +136,19 @@ public class AdminPhoneService {
         };
 
         Page<Phone> page = phoneRepository.findAll(spec, pageable);
+        Map<Long, Long> counts = new java.util.HashMap<>();
+        if ((lowStock || warehouseId != null) && !page.isEmpty()) {
+            var stocks = warehouseStockRepository.findInventoryStock(page.getContent().stream().map(Phone::getId).toList(), warehouseId, lowStock, threshold);
+            stocks.stream().collect(java.util.stream.Collectors.groupingBy(stock -> stock.getPhoneVariant().getPhone().getId(),
+                    java.util.stream.Collectors.mapping(stock -> stock.getPhoneVariant().getId(), java.util.stream.Collectors.toSet())))
+                    .forEach((phoneId, variantIds) -> counts.put(phoneId, (long) variantIds.size()));
+        }
         List<PhoneDTO> dtos = page.getContent().stream()
-                .map(this::toAdminListingDto)
+                .map(phone -> {
+                    PhoneDTO dto = toAdminListingDto(phone);
+                    if (lowStock || warehouseId != null) dto.setVariantCount(counts.getOrDefault(phone.getId(), 0L));
+                    return dto;
+                })
                 .toList();
         return new PageResponse<>(dtos, page.getNumber(), page.getSize(),
                 page.getTotalElements(), page.getTotalPages(), page.isLast());
@@ -270,6 +266,25 @@ public class AdminPhoneService {
     public List<PhoneVariantDTO> getVariants(Long phoneId) {
         return phoneVariantMapper.toDtoList(
                 phoneVariantRepository.findByPhoneId(phoneId));
+    }
+
+    @Transactional(readOnly = true)
+    public List<PhoneVariantDTO> getVariants(Long phoneId, boolean lowStock, Long warehouseId) {
+        if (!lowStock && warehouseId == null) return getVariants(phoneId);
+        var stocks = warehouseStockRepository.findInventoryStock(List.of(phoneId), warehouseId, lowStock, LOW_STOCK_THRESHOLD);
+        var byVariant = stocks.stream().collect(java.util.stream.Collectors.groupingBy(stock -> stock.getPhoneVariant().getId(),
+                java.util.LinkedHashMap::new, java.util.stream.Collectors.toList()));
+        return byVariant.values().stream().map(branchStocks -> {
+            PhoneVariant variant = branchStocks.get(0).getPhoneVariant();
+            PhoneVariantDTO dto = phoneVariantMapper.toDto(variant);
+            dto.setWarehouseStocks(branchStocks.stream().map(stock -> {
+                Warehouse warehouse = stock.getWarehouse();
+                return new com.re.greenphone.dto.response.WarehouseStockResponse(warehouse.getId(), warehouse.getCode(), warehouse.getName(), warehouse.getStatus(),
+                        variant.getId(), phoneId, variant.getPhone().getName(), variant.getSku(), dto.getRam(), dto.getStorage(), dto.getColor(),
+                        stock.getQuantity(), variant.getStockQuantity());
+            }).toList());
+            return dto;
+        }).toList();
     }
 
     @CacheEvict(value = "phones", key = "#phoneId")

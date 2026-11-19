@@ -34,6 +34,7 @@ import static org.mockito.Mockito.when;
 class AdminPhoneServiceTest {
 
     @Mock private PhoneRepository phoneRepository;
+    @Mock private WarehouseStockRepository warehouseStockRepository;
     @Mock private BrandRepository brandRepository;
     @Mock private PhoneVariantRepository phoneVariantRepository;
     @Mock private PhoneImageRepository phoneImageRepository;

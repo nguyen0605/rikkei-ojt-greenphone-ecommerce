@@ -86,6 +86,24 @@ function QuickAddSelect({
   );
 }
 
+/** Query scope is part of the key so changing filters cannot reuse another branch's variants. */
+function InventoryVariantsTable({ phone, lowStock, warehouseId, columns }: {
+  phone: PhoneDTO; lowStock: boolean; warehouseId?: string; columns: TableColumnsType<PhoneVariantDTO>;
+}) {
+  const params: Record<string, string> = {};
+  if (lowStock) params.lowStock = 'true';
+  if (warehouseId) params.warehouseId = warehouseId;
+  const query = useQuery({
+    queryKey: ['admin-variants', phone.id, params],
+    queryFn: () => adminPhoneService.variants(phone.id, params),
+  });
+  return <Table<PhoneVariantDTO> columns={columns} dataSource={query.isError ? [] : query.data ?? []}
+    rowKey="id" loading={query.isPending} pagination={false} size="small" scroll={{ x: 1050 }}
+    locale={{ emptyText: query.isError ? 'Không thể tải biến thể' : 'Không có biến thể phù hợp bộ lọc' }}
+    expandable={{ expandedRowRender: (variant) => <VariantWarehouseStock variantId={variant.id} stocks={variant.warehouseStocks} />,
+      columnTitle: 'Chi nhánh', columnWidth: 85 }} />;
+}
+
 export default function AdminProductsPage({ inventoryMode = false }: { inventoryMode?: boolean }) {
   const qc = useQueryClient();
   const warehouseQuery = useQuery({ queryKey: ['admin', 'warehouses'], queryFn: ({ signal }) => warehouseService.list(signal), enabled: inventoryMode });
@@ -133,8 +151,6 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
   const [movementVariant, setMovementVariant] = useState<PhoneVariantDTO | null>(null);
   const [movementType, setMovementType] = useState<'IMPORT' | 'EXPORT'>('IMPORT');
   const [expandedInventoryRows, setExpandedInventoryRows] = useState<Key[]>([]);
-  const [inventoryVariants, setInventoryVariants] = useState<Record<number, PhoneVariantDTO[]>>({});
-  const [inventoryVariantLoading, setInventoryVariantLoading] = useState<Record<number, boolean>>({});
 
   // ── Modal hình ảnh ──
   const [imgOpen, setImgOpen] = useState(false);
@@ -196,16 +212,8 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
       setVariants(loadedVariants);
     } finally { setVarLoading(false); }
   };
-  const handleInventoryExpand = async (expanded: boolean, phone: PhoneDTO) => {
+  const handleInventoryExpand = (expanded: boolean, phone: PhoneDTO) => {
     setExpandedInventoryRows((current) => expanded ? [...current, phone.id] : current.filter((id) => id !== phone.id));
-    if (!expanded) return;
-    setInventoryVariantLoading((current) => ({ ...current, [phone.id]: true }));
-    try {
-      const loadedVariants = await qc.fetchQuery({ queryKey: ['admin-variants', phone.id], queryFn: () => adminPhoneService.variants(phone.id), staleTime: 0 });
-      setInventoryVariants((current) => ({ ...current, [phone.id]: loadedVariants }));
-    } finally {
-      setInventoryVariantLoading((current) => ({ ...current, [phone.id]: false }));
-    }
   };
   const varMut = useMutation({
     mutationFn: (v: PhoneVariantRequest) => {
@@ -238,12 +246,7 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
     },
     onSuccess: (updated) => {
       setVariants((current) => current.map((variant) => variant.id === updated.id ? updated : variant));
-      setInventoryVariants((current) => Object.fromEntries(
-        Object.entries(current).map(([phoneId, currentVariants]) => [
-          phoneId,
-          currentVariants.map((variant) => variant.id === updated.id ? updated : variant),
-        ]),
-      ));
+      void qc.invalidateQueries({ queryKey: ['admin-variants'] });
       qc.invalidateQueries({ queryKey: ['admin-phones'] });
       qc.invalidateQueries({ queryKey: ['admin-inventory-history', updated.id] });
       qc.invalidateQueries({ queryKey: ['warehouse-distribution', updated.id] });
@@ -421,9 +424,8 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
     { title: 'SKU', dataIndex: 'sku', width: 150, render: (value: string) => <span className="font-mono text-xs text-ink-2">{value}</span> },
     { title: 'Giá', dataIndex: 'price', width: 120, render: (value: number) => <span className="font-semibold text-ink">{value?.toLocaleString('vi-VN')}₫</span> },
     { title: 'Giá KM', dataIndex: 'discountPrice', width: 120, render: (value: number | null) => value ? <span className="font-medium text-primary-600">{value.toLocaleString('vi-VN')}₫</span> : <span className="text-gray-400">—</span> },
-    { title: 'Tồn', dataIndex: 'stockQuantity', width: 130, align: 'right' as const, render: (value: number) => <Space size={6}><span className="font-semibold">{value}</span><LowStockAlertBadge stockQuantity={value} /></Space> },
     {
-      title: 'Thao tác', width: 250,
+      title: 'Thao tác', width: 230,
       render: (_, variant) => (
         <Space>
           <Button size="small" type="primary" onClick={() => { setMovementVariant(variant); setMovementType('IMPORT'); }} className="!rounded-full">Nhập</Button>
@@ -437,17 +439,7 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
   const renderInventoryExpandedRow = (phone: PhoneDTO) => (
     <div className="rounded-xl border border-primary-100 bg-primary-50/30 p-3">
       <div className="mb-3 text-sm font-semibold text-ink">Các biến thể của {phone.name}</div>
-      <Table<PhoneVariantDTO>
-        columns={inventoryVariantColumns}
-        dataSource={inventoryVariants[phone.id] || []}
-        rowKey="id"
-        loading={inventoryVariantLoading[phone.id]}
-        pagination={false}
-        size="small"
-        scroll={{ x: 1050 }}
-        locale={{ emptyText: 'Sản phẩm chưa có biến thể' }}
-        expandable={{ expandedRowRender: (variant) => <VariantWarehouseStock variantId={variant.id} />, columnTitle: 'Chi nhánh', columnWidth: 85 }}
-      />
+      <InventoryVariantsTable phone={phone} lowStock={lowStockOnly} warehouseId={warehouseFilter} columns={inventoryVariantColumns} />
     </div>
   );
 
@@ -523,6 +515,7 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
           rowKey="id"
           loading={isLoading}
           size="middle"
+          locale={inventoryMode && lowStockOnly ? { emptyText: 'Không có sản phẩm sắp hết hàng phù hợp bộ lọc' } : undefined}
           expandable={inventoryMode ? {
             expandedRowKeys: expandedInventoryRows,
             expandedRowRender: renderInventoryExpandedRow,

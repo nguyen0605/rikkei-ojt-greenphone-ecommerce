@@ -25,4 +25,6 @@ public class PhoneVariantDTO {
     private Integer stockQuantity;
     private String sku;
     private String status;
+    /** Branch quantities in the requested inventory scope; null for the regular catalog API. */
+    private java.util.List<WarehouseStockResponse> warehouseStocks;
 }
