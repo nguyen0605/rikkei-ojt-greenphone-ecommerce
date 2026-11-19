@@ -9,7 +9,7 @@ import {
   CheckCircleOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
-import { Sparkles, MapPin, Home, Building2, Users, Navigation, Lock, RotateCw, ToggleRight } from 'lucide-react';
+import { Sparkles, MapPin, Home, Building2, Users, Navigation } from 'lucide-react';
 import { VIETNAM_PROVINCES, findMatchingProvince, parseAddressComponents } from '@/utils/provinces';
 import {
   getDistrictsForProvince,
@@ -61,7 +61,6 @@ export default function AddressModal({
   const [isLocatingAddress, setIsLocatingAddress] = useState(false);
   const [isLocatingCurrentGps, setIsLocatingCurrentGps] = useState(false);
   const [isEstimateLocation, setIsEstimateLocation] = useState(false);
-  const [showPermissionGuideModal, setShowPermissionGuideModal] = useState(false);
   const hasUserOverriddenCoords = useRef(false);
 
   // Danh sách gợi ý Quận/Huyện tương ứng với Tỉnh/Thành phố đang chọn
@@ -450,14 +449,14 @@ export default function AddressModal({
 
     let pos: GeolocationPosition | null = null;
     try {
-      // Buoc 1: Thu lay toa do GPS do chinh xac cao (GPS phan cung neu co)
-      pos = await getPosition({ enableHighAccuracy: true, timeout: 6000, maximumAge: 30000 });
+      // Gọi trực tiếp navigator.geolocation. Trình duyệt Google Chrome sẽ tự động hiển thị popup native xin quyền
+      pos = await getPosition({ enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 });
     } catch (firstErr: unknown) {
       const err = firstErr as GeolocationPositionError;
       // Neu loi timeout (code 3) hoac khong kha dung (code 2), thu fallback sang do chinh xac tieu chuan (WiFi / IP)
       if (err?.code === 2 || err?.code === 3) {
         try {
-          pos = await getPosition({ enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 });
+          pos = await getPosition({ enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 });
         } catch {
           pos = null;
         }
@@ -466,10 +465,9 @@ export default function AddressModal({
       if (!pos) {
         setIsLocatingCurrentGps(false);
         if (err?.code === 1 || err?.code === (window.GeolocationPositionError?.PERMISSION_DENIED ?? 1)) {
-          setShowPermissionGuideModal(true);
           message.warning('Vui lòng bật quyền truy cập vị trí trên trình duyệt (ở biểu tượng ổ khóa bên trái thanh URL) để tự động điền địa chỉ.');
         } else if (err?.code === 3 || err?.code === (window.GeolocationPositionError?.TIMEOUT ?? 3)) {
-          message.warning('Hết thời gian chờ định vị GPS. Vui lòng thử lại.');
+          message.warning('Hết thời gian chờ định vị GPS. Vui lòng thử lại hoặc chọn vị trí trên bản đồ.');
         } else {
           message.warning('Không thể xác định vị trí hiện tại của thiết bị.');
         }
@@ -483,9 +481,6 @@ export default function AddressModal({
         message.error('Tọa độ vị trí hiện tại không hợp lệ.');
         return;
       }
-
-      // Tat modal huong dan neu dang mo
-      setShowPermissionGuideModal(false);
 
       // Phân tích chi tiết địa chỉ từ tọa độ GPS
       const details = await reverseGeocodeDetails(latitude, longitude);
@@ -544,7 +539,6 @@ export default function AddressModal({
 
     const handlePermChange = () => {
       if (permObj && permObj.state === 'granted') {
-        setShowPermissionGuideModal(false);
         handleUseCurrentLocation();
       }
     };
@@ -715,8 +709,7 @@ export default function AddressModal({
   };
 
   return (
-    <>
-      <Modal
+    <Modal
         title={
           <div className="flex items-center gap-2 text-lg font-bold text-gray-900 border-b border-gray-100 pb-3">
             <EnvironmentOutlined className="text-green-600" />
@@ -1150,100 +1143,5 @@ export default function AddressModal({
         </div>
       </Form>
     </Modal>
-
-    {/* Modal huong dan vi tri can bam khi trinh duyet chan quyen vi tri */}
-    <Modal
-      open={showPermissionGuideModal}
-      onCancel={() => setShowPermissionGuideModal(false)}
-      footer={null}
-      centered
-      width={420}
-      title={
-        <div className="flex items-center gap-2 text-base font-bold text-gray-900 border-b border-gray-100 pb-3">
-          <EnvironmentOutlined className="text-blue-600" />
-          <span>Cách bật định vị trên trình duyệt</span>
-        </div>
-      }
-    >
-      <div className="py-2 space-y-3">
-        <p className="text-xs text-gray-600">
-          Trình duyệt đang chặn định vị GPS. Bạn chỉ cần thực hiện 3 bước đơn giản:
-        </p>
-
-        {/* Buoc 1 */}
-        <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50/70 p-3">
-          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white font-bold text-[11px] mt-0.5">
-            1
-          </div>
-          <div className="text-xs space-y-0.5">
-            <div className="font-semibold text-gray-900 flex items-center gap-1.5">
-              <Lock className="w-3.5 h-3.5 text-blue-600" />
-              <span>Bấm biểu tượng Ổ khóa hoặc (i)</span>
-            </div>
-            <p className="text-[11px] text-gray-500 leading-normal">
-              Ở góc trên bên trái thanh địa chỉ trình duyệt (ngay cạnh tên trang web).
-            </p>
-          </div>
-        </div>
-
-        {/* Buoc 2 */}
-        <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50/70 p-3">
-          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white font-bold text-[11px] mt-0.5">
-            2
-          </div>
-          <div className="text-xs space-y-0.5">
-            <div className="font-semibold text-gray-900 flex items-center gap-1.5">
-              <ToggleRight className="w-3.5 h-3.5 text-green-600" />
-              <span>Bật quyền "Vị trí" (Location)</span>
-            </div>
-            <p className="text-[11px] text-gray-500 leading-normal">
-              Gạt mục <strong>Vị trí (Location)</strong> sang <strong>Bật</strong> (hoặc chọn <strong>Cho phép / Allow</strong>).
-            </p>
-          </div>
-        </div>
-
-        {/* Buoc 3 */}
-        <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50/70 p-3">
-          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white font-bold text-[11px] mt-0.5">
-            3
-          </div>
-          <div className="text-xs space-y-0.5">
-            <div className="font-semibold text-gray-900 flex items-center gap-1.5">
-              <RotateCw className="w-3.5 h-3.5 text-blue-600" />
-              <span>Tải lại trang để hoàn tất</span>
-            </div>
-            <p className="text-[11px] text-gray-500 leading-normal">
-              Bấm nút <strong>Tải lại trang (F5)</strong> bên dưới để hệ thống tự động xác định vị trí.
-            </p>
-          </div>
-        </div>
-
-        <p className="text-[11px] text-gray-400 italic text-center pt-1">
-          Gợi ý: Bạn cũng có thể trực tiếp chọn và ghim vị trí trên bản đồ mà không cần bật GPS.
-        </p>
-
-        {/* Action buttons */}
-        <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-gray-100">
-          <Button onClick={() => setShowPermissionGuideModal(false)} className="!rounded-xl text-xs">
-            Đóng
-          </Button>
-          <Button
-            type="primary"
-            icon={<RotateCw className="w-3.5 h-3.5" />}
-            onClick={() => {
-              if (typeof window !== 'undefined') {
-                sessionStorage.setItem('gp_auto_locate_on_reload', 'true');
-                sessionStorage.setItem('gp_auto_open_address_modal', 'true');
-                window.location.reload();
-              }
-            }}
-            className="!rounded-xl !bg-blue-600 hover:!bg-blue-700 text-xs font-semibold"
-          >
-            Tải lại trang (F5)
-          </Button>
-        </div>
-      </div>
-    </Modal>
-  </>
-);
+  );
 }
