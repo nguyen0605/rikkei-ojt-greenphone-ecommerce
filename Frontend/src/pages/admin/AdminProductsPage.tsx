@@ -31,7 +31,7 @@ function QuickAddSelect({
   onChange: (v: number) => void;
   items: OptionItemDTO[];
   placeholder?: string;
-  width?: number;
+  width?: number | string;
 }) {
   const qc = useQueryClient();
   const [newValue, setNewValue] = useState('');
@@ -57,7 +57,7 @@ function QuickAddSelect({
       onChange={onChange}
       placeholder={optionId ? placeholder : `Chưa có danh mục ${type}`}
       disabled={!optionId}
-      style={{ width: width ?? 140 }}
+      style={{ width: width ?? '100%' }}
       options={items.map((i) => ({ value: i.id, label: i.value }))}
       dropdownRender={(menu) => (
         <>
@@ -213,9 +213,15 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
       return varEdit ? adminPhoneService.updateVariant(variantPhone.id, varEdit.id, v) : adminPhoneService.addVariant(variantPhone.id, v);
     },
     onSuccess: async () => {
-      message.success(varEdit ? 'Cập nhật biến thể' : 'Thêm biến thể');
-      setVarEdit(null); varForm.resetFields();
+      message.success(varEdit ? 'Cập nhật biến thể thành công' : 'Thêm biến thể thành công');
+      setVarEdit(null);
+      varForm.resetFields();
+      qc.invalidateQueries({ queryKey: ['admin-phones'] });
+      qc.invalidateQueries({ queryKey: ['phones'] });
       if (variantPhone) setVariants(await adminPhoneService.variants(variantPhone.id));
+    },
+    onError: (e) => {
+      message.error(e instanceof Error ? e.message : 'Thao tác biến thể thất bại');
     },
   });
 
@@ -575,32 +581,122 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
         <Table<PhoneVariantDTO> columns={variantColumns} dataSource={variants} rowKey="id" loading={varLoading} size="small" pagination={false} className="mb-4" />
         {!inventoryMode && <div className="rounded-xl border border-dashed border-gray-200 bg-bg-soft p-4">
           <div className="mb-3 text-sm font-semibold text-ink">{varEdit ? 'Sửa biến thể' : 'Thêm biến thể mới'}</div>
-          <Form form={varForm} layout="inline" onFinish={(v) => varMut.mutate(v)}>
-            <Form.Item name="ramItemId" rules={[{ required: true, message: 'RAM' }]}>
-              <QuickAddSelect optionId={categoryOf('RAM')?.id} type="RAM" value={varForm.getFieldValue('ramItemId')} onChange={(v) => varForm.setFieldValue('ramItemId', v)} items={itemsByType('RAM')} placeholder="RAM" width={90} />
-            </Form.Item>
-            <Form.Item name="storageItemId" rules={[{ required: true, message: 'ROM' }]}>
-              <QuickAddSelect optionId={categoryOf('STORAGE')?.id} type="STORAGE" value={varForm.getFieldValue('storageItemId')} onChange={(v) => varForm.setFieldValue('storageItemId', v)} items={itemsByType('STORAGE')} placeholder="ROM" width={100} />
-            </Form.Item>
-            <Form.Item name="colorItemId" rules={[{ required: true, message: 'Màu' }]}>
-              <QuickAddSelect optionId={categoryOf('COLOR')?.id} type="COLOR" value={varForm.getFieldValue('colorItemId')} onChange={(v) => varForm.setFieldValue('colorItemId', v)} items={itemsByType('COLOR')} placeholder="Màu" width={130} />
-            </Form.Item>
-            <Form.Item name="price" rules={[{ required: true, message: 'Giá' }]}>
-              <InputNumber placeholder="Giá (₫)" style={{ width: 140 }} min={0}
-                formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
-                parser={parseVariantNumber} />
-            </Form.Item>
-            <Form.Item name="discountPrice">
-              <InputNumber placeholder="Giá KM" style={{ width: 120 }} min={0}
-                formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
-                parser={parseVariantNumber} />
-            </Form.Item>
-            <Form.Item>
-              <Space>
-                <Button type="primary" htmlType="submit" loading={varMut.isPending} className="!rounded-full !bg-primary-600">{varEdit ? 'Lưu' : 'Thêm'}</Button>
-                {varEdit && <Button onClick={() => { setVarEdit(null); varForm.resetFields(); }} className="!rounded-full">Hủy</Button>}
-              </Space>
-            </Form.Item>
+          <Form form={varForm} layout="vertical" onFinish={(v) => varMut.mutate(v)}>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2">
+              <Form.Item name="ramItemId" label="RAM" rules={[{ required: true, message: 'Chọn RAM' }]}>
+                <QuickAddSelect optionId={categoryOf('RAM')?.id} type="RAM" value={varForm.getFieldValue('ramItemId')} onChange={(v) => varForm.setFieldValue('ramItemId', v)} items={itemsByType('RAM')} placeholder="Chọn RAM" width="100%" />
+              </Form.Item>
+              <Form.Item name="storageItemId" label="Bộ nhớ (ROM)" rules={[{ required: true, message: 'Chọn ROM' }]}>
+                <QuickAddSelect optionId={categoryOf('STORAGE')?.id} type="STORAGE" value={varForm.getFieldValue('storageItemId')} onChange={(v) => varForm.setFieldValue('storageItemId', v)} items={itemsByType('STORAGE')} placeholder="Chọn ROM" width="100%" />
+              </Form.Item>
+              <Form.Item
+                name="colorItemId"
+                label="Màu sắc"
+                dependencies={['ramItemId', 'storageItemId']}
+                rules={[
+                  { required: true, message: 'Chọn màu sắc' },
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (!value) return Promise.resolve();
+                      const ram = getFieldValue('ramItemId');
+                      const rom = getFieldValue('storageItemId');
+                      if (ram && rom) {
+                        const isDuplicate = variants.some(
+                          (v) => (!varEdit || v.id !== varEdit.id) &&
+                                 v.ramItemId === ram &&
+                                 v.storageItemId === rom &&
+                                 v.colorItemId === value
+                        );
+                        if (isDuplicate) {
+                          return Promise.reject(new Error('Cấu hình RAM/ROM/Màu này đã tồn tại'));
+                        }
+                      }
+                      return Promise.resolve();
+                    },
+                  }),
+                ]}
+              >
+                <QuickAddSelect optionId={categoryOf('COLOR')?.id} type="COLOR" value={varForm.getFieldValue('colorItemId')} onChange={(v) => varForm.setFieldValue('colorItemId', v)} items={itemsByType('COLOR')} placeholder="Chọn màu" width="100%" />
+              </Form.Item>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+              <Form.Item
+                name="price"
+                label="Giá gốc (₫)"
+                rules={[
+                  { required: true, message: 'Vui lòng nhập giá gốc' },
+                  {
+                    validator(_, value) {
+                      if (value === undefined || value === null || value === '') {
+                        return Promise.resolve();
+                      }
+                      const num = Number(value);
+                      if (num <= 0) {
+                        return Promise.reject(new Error('Giá gốc phải lớn hơn 0'));
+                      }
+                      if (num < 1000) {
+                        return Promise.reject(new Error('Giá gốc tối thiểu 1.000₫'));
+                      }
+                      return Promise.resolve();
+                    },
+                  },
+                ]}
+              >
+                <InputNumber
+                  placeholder="VD: 34.990.000"
+                  className="w-full"
+                  min={1000}
+                  formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
+                  parser={parseVariantNumber}
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="discountPrice"
+                label="Giá khuyến mãi (₫) (tùy chọn)"
+                dependencies={['price']}
+                rules={[
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (value === undefined || value === null || value === '') {
+                        return Promise.resolve();
+                      }
+                      const numDiscount = Number(value);
+                      if (numDiscount <= 0) {
+                        return Promise.reject(new Error('Giá khuyến mãi phải lớn hơn 0'));
+                      }
+                      const price = getFieldValue('price');
+                      if (price !== undefined && price !== null && numDiscount >= Number(price)) {
+                        return Promise.reject(new Error('Giá KM phải nhỏ hơn giá gốc'));
+                      }
+                      return Promise.resolve();
+                    },
+                  }),
+                ]}
+              >
+                <InputNumber
+                  placeholder="VD: 32.990.000"
+                  className="w-full"
+                  min={1000}
+                  formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
+                  parser={parseVariantNumber}
+                />
+              </Form.Item>
+
+              <Form.Item>
+                <Space className="w-full">
+                  <Button type="primary" htmlType="submit" loading={varMut.isPending} className="!rounded-full !bg-primary-600">
+                    {varEdit ? 'Lưu thay đổi' : 'Thêm biến thể'}
+                  </Button>
+                  {varEdit && (
+                    <Button onClick={() => { setVarEdit(null); varForm.resetFields(); }} className="!rounded-full">
+                      Hủy
+                    </Button>
+                  )}
+                </Space>
+              </Form.Item>
+            </div>
           </Form>
         </div>}
       </Modal>
