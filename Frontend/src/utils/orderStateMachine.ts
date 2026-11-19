@@ -108,6 +108,18 @@ export const isTerminalOrderStatus = (status?: string | null): boolean => {
 };
 
 /**
+ * Kiểm tra xem toàn bộ trạng thái đơn hàng có bị khóa cứng hay không.
+ * Đơn hàng bị khóa khi:
+ * - Trạng thái đơn là DELIVERED hoặc CANCELLED
+ * - Hoặc trạng thái thanh toán là REFUNDED (Đã hoàn tiền thành công)
+ */
+export const isOrderLocked = (orderStatus?: string | null, paymentStatus?: string | null): boolean => {
+  if (isTerminalOrderStatus(orderStatus)) return true;
+  if (isTerminalPaymentStatus(paymentStatus)) return true;
+  return false;
+};
+
+/**
  * Kiểm tra xem chuyển đổi trạng thái từ fromStatus sang toStatus có hợp lệ hay không.
  */
 export const isValidOrderStatusTransition = (fromStatus: string, toStatus: string): boolean => {
@@ -118,11 +130,20 @@ export const isValidOrderStatusTransition = (fromStatus: string, toStatus: strin
 
 /**
  * Lấy danh sách options hợp lệ cho dropdown cập nhật trạng thái đơn hàng.
- * Chỉ trả về trạng thái hiện tại kèm các trạng thái kế tiếp hợp lệ theo State Machine.
+ * Nếu đơn hàng đã hoàn tiền (REFUNDED), chỉ trả về trạng thái hiện tại kèm nhãn đã khóa.
  */
 export const getAvailableNextStatusOptions = (
-  currentStatus: string
+  currentStatus: string,
+  paymentStatus?: string | null
 ): { value: string; label: string }[] => {
+  if (isTerminalPaymentStatus(paymentStatus)) {
+    return [
+      {
+        value: currentStatus,
+        label: `${currentStatus} (${ORDER_STATUS_LABEL[currentStatus] || currentStatus})`,
+      },
+    ];
+  }
   const nextStates = ORDER_STATE_TRANSITIONS[currentStatus] || [];
   const validStates = [currentStatus, ...nextStates];
   return validStates.map((status) => ({

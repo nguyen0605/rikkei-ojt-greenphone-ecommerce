@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   ORDER_STATE_TRANSITIONS,
   isTerminalOrderStatus,
+  isOrderLocked,
   isValidOrderStatusTransition,
   getAvailableNextStatusOptions,
   extractCancelReason,
@@ -31,6 +32,15 @@ describe('Order State Machine & Transition Rules', () => {
       expect(isTerminalOrderStatus('SHIPPING')).toBe(false);
       expect(isTerminalOrderStatus(null)).toBe(false);
       expect(isTerminalOrderStatus(undefined)).toBe(false);
+    });
+
+    it('should lock entire order via isOrderLocked when status is terminal or refunded', () => {
+      expect(isOrderLocked('DELIVERED', 'PAID')).toBe(true);
+      expect(isOrderLocked('CANCELLED', 'UNPAID')).toBe(true);
+      expect(isOrderLocked('PENDING', 'REFUNDED')).toBe(true);
+      expect(isOrderLocked('PROCESSING', 'REFUNDED')).toBe(true);
+      expect(isOrderLocked('PENDING', 'PAID')).toBe(false);
+      expect(isOrderLocked('PROCESSING', 'UNPAID')).toBe(false);
     });
   });
 
@@ -100,6 +110,12 @@ describe('Order State Machine & Transition Rules', () => {
       const options = getAvailableNextStatusOptions('CANCELLED');
       const values = options.map((o) => o.value);
       expect(values).toEqual(['CANCELLED']);
+    });
+
+    it('should lock order status options and only return current status when paymentStatus is REFUNDED', () => {
+      const options = getAvailableNextStatusOptions('PENDING', 'REFUNDED');
+      const values = options.map((o) => o.value);
+      expect(values).toEqual(['PENDING']);
     });
   });
 

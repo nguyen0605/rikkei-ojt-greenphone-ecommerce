@@ -218,6 +218,23 @@ class AdminOrderServiceTest {
     }
 
     @Test
+    @DisplayName("Chặn thay đổi trạng thái đơn hàng khi đơn đã hoàn tiền REFUNDED (Khóa cứng trạng thái)")
+    void updateStatus_whenPaymentStatusIsRefunded_throwsBadRequest() {
+        Order order = Order.builder()
+                .orderStatus("CANCELLED")
+                .paymentStatus("REFUNDED")
+                .build();
+        order.setId(88L);
+
+        when(orderRepository.findById(88L)).thenReturn(Optional.of(order));
+
+        BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> adminOrderService.updateStatus(88L, "PROCESSING"));
+
+        assertThat(ex.getMessage()).contains("Đơn hàng đã hoàn tiền thành công, trạng thái đơn hàng đã bị khóa vĩnh viễn");
+    }
+
+    @Test
     @DisplayName("Chặn vi phạm quy trình: Đã thanh toán PAID không thể tự ý chuyển về UNPAID")
     void updatePaymentStatus_invalidTransition_paid_to_unpaid_throwsBadRequest() {
         Order order = Order.builder()

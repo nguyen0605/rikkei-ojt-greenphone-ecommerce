@@ -141,4 +141,27 @@ describe('AdminOrdersPage - Confirmation Dialog on Status Change', () => {
 
     expect(await screen.findByText('Xác nhận hủy đơn hàng #101')).toBeInTheDocument();
   });
+
+  it('locks orderStatus dropdown when paymentStatus is REFUNDED', async () => {
+    const refundedOrder: OrderDTO = {
+      ...mockOrder,
+      id: 202,
+      orderStatus: 'PENDING',
+      paymentStatus: 'REFUNDED',
+    };
+
+    vi.mocked(adminOrderService.list).mockResolvedValue({
+      ...mockPageResponse,
+      content: [refundedOrder],
+    });
+
+    renderComponent();
+
+    await screen.findByText('#202');
+
+    const comboboxes = screen.getAllByRole('combobox');
+    const orderStatusSelect = comboboxes[comboboxes.length - 1];
+
+    expect(orderStatusSelect).toBeDisabled();
+  });
 });
