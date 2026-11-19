@@ -29,11 +29,12 @@ import {
   ORDER_STATUS_LABEL,
   isTerminalOrderStatus,
   getAvailableNextStatusOptions,
+  PAYMENT_STATUS_LABEL,
+  isTerminalPaymentStatus,
+  getAvailableNextPaymentStatusOptions,
 } from '@/utils/orderStateMachine';
 
 const { TextArea } = Input;
-
-const paymentStatusOpts = ['UNPAID', 'PAID', 'REFUND_PENDING', 'REFUNDED'];
 
 const CANCEL_REASONS = [
   'Khách hàng yêu cầu hủy',
@@ -106,6 +107,20 @@ export default function AdminOrdersPage() {
       message.error(err?.message || 'Không thể cập nhật thanh toán');
     },
   });
+
+  // Xác nhận chuyển trạng thái thanh toán
+  const handlePaymentStatusChange = (orderId: number, nextStatus: string, currentStatus: string) => {
+    if (nextStatus === currentStatus) return;
+    Modal.confirm({
+      title: 'Xác nhận chuyển trạng thái thanh toán',
+      content: `Bạn có chắc chắn muốn chuyển trạng thái thanh toán của đơn #${orderId} từ "${PAYMENT_STATUS_LABEL[currentStatus] || currentStatus}" sang "${PAYMENT_STATUS_LABEL[nextStatus] || nextStatus}"?`,
+      okText: 'Xác nhận',
+      cancelText: 'Hủy',
+      onOk: () => {
+        paymentMut.mutate({ id: orderId, paymentStatus: nextStatus });
+      },
+    });
+  };
 
   // Xử lý mở Drawer chi tiết
   const handleOpenDetail = (order: OrderDTO) => {
@@ -193,23 +208,30 @@ export default function AdminOrdersPage() {
     {
       title: 'Thanh toán',
       dataIndex: 'paymentStatus',
-      width: 230,
-      render: (s: string, r) => (
-        <div className="flex items-center gap-2">
-          {/* Cố định width 110px cho StatusTag để các dòng luôn thẳng hàng tuyệt đối */}
-          <div className="w-[110px] shrink-0 flex items-center">
-            <StatusTag status={s} className="!w-full !m-0" />
+      width: 260,
+      render: (s: string, r) => {
+        const isTerminalPayment = isTerminalPaymentStatus(s);
+        const isCancelledNonRefundable = r.orderStatus === 'CANCELLED' && s !== 'REFUND_PENDING';
+        const isLocked = isTerminalPayment || isCancelledNonRefundable;
+        const paymentOptions = getAvailableNextPaymentStatusOptions(s);
+
+        return (
+          <div className="flex items-center gap-2">
+            {/* Cố định width 110px cho StatusTag để các dòng luôn thẳng hàng tuyệt đối */}
+            <div className="w-[110px] shrink-0 flex items-center">
+              <StatusTag status={s} className="!w-full !m-0" />
+            </div>
+            <Select
+              size="small"
+              value={s}
+              style={{ width: 135 }}
+              disabled={isLocked}
+              onChange={(v) => handlePaymentStatusChange(r.id, v, s)}
+              options={paymentOptions}
+            />
           </div>
-          <Select
-            size="small"
-            value={s}
-            style={{ width: 105 }}
-            disabled={r.orderStatus === 'CANCELLED' && r.paymentStatus !== 'REFUND_PENDING'}
-            onChange={(v) => paymentMut.mutate({ id: r.id, paymentStatus: v })}
-            options={paymentStatusOpts.map((o) => ({ value: o, label: o }))}
-          />
-        </div>
-      ),
+        );
+      },
     },
     {
       title: 'Trạng thái đơn',

@@ -72,6 +72,21 @@ public class AdminOrderService {
         };
     }
 
+    private boolean isValidPaymentTransition(String current, String next) {
+        if (next == null) return false;
+        String cur = (current != null ? current : "UNPAID").toUpperCase();
+        String nxt = next.toUpperCase();
+        if (cur.equals(nxt)) return true;
+
+        return switch (cur) {
+            case "UNPAID" -> "PAID".equals(nxt);
+            case "PAID" -> "REFUND_PENDING".equals(nxt);
+            case "REFUND_PENDING" -> "REFUNDED".equals(nxt) || "PAID".equals(nxt);
+            case "REFUNDED" -> false; // Terminal state: đã hoàn tiền không thể chuyển đổi
+            default -> false;
+        };
+    }
+
     public PageResponse<OrderDTO> getOrders(String status, String search, PageRequest pageRequest) {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(
                 pageRequest.getPage(), pageRequest.getSize(),
@@ -236,12 +251,46 @@ public class AdminOrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
 
-        if (!List.of("UNPAID", "PAID", "REFUND_PENDING", "REFUNDED").contains(paymentStatus)) {
+        if (paymentStatus == null || !List.of("UNPAID", "PAID", "REFUND_PENDING", "REFUNDED").contains(paymentStatus.toUpperCase())) {
             throw new BadRequestException("Trạng thái thanh toán không hợp lệ: " + paymentStatus);
         }
 
-        String previousPaymentStatus = order.getPaymentStatus();
-        if ("REFUNDED".equalsIgnoreCase(paymentStatus)) {
+        String targetStatus = paymentStatus.toUpperCase();
+        String previousPaymentStatus = order.getPaymentStatus() != null ? order.getPaymentStatus().toUpperCase() : "UNPAID";
+
+        if (!isValidPaymentTransition(previousPaymentStatus, targetStatus)) {
+            throw new BadRequestException(String.format(
+                    "Vi phạm quy trình: Không thể chuyển trạng thái thanh toán từ %s sang %s",
+                    previousPaymentStatus, targetStatus));
+        }
+
+        if (previousPaymentStatus.equals(targetStatus)) {
+            return orderMapper.toDto(order);
+        }
+
+        // Đồng bộ bản ghi Payment khi chuyển sang PAID
+        if ("PAID".equals(targetStatus)) {
+            List<Payment> payments = paymentRepository.findByOrderIdOrderByIdAsc(order.getId());
+            if (payments.isEmpty()) {
+                Payment payment = Payment.builder()
+                        .order(order)
+                        .paymentProvider(order.getPaymentMethod() != null ? order.getPaymentMethod() : "MANUAL_ADMIN")
+                        .transactionCode("MANUAL-" + order.getId() + "-" + System.currentTimeMillis())
+                        .amount(order.getFinalAmount() != null ? order.getFinalAmount() : order.getTotalAmount())
+                        .paidAt(LocalDateTime.now())
+                        .build();
+                paymentRepository.save(payment);
+            } else {
+                for (Payment payment : payments) {
+                    if (payment.getPaidAt() == null) {
+                        payment.setPaidAt(LocalDateTime.now());
+                        paymentRepository.save(payment);
+                    }
+                }
+            }
+        }
+
+        if ("REFUNDED".equals(targetStatus)) {
             String existingNote = order.getNote() != null ? order.getNote().trim() : "";
             String refundTag = "[Kế toán đã hoàn tiền thành công lúc " + java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").format(LocalDateTime.now()) + "]";
             if (!existingNote.contains("[Kế toán đã hoàn tiền")) {
@@ -249,14 +298,14 @@ public class AdminOrderService {
             }
         }
 
-        order.setPaymentStatus(paymentStatus);
+        order.setPaymentStatus(targetStatus);
         order = orderRepository.save(order);
 
         orderHistoryRepository.save(com.re.greenphone.entity.OrderHistory.builder()
                 .order(order)
                 .fromStatus(previousPaymentStatus)
-                .toStatus(paymentStatus)
-                .note("REFUNDED".equalsIgnoreCase(paymentStatus) ? "Kế toán đã hoàn tiền thành công" : "Cập nhật trạng thái thanh toán sang " + paymentStatus)
+                .toStatus(targetStatus)
+                .note("REFUNDED".equals(targetStatus) ? "Kế toán đã hoàn tiền thành công" : "Cập nhật trạng thái thanh toán sang " + targetStatus)
                 .changedBy("ADMIN")
                 .build());
 
