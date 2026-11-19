@@ -74,8 +74,10 @@ public class AdminPhoneController {
 
     // Variants
     @GetMapping("/{phoneId}/variants")
-    public ResponseEntity<ApiResponse<?>> getVariants(@PathVariable Long phoneId) {
-        return ResponseEntity.ok(ApiResponse.success(adminPhoneService.getVariants(phoneId)));
+    public ResponseEntity<ApiResponse<?>> getVariants(@PathVariable Long phoneId,
+            @RequestParam(defaultValue = "false") boolean lowStock,
+            @RequestParam(required = false) Long warehouseId) {
+        return ResponseEntity.ok(ApiResponse.success(adminPhoneService.getVariants(phoneId, lowStock, warehouseId)));
     }
 
     @PostMapping("/{phoneId}/variants")
