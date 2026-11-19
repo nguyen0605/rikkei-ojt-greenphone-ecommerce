@@ -27,6 +27,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.Map;
+import java.util.LinkedHashMap;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -54,6 +56,8 @@ public class OrderService {
     private final InventoryStockHistoryService inventoryStockHistoryService;
     private final WarehouseRoutingService warehouseRoutingService;
     private final WarehouseTransferService warehouseTransferService;
+    private final WarehouseStockRepository warehouseStockRepository;
+    private final WarehouseRepository warehouseRepository;
     private final jakarta.persistence.EntityManager entityManager;
     private final RedisTemplate<String, Object> redisTemplate;
     private final ApplicationEventPublisher eventPublisher;
@@ -169,32 +173,75 @@ public class OrderService {
                 .sorted(java.util.Comparator.comparing(com.re.greenphone.dto.request.OrderItemRequest::getPhoneVariantId))
                 .toList();
 
+        // Gom nhóm tổng số lượng đặt theo từng biến thể (xử lý đơn hàng có nhiều item cùng biến thể)
+        Map<Long, Integer> consolidatedQuantities = new java.util.LinkedHashMap<>();
+        for (var itemReq : sortedItems) {
+            consolidatedQuantities.merge(itemReq.getPhoneVariantId(), itemReq.getQuantity(), Integer::sum);
+        }
+
         // [ORD-04] 1. Khóa từng sản phẩm và kiểm tra đủ hàng trong kho
         List<PhoneVariant> lockedVariants = new java.util.ArrayList<>();
-        for (var itemReq : sortedItems) {
-            PhoneVariant variant = phoneVariantRepository.findByIdWithLock(itemReq.getPhoneVariantId())
-                    .orElseThrow(() -> new ResourceNotFoundException("PhoneVariant", "id", itemReq.getPhoneVariantId()));
+        for (Long variantId : consolidatedQuantities.keySet()) {
+            PhoneVariant variant = phoneVariantRepository.findByIdWithLock(variantId)
+                    .orElseThrow(() -> new ResourceNotFoundException("PhoneVariant", "id", variantId));
 
             if ("INACTIVE".equalsIgnoreCase(variant.getStatus())
                     || (variant.getPhone() != null && "INACTIVE".equalsIgnoreCase(variant.getPhone().getStatus()))) {
                 throw new BadRequestException("Sản phẩm #" + variant.getId() + " hiện không còn được bán. Vui lòng xóa khỏi giỏ hàng và thử lại.");
             }
 
+            int totalRequired = consolidatedQuantities.get(variantId);
             // Chặn bán âm ngay trong lock
-            if (variant.getStockQuantity() != null && variant.getStockQuantity() < itemReq.getQuantity()) {
+            if (variant.getStockQuantity() != null && variant.getStockQuantity() < totalRequired) {
                 throw new BadRequestException("Sản phẩm #" + variant.getId() + " không đủ số lượng trong kho (còn " + variant.getStockQuantity() + " sản phẩm).");
             }
             lockedVariants.add(variant);
         }
 
         // [ORD-04] 2. Định tuyến kho gần nhất (giao trực tiếp hoặc gom hàng liên kho)
+        Double lat = request.getLatitude();
+        Double lng = request.getLongitude();
+
+        List<Long> orderVariantIds = new java.util.ArrayList<>(consolidatedQuantities.keySet());
+        com.re.greenphone.dto.response.NearestWarehouseStockResponse nearestRes = warehouseRoutingService
+                .findNearestWarehouseStock(lat, lng, request.getShippingAddress(), orderVariantIds);
+
+        Warehouse nearestBranch = null;
+        if (nearestRes != null && nearestRes.getWarehouseId() != null) {
+            nearestBranch = warehouseRepository.findById(nearestRes.getWarehouseId()).orElse(null);
+        }
+
+        if ((lat == null || lng == null) && nearestBranch != null) {
+            lat = nearestBranch.getLatitudeAsDouble();
+            lng = nearestBranch.getLongitudeAsDouble();
+        }
+
+        // Chặn đặt vượt tồn kho tại kho chi nhánh gần nhất
+        if (nearestBranch != null) {
+            for (Map.Entry<Long, Integer> entry : consolidatedQuantities.entrySet()) {
+                Long vId = entry.getKey();
+                int requiredQty = entry.getValue();
+                WarehouseStock ws = warehouseStockRepository.findByWarehouseIdAndPhoneVariantIdForUpdate(
+                        nearestBranch.getId(), vId).orElse(null);
+                int availableAtBranch = ws != null ? ws.getAvailableQuantity() : 0;
+                if (availableAtBranch < requiredQty) {
+                    PhoneVariant v = lockedVariants.stream()
+                            .filter(lv -> lv.getId().equals(vId)).findFirst().orElse(null);
+                    String pName = v != null && v.getPhone() != null ? v.getPhone().getName() : ("#" + vId);
+                    throw new BadRequestException("Sản phẩm " + pName + " tại " + nearestBranch.getName()
+                            + (availableAtBranch <= 0 ? " đã hết hàng." : (" không đủ số lượng (chỉ còn " + availableAtBranch + " sản phẩm)."))
+                            + " Vui lòng điều chỉnh lại số lượng đặt mua.");
+                }
+            }
+        }
+
         List<com.re.greenphone.dto.request.OrderItemRequirement> itemRequirements = sortedItems.stream()
                 .map(item -> new com.re.greenphone.dto.request.OrderItemRequirement(item.getPhoneVariantId(), item.getQuantity()))
                 .toList();
 
         com.re.greenphone.dto.response.InterWarehouseTransferPlan transferPlan = warehouseRoutingService.routeInterWarehouseFulfillment(
-                request.getLatitude(),
-                request.getLongitude(),
+                lat,
+                lng,
                 itemRequirements
         );
 
@@ -202,7 +249,12 @@ public class OrderService {
             throw new BadRequestException("Tổng tồn kho toàn hệ thống không đủ để đáp ứng đơn hàng");
         }
 
-        Warehouse routedWarehouse = transferPlan.getDestinationWarehouse();
+        Warehouse routedWarehouse = nearestBranch != null ? nearestBranch : transferPlan.getDestinationWarehouse();
+        if (routedWarehouse == null) {
+            routedWarehouse = warehouseRepository.findByCode(com.re.greenphone.service.admin.WarehouseStockLedgerService.MAIN_CODE)
+                    .orElseGet(() -> warehouseRepository.findAll().stream().findFirst().orElse(null));
+        }
+
         order.setFulfillmentWarehouse(routedWarehouse);
         boolean isDirect = transferPlan.isDirectFulfillment();
 
@@ -217,8 +269,9 @@ public class OrderService {
 
             if (variant.getStockQuantity() != null) {
                 int quantityBefore = variant.getStockQuantity();
-                variant.setStockQuantity(quantityBefore - itemReq.getQuantity()); // Trừ tồn kho
-                if (isDirect) {
+                variant.setStockQuantity(Math.max(0, quantityBefore - itemReq.getQuantity())); // Trừ tồn kho
+                phoneVariantRepository.save(variant);
+                if (routedWarehouse != null) {
                     inventoryStockHistoryService.recordAtWarehouse(variant, quantityBefore, -itemReq.getQuantity(), "EXPORT", "Đặt hàng", routedWarehouse.getId());
                 } else {
                     inventoryStockHistoryService.recordAggregateOnly(variant, quantityBefore, -itemReq.getQuantity(), "EXPORT", "Đặt hàng (chờ gom hàng liên kho)");
@@ -314,7 +367,7 @@ public class OrderService {
         }
 
         String initialOrderNote = isDirect
-                ? "Đơn hàng được khởi tạo thành công (" + order.getPaymentMethod() + ")"
+                ? "Đơn hàng được khởi tạo thành công (" + order.getPaymentMethod() + ") - Xuất từ " + routedWarehouse.getName()
                 : "Đơn hàng được khởi tạo thành công - Đang chờ điều chuyển hàng liên kho về " + routedWarehouse.getName() + " (" + order.getPaymentMethod() + ")";
 
         orderHistoryRepository.save(com.re.greenphone.entity.OrderHistory.builder()

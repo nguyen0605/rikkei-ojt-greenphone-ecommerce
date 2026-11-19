@@ -582,5 +582,28 @@ class WarehouseRoutingServiceTest {
         System.out.printf("INV-08 InterWarehouse Benchmark: Avg time for 20-item cart: %.4f ms (Threshold: 50.0 ms)%n", avgMs);
         assertTrue(avgMs < 50.0, "InterWarehouse planning must execute well under 50ms. Actual: " + avgMs + " ms");
     }
+
+    @Test
+    @DisplayName("findNearestWarehouseStock tra ve ton kho kha dung cua kho gan nhat tai TP.HCM")
+    void findNearestWarehouseStock_returnsAvailableStockAtNearestWarehouse() {
+        when(warehouseRepository.findByStatus("ACTIVE")).thenReturn(List.of(warehouseHn, warehouseHcm));
+
+        PhoneVariant pv602 = PhoneVariant.builder().sku("SKU-602").build();
+        pv602.setId(602L);
+
+        WarehouseStock stockHcm = new WarehouseStock();
+        stockHcm.setWarehouse(warehouseHcm);
+        stockHcm.setPhoneVariant(pv602);
+        stockHcm.setQuantity(17);
+        stockHcm.setReservedQuantity(0);
+
+        when(warehouseStockRepository.findByWarehouseIdInAndPhoneVariantIdIn(eq(List.of(warehouseHcm.getId())), eq(List.of(602L))))
+                .thenReturn(List.of(stockHcm));
+
+        var res = routingService.findNearestWarehouseStock(HCM_LAT, HCM_LNG, "TP. Hồ Chí Minh", List.of(602L));
+        assertNotNull(res);
+        assertEquals(warehouseHcm.getId(), res.getWarehouseId());
+        assertEquals(17, res.getStocks().get(602L));
+    }
 }
 

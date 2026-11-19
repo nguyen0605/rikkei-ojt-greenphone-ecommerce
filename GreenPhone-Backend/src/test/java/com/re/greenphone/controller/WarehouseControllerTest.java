@@ -130,5 +130,35 @@ class WarehouseControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Vĩ độ (latitude) phải nằm trong khoảng [-90, 90]"));
     }
+
+    @Test
+    @DisplayName("GET /api/v1/warehouses/nearest-stock tra ve kho gan nhat kem ton kho bien the")
+    void getNearestWarehouseStock_returnsNearestWarehouseAndStock() throws Exception {
+        com.re.greenphone.dto.response.NearestWarehouseStockResponse response =
+                com.re.greenphone.dto.response.NearestWarehouseStockResponse.builder()
+                        .warehouseId(2L)
+                        .warehouseCode("WH-HCM-Q1")
+                        .warehouseName("Kho Chi Nhánh TP.HCM")
+                        .warehouseAddress("Quận 1, TP. Hồ Chí Minh")
+                        .distanceKm(16.71)
+                        .status("ACTIVE")
+                        .stocks(java.util.Map.of(602L, 17, 603L, 0))
+                        .build();
+
+        when(warehouseRoutingService.findNearestWarehouseStock(eq(10.8464), eq(106.8365), eq("TP. Hồ Chí Minh"), eq(java.util.List.of(602L, 603L))))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/warehouses/nearest-stock")
+                        .param("lat", "10.8464")
+                        .param("lng", "106.8365")
+                        .param("province", "TP. Hồ Chí Minh")
+                        .param("variantIds", "602", "603")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.warehouseCode").value("WH-HCM-Q1"))
+                .andExpect(jsonPath("$.data.stocks['602']").value(17))
+                .andExpect(jsonPath("$.data.stocks['603']").value(0));
+    }
 }
 
