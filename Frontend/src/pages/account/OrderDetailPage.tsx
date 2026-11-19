@@ -116,10 +116,11 @@ export const OrderDetailPage: React.FC = () => {
 
   const remainingSeconds = usePaymentCountdown(qrData?.expiresAt);
 
-  // Điều kiện nút hành động: PENDING hoặc CONFIRMED đều có thể gửi yêu cầu hủy đơn
-  const isOrderActive = order ? ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPING'].includes(order.orderStatus) : false;
-  const canCancel = order?.orderStatus === 'PENDING' || order?.orderStatus === 'CONFIRMED';
-  const canReview = order?.orderStatus === 'DELIVERED';
+  // Điều kiện nút hành động: PENDING hoặc CONFIRMED đều có thể gửi yêu cầu hủy đơn (trừ khi đã hoàn tiền)
+  const isRefunded = order?.paymentStatus === 'REFUNDED';
+  const isOrderActive = order && !isRefunded ? ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPING'].includes(order.orderStatus) : false;
+  const canCancel = (order?.orderStatus === 'PENDING' || order?.orderStatus === 'CONFIRMED') && !isRefunded;
+  const canReview = order?.orderStatus === 'DELIVERED' && !isRefunded;
   const canReorder = order?.orderDetails && order.orderDetails.length > 0;
   // Điều kiện xem hóa đơn tài chính:
   // - Nếu đơn hàng có yêu cầu xuất hóa đơn VAT: Bắt buộc đã được kế toán/hệ thống duyệt phát hành (invoiceStatus === 'ISSUED')
@@ -362,9 +363,9 @@ export const OrderDetailPage: React.FC = () => {
             <CheckCircle2 className="h-5 w-5" />
           </div>
           <div>
-            <h4 className="text-sm font-bold text-purple-900">Đã hoàn tiền thành công</h4>
+            <h4 className="text-sm font-bold text-purple-900">Đã hoàn tiền thành công (Trạng thái đơn hàng đã khóa)</h4>
             <p className="mt-1 text-xs text-purple-800 leading-relaxed">
-              Số tiền đơn hàng đã được GreenPhone hoàn trả vào tài khoản ngân hàng của bạn. Xin vui lòng kiểm tra biến động số dư tài khoản.
+              Số tiền đơn hàng đã được GreenPhone hoàn trả vào tài khoản ngân hàng của bạn. Đơn hàng đã kết thúc và toàn bộ trạng thái đã được khóa cố định.
             </p>
           </div>
         </div>
@@ -576,38 +577,40 @@ export const OrderDetailPage: React.FC = () => {
                         Tiến độ đổi trả ({existingReturn.status === 'PENDING' ? 'Chờ duyệt' : existingReturn.status === 'APPROVED' ? 'Đã duyệt' : existingReturn.status})
                       </button>
                     ) : (
-                      <Tooltip
-                        title={
-                          !isWithin7Days
-                            ? 'Đơn hàng đã hoàn tất quá 7 ngày, chính sách đổi trả máy mới đã hết hiệu lực.'
-                            : 'Gửi yêu cầu đổi mới 1-1 hoặc hoàn tiền khi sản phẩm phát sinh lỗi phần cứng.'
-                        }
-                      >
-                        <button
-                          type="button"
-                          disabled={!isWithin7Days}
-                          onClick={() =>
-                            navigate(ROUTES.ACCOUNT_RETURN_REQUEST, {
-                              state: {
-                                orderId: order.id,
-                                phoneVariantId: item.phoneVariantId,
-                                productName: item.productName,
-                                variantSpecs,
-                                price: item.unitPrice,
-                                imageUrl: resolved.imageUrl,
-                              },
-                            })
+                      !isRefunded && (
+                        <Tooltip
+                          title={
+                            !isWithin7Days
+                              ? 'Đơn hàng đã hoàn tất quá 7 ngày, chính sách đổi trả máy mới đã hết hiệu lực.'
+                              : 'Gửi yêu cầu đổi mới 1-1 hoặc hoàn tiền khi sản phẩm phát sinh lỗi phần cứng.'
                           }
-                          className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all ${
-                            isWithin7Days
-                              ? 'border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                              : 'border border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
-                          }`}
                         >
-                          <ShieldAlert className="h-3 w-3" />
-                          Đổi trả / Bảo hành
-                        </button>
-                      </Tooltip>
+                          <button
+                            type="button"
+                            disabled={!isWithin7Days}
+                            onClick={() =>
+                              navigate(ROUTES.ACCOUNT_RETURN_REQUEST, {
+                                state: {
+                                  orderId: order.id,
+                                  phoneVariantId: item.phoneVariantId,
+                                  productName: item.productName,
+                                  variantSpecs,
+                                  price: item.unitPrice,
+                                  imageUrl: resolved.imageUrl,
+                                },
+                              })
+                            }
+                            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                              isWithin7Days
+                                ? 'border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                                : 'border border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
+                            }`}
+                          >
+                            <ShieldAlert className="h-3 w-3" />
+                            Đổi trả / Bảo hành
+                          </button>
+                        </Tooltip>
+                      )
                     )
                   )}
                 </div>

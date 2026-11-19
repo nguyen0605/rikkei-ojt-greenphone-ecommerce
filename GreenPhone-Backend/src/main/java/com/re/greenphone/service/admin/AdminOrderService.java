@@ -148,6 +148,11 @@ public class AdminOrderService {
             throw new BadRequestException("Trạng thái đơn hàng không hợp lệ: " + status);
         }
 
+        // Khóa vĩnh viễn trạng thái đơn hàng khi đã hoàn tiền thành công (REFUNDED)
+        if ("REFUNDED".equalsIgnoreCase(order.getPaymentStatus())) {
+            throw new BadRequestException("Đơn hàng đã hoàn tiền thành công, trạng thái đơn hàng đã bị khóa vĩnh viễn");
+        }
+
         String currentStatus = order.getOrderStatus();
         if (!isValidTransition(currentStatus, status)) {
             throw new BadRequestException(

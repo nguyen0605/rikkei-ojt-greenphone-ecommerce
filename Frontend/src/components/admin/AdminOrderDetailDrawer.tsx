@@ -22,6 +22,7 @@ import {
   extractCustomerNote,
   extractPaperInvoicePreference,
   isTerminalOrderStatus,
+  isTerminalPaymentStatus,
 } from '@/utils/orderStateMachine';
 import { useOrderProductLookup } from '@/hooks/useOrderProductLookup';
 import OrderItemThumbnail from '@/components/order/OrderItemThumbnail';
@@ -154,7 +155,8 @@ export default function AdminOrderDetailDrawer({
   const cancelReason = extractCancelReason(order?.note);
   const customerNote = extractCustomerNote(order?.note);
   const hasPaperInvoice = extractPaperInvoicePreference(order);
-  const isTerminal = isTerminalOrderStatus(order?.orderStatus);
+  const isRefunded = isTerminalPaymentStatus(order?.paymentStatus);
+  const isTerminal = isTerminalOrderStatus(order?.orderStatus) || isRefunded;
 
   return (
     <>
@@ -166,6 +168,11 @@ export default function AdminOrderDetailDrawer({
               Chi tiết đơn hàng #{order?.id}
             </span>
             {order?.orderStatus && <StatusTag status={order.orderStatus} />}
+            {isRefunded && (
+              <Tag color="purple" className="!m-0 text-xs font-medium">
+                Đã hoàn tiền - Đã khóa
+              </Tag>
+            )}
           </div>
           {order?.createdAt && (
             <span className="text-xs text-ink-3">
@@ -197,8 +204,8 @@ export default function AdminOrderDetailDrawer({
               </Button>
             )}
 
-            {/* Chỉ cho phép xác nhận khi đơn đang ở PENDING */}
-            {order && order.orderStatus === 'PENDING' && onConfirmOrder && (
+            {/* Chỉ cho phép xác nhận khi đơn đang ở PENDING và chưa bị khóa */}
+            {order && order.orderStatus === 'PENDING' && !isTerminal && onConfirmOrder && (
               <Button
                 type="primary"
                 icon={<CheckCircleOutlined />}

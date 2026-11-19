@@ -8,6 +8,7 @@ import {
   Space,
   Radio,
   Tabs,
+  Tooltip,
   message,
   type TableColumnsType,
 } from 'antd';
@@ -126,8 +127,13 @@ export default function AdminOrdersPage() {
   const handleOrderStatusChange = (orderId: number, nextStatus: string, currentStatus: string) => {
     if (nextStatus === currentStatus) return;
 
+    const order = data?.content?.find((o) => o.id === orderId);
+    if (order && isTerminalPaymentStatus(order.paymentStatus)) {
+      message.error('Đơn hàng đã hoàn tiền thành công, trạng thái đơn hàng đã bị khóa vĩnh viễn');
+      return;
+    }
+
     if (nextStatus === 'CANCELLED') {
-      const order = data?.content?.find((o) => o.id === orderId);
       if (order) {
         handleOpenCancelModal(order);
       }
@@ -264,10 +270,11 @@ export default function AdminOrdersPage() {
       dataIndex: 'orderStatus',
       width: 260,
       render: (s: string, r) => {
-        // State Machine: Khóa cứng dropdown khi là DELIVERED hoặc CANCELLED
-        const isTerminal = isTerminalOrderStatus(s);
+        // State Machine: Khóa cứng dropdown khi là DELIVERED, CANCELLED hoặc ĐÃ HOÀN TIỀN (REFUNDED)
+        const isRefunded = isTerminalPaymentStatus(r.paymentStatus);
+        const isTerminal = isTerminalOrderStatus(s) || isRefunded;
         // Chỉ hiển thị các trạng thái kế tiếp hợp lệ
-        const options = getAvailableNextStatusOptions(s);
+        const options = getAvailableNextStatusOptions(s, r.paymentStatus);
 
         return (
           <div className="flex items-center gap-2">
@@ -275,14 +282,26 @@ export default function AdminOrdersPage() {
             <div className="w-[105px] shrink-0 flex items-center">
               <StatusTag status={s} className="!w-full !m-0" />
             </div>
-            <Select
-              size="small"
-              value={s}
-              style={{ width: 140 }}
-              disabled={isTerminal}
-              onChange={(v) => handleOrderStatusChange(r.id, v, s)}
-              options={options}
-            />
+            <Tooltip
+              title={
+                isRefunded
+                  ? 'Đơn hàng đã hoàn tiền thành công, trạng thái đã bị khóa vĩnh viễn'
+                  : isTerminalOrderStatus(s)
+                    ? 'Đơn hàng ở trạng thái kết thúc'
+                    : undefined
+              }
+            >
+              <span>
+                <Select
+                  size="small"
+                  value={s}
+                  style={{ width: 140 }}
+                  disabled={isTerminal}
+                  onChange={(v) => handleOrderStatusChange(r.id, v, s)}
+                  options={options}
+                />
+              </span>
+            </Tooltip>
           </div>
         );
       },
