@@ -9,7 +9,7 @@ import {
   CheckCircleOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
-import { Sparkles, MapPin, Home, Building2, Users, Navigation } from 'lucide-react';
+import { Sparkles, MapPin, Home, Building2, Users, Navigation, Lock, RotateCw, ToggleRight } from 'lucide-react';
 import { VIETNAM_PROVINCES, findMatchingProvince, parseAddressComponents } from '@/utils/provinces';
 import {
   getDistrictsForProvince,
@@ -1014,17 +1014,6 @@ export default function AddressModal({
                 </Radio.Button>
               </Radio.Group>
             </Form.Item>
-
-            {/* Nút trỏ vị trí hiện tại cạnh mục Khác để người dùng không cần nhập địa chỉ hiện tại */}
-            <Button
-              type="default"
-              icon={<Navigation className="w-3.5 h-3.5 text-blue-600" />}
-              onClick={handleUseCurrentLocation}
-              loading={isLocatingCurrentGps}
-              className="!rounded-xl !border-blue-200 !bg-blue-50/80 !text-blue-700 hover:!bg-blue-100 hover:!border-blue-400 !font-medium !text-xs !h-8 !px-3 shadow-2xs"
-            >
-              Vị trí hiện tại
-            </Button>
           </div>
         </Form.Item>
 
@@ -1043,7 +1032,7 @@ export default function AddressModal({
                 loading={isLocatingCurrentGps}
                 className="!rounded-lg !text-xs !border-blue-500 !text-blue-600 hover:!bg-blue-50 font-medium"
               >
-                Định vị GPS hiện tại
+                Vị trí hiện tại
               </Button>
               <Button
                 size="small"
@@ -1168,96 +1157,90 @@ export default function AddressModal({
       onCancel={() => setShowPermissionGuideModal(false)}
       footer={null}
       centered
-      width={460}
+      width={420}
       title={
         <div className="flex items-center gap-2 text-base font-bold text-gray-900 border-b border-gray-100 pb-3">
           <EnvironmentOutlined className="text-blue-600" />
-          <span>Hướng dẫn bật quyền vị trí trên trình duyệt</span>
+          <span>Cách bật định vị trên trình duyệt</span>
         </div>
       }
     >
-      <div className="py-2 space-y-3.5">
-        <p className="text-xs text-gray-600 leading-relaxed">
-          Trình duyệt đang chặn định vị GPS. Bạn chỉ cần thực hiện 2 bước đơn giản để bật:
+      <div className="py-2 space-y-3">
+        <p className="text-xs text-gray-600">
+          Trình duyệt đang chặn định vị GPS. Bạn chỉ cần thực hiện 3 bước đơn giản:
         </p>
 
-        {/* Buoc 1: Mo phong thanh dia chi trinh duyet */}
-        <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3 space-y-1.5">
-          <div className="flex items-center gap-2 text-xs font-bold text-blue-900">
-            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-white text-[10px]">1</span>
-            <span>Nhìn lên góc trên bên trái thanh địa chỉ trình duyệt:</span>
+        {/* Buoc 1 */}
+        <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50/70 p-3">
+          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white font-bold text-[11px] mt-0.5">
+            1
           </div>
-          <div className="rounded-lg bg-gray-900 px-3 py-2 text-xs text-white font-mono flex items-center justify-between shadow-inner">
-            <div className="flex items-center gap-2">
-              <span className="rounded bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white animate-pulse">
-                Nhấp vào đây
-              </span>
-              <span className="text-gray-300">
-                (i) {typeof window !== 'undefined' ? window.location.host : 'localhost:5173'}
-              </span>
+          <div className="text-xs space-y-0.5">
+            <div className="font-semibold text-gray-900 flex items-center gap-1.5">
+              <Lock className="w-3.5 h-3.5 text-blue-600" />
+              <span>Bấm biểu tượng Ổ khóa hoặc (i)</span>
             </div>
-            <span className="text-gray-500 text-[10px]">Thanh URL</span>
+            <p className="text-[11px] text-gray-500 leading-normal">
+              Ở góc trên bên trái thanh địa chỉ trình duyệt (ngay cạnh tên trang web).
+            </p>
           </div>
-          <p className="text-[11px] text-gray-600 pl-6">
-            Nhấp chuột vào biểu tượng <strong>(i)</strong> hoặc biểu tượng <strong>Ổ khóa</strong> ở bên trái địa chỉ web.
-          </p>
         </div>
 
-        {/* Buoc 2: Bam Reset permission hoac gat BAT Location */}
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-1.5">
-          <div className="flex items-center gap-2 text-xs font-bold text-gray-900">
-            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-gray-700 text-white text-[10px]">2</span>
-            <span>Trong bảng cài đặt mở ra:</span>
+        {/* Buoc 2 */}
+        <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50/70 p-3">
+          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white font-bold text-[11px] mt-0.5">
+            2
           </div>
-          <div className="rounded-lg bg-white border border-gray-200 p-2.5 text-xs space-y-2 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-700 font-medium">Bấm vào nút:</span>
-              <span className="rounded-full border border-blue-500 text-blue-600 font-bold px-2.5 py-0.5 text-[11px]">
-                Reset permission
-              </span>
+          <div className="text-xs space-y-0.5">
+            <div className="font-semibold text-gray-900 flex items-center gap-1.5">
+              <ToggleRight className="w-3.5 h-3.5 text-green-600" />
+              <span>Bật quyền "Vị trí" (Location)</span>
             </div>
-            <div className="flex items-center justify-between border-t border-gray-100 pt-1.5 text-gray-500">
-              <span>Hoặc gạt mục Vị trí (Location):</span>
-              <span className="rounded bg-green-100 text-green-800 font-bold px-2 py-0.5 text-[11px]">
-                Gạt sang BẬT
-              </span>
-            </div>
-          </div>
-          <div className="rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-[11px] text-amber-800 leading-normal">
-            <strong>Mẹo áp dụng ngay:</strong> Trên Google Chrome, sau khi gạt Bật ở ổ khóa, trình duyệt cần <strong>tải lại trang (F5)</strong> để áp dụng quyền mới. Hãy bấm nút <strong>Tải lại trang (F5)</strong> bên dưới để hệ thống tự động tải lại và lấy vị trí ngay. Nếu dùng máy tính bàn/laptop Windows, hãy kiểm tra thêm mục <em>Cài đặt Windows &gt; Quyền riêng tư (Privacy) &gt; Vị trí (Location)</em> cũng đang được Bật.
+            <p className="text-[11px] text-gray-500 leading-normal">
+              Gạt mục <strong>Vị trí (Location)</strong> sang <strong>Bật</strong> (hoặc chọn <strong>Cho phép / Allow</strong>).
+            </p>
           </div>
         </div>
+
+        {/* Buoc 3 */}
+        <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50/70 p-3">
+          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white font-bold text-[11px] mt-0.5">
+            3
+          </div>
+          <div className="text-xs space-y-0.5">
+            <div className="font-semibold text-gray-900 flex items-center gap-1.5">
+              <RotateCw className="w-3.5 h-3.5 text-blue-600" />
+              <span>Tải lại trang để hoàn tất</span>
+            </div>
+            <p className="text-[11px] text-gray-500 leading-normal">
+              Bấm nút <strong>Tải lại trang (F5)</strong> bên dưới để hệ thống tự động xác định vị trí.
+            </p>
+          </div>
+        </div>
+
+        <p className="text-[11px] text-gray-400 italic text-center pt-1">
+          Gợi ý: Bạn cũng có thể trực tiếp chọn và ghim vị trí trên bản đồ mà không cần bật GPS.
+        </p>
 
         {/* Action buttons */}
-        <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100">
+        <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-gray-100">
           <Button onClick={() => setShowPermissionGuideModal(false)} className="!rounded-xl text-xs">
             Đóng
           </Button>
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => {
-                if (typeof window !== 'undefined') {
-                  sessionStorage.setItem('gp_auto_locate_on_reload', 'true');
-                  sessionStorage.setItem('gp_auto_open_address_modal', 'true');
-                  window.location.reload();
-                }
-              }}
-              className="!rounded-xl text-xs font-semibold !text-blue-600 !border-blue-300 hover:!bg-blue-50"
-            >
-              Tải lại trang (F5)
-            </Button>
-            <Button
-              type="primary"
-              loading={isLocatingCurrentGps}
-              onClick={async () => {
-                setShowPermissionGuideModal(false);
-                await handleUseCurrentLocation();
-              }}
-              className="!rounded-xl !bg-blue-600 hover:!bg-blue-700 text-xs font-semibold"
-            >
-              Tôi đã bật, định vị ngay
-            </Button>
-          </div>
+          <Button
+            type="primary"
+            icon={<RotateCw className="w-3.5 h-3.5" />}
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem('gp_auto_locate_on_reload', 'true');
+                sessionStorage.setItem('gp_auto_open_address_modal', 'true');
+                window.location.reload();
+              }
+            }}
+            className="!rounded-xl !bg-blue-600 hover:!bg-blue-700 text-xs font-semibold"
+          >
+            Tải lại trang (F5)
+          </Button>
         </div>
       </div>
     </Modal>

@@ -17,10 +17,10 @@ import { store, persistor } from './store';
 import { antdTheme } from './lib/antdTheme';
 import { queryClient } from './lib/queryClient';
 
-// Cấu hình giới hạn số lượng thông báo message trên màn hình tối đa 2 thông báo cùng lúc
+// Cấu hình giới hạn số lượng thông báo message trên màn hình tối đa 1 thông báo để tránh rối loạn
 message.config({
-  maxCount: 2,
-  duration: 2.5,
+  maxCount: 1,
+  duration: 2,
 });
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {
@@ -33,7 +33,7 @@ createRoot(document.getElementById('root')!).render(
       <PersistGate loading={null} persistor={persistor}>
         <QueryClientProvider client={queryClient}>
           <ConfigProvider theme={antdTheme} locale={vi_VN}>
-            <AntApp>
+            <AntApp message={{ maxCount: 1, duration: 2 }}>
               <BrowserRouter>
                 <App />
               </BrowserRouter>
