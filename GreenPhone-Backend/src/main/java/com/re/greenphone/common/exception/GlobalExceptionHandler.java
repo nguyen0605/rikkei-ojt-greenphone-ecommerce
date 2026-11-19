@@ -18,6 +18,12 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(AccountBlockedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccountBlocked(AccountBlockedException ex) {
+        log.warn("Account blocked intercepted: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ex.toResponseMap());
+    }
+
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ApiResponse<Void>> handleAppException(AppException ex) {
         log.error("AppException: {} - {} (errorCode: {})", ex.getStatus(), ex.getMessage(), ex.getErrorCode());

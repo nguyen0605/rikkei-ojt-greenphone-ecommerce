@@ -1,7 +1,7 @@
-import { useSelector } from 'react-redux';  
 import { Navigate, useLocation } from 'react-router-dom';  
 import type { ReactNode } from 'react';  
 import { useAppSelector } from '@/store/hooks';  
+import { GlobalPageLoader } from '@/components/common';  
   
 type UserRole = 'CUSTOMER' | 'ADMIN' | 'SALES' | 'WAREHOUSE' | 'MARKETING' | string;
 
@@ -14,8 +14,12 @@ interface RequireAuthProps {
 }
 
 export default function RequireAuth({ children, role, roles }: RequireAuthProps) {
-  const { isAuthenticated, user } = useAppSelector((s) => s.auth);
+  const { isAuthenticated, user, isRestoringSession } = useAppSelector((s) => s.auth);
   const location = useLocation();
+
+  if (isRestoringSession) {
+    return <GlobalPageLoader />;
+  }
 
   if (!isAuthenticated || !user) {
     return <Navigate to="/dang-nhap" replace state={{ from: location.pathname + location.search }} />;

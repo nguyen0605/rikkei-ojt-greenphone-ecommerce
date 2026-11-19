@@ -17,9 +17,20 @@ export default function LoginPage() {
 
   const { setConfig } = useAuthLayout();  
   useEffect(() => { setConfig({ title: 'Chào mừng bạn quay lại', subtitle: 'Đăng nhập để tiếp tục hành trình mua sắm tại GreenPhone.', heroImage: authHeroImg }); }, [setConfig]);  
-  const { isAuthenticated, user, error, loading, rememberedEmail } = useAppSelector((s) => s.auth);  
+  const { isAuthenticated, user, error, errorCode, blockedReason, loading, rememberedEmail } = useAppSelector((s) => s.auth);  
   const [showPassword, setShowPassword] = useState(false);  
+  const [blockedNotice, setBlockedNotice] = useState<string | null>(null);
   const [form] = Form.useForm<LoginFormValues>(); 
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const msg = sessionStorage.getItem('greenphone.blocked_message');
+      if (msg) {
+        setBlockedNotice(msg);
+        sessionStorage.removeItem('greenphone.blocked_message');
+      }
+    }
+  }, []); 
   useEffect(() => { if (rememberedEmail) form.setFieldsValue({ email: rememberedEmail, remember: true }); }, [rememberedEmail, form]);  
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -36,7 +47,40 @@ export default function LoginPage() {
         <div className="mx-auto mb-2 inline-flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-green-600"><ShieldCheck className="h-5 w-5" strokeWidth={2.2} /></div>  
         <h2 className="text-xl font-bold text-gray-900 md:text-2xl">Đăng nhập</h2>  
       </div> 
-      {error && (
+      {blockedNotice && (
+        <Alert
+          message={blockedNotice}
+          type="error"
+          showIcon
+          closable
+          className="mb-4"
+          onClose={() => setBlockedNotice(null)}
+        />
+      )}
+      {(errorCode === 'ACCOUNT_BLOCKED' || blockedReason) ? (
+        <Alert
+          message={
+            <div className="font-bold text-red-800">
+              Tài khoản của bạn đã bị khóa
+            </div>
+          }
+          description={
+            <div className="text-sm text-red-700 space-y-1.5 mt-1 leading-relaxed">
+              <div>
+                Tài khoản của bạn đã bị khóa do: <strong>{blockedReason || 'Phát hiện hành vi vi phạm chính sách và điều khoản bảo mật của GreenPhone.'}</strong>.
+              </div>
+              <div className="text-xs text-red-600">
+                Vui lòng kiểm tra email để biết hướng dẫn chi tiết hoặc liên hệ Hotline <strong>1900 1234</strong> (email: <em>hotro@greenphone.com</em>).
+              </div>
+            </div>
+          }
+          type="error"
+          showIcon
+          closable
+          className="mb-4 !border-red-300 !bg-red-50"
+          onClose={() => dispatch(clearError())}
+        />
+      ) : error ? (
         <Alert
           message={
             error.includes('chưa được kích hoạt')
@@ -65,7 +109,7 @@ export default function LoginPage() {
           className="mb-4"
           onClose={() => dispatch(clearError())}
         />
-      )}  
+      ) : null}  
       <Form form={form} layout="vertical" onFinish={handleSubmit} autoComplete="on" requiredMark={false}>  
         <Form.Item name="email" label="Email" rules={[{ required: true, message: 'Vui lòng nhập email' }]}>  
           <Input size="large" prefix={<User className="h-4 w-4 text-gray-400" />} placeholder="Nhập email" className="!h-11 !rounded-xl" autoComplete="username" />  
