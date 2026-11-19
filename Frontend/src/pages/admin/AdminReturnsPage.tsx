@@ -248,14 +248,7 @@ export default function AdminReturnsPage() {
       <AdminPageHeader
         title="Thẩm định Đổi trả & Hoàn tiền"
         subtitle="Kiểm tra lỗi phần cứng từ ảnh minh chứng, xuất kho đổi máy mới hoặc phê duyệt hoàn tiền"
-        actions={
-          <Button
-            icon={<ReloadOutlined spin={isFetching} />}
-            onClick={() => refetch()}
-          >
-            Làm mới
-          </Button>
-        }
+        onRefresh={() => void refetch()}
       />
 
       <AdminCard>
