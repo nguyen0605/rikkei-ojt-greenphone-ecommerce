@@ -123,7 +123,7 @@ describe('AdminUsersPage Component', () => {
     expect(switches[1]).toHaveAttribute('aria-checked', 'false');
   });
 
-  it('triggers block confirmation and calls updateStatus with BLOCKED', async () => {
+  it('triggers block modal, enforces minimum 10 characters reason and calls updateStatus with BLOCKED', async () => {
     const user = userEvent.setup();
     vi.mocked(adminUserService.updateStatus).mockResolvedValue({
       ...mockCustomerList[0],
@@ -145,15 +145,31 @@ describe('AdminUsersPage Component', () => {
     const switches = screen.getAllByRole('switch');
     await user.click(switches[0]);
 
-    // Check popconfirm popover description
-    expect(await screen.findByText(/Khách hàng sẽ bị đăng xuất ngay lập tức/)).toBeInTheDocument();
+    // Modal khóa tài khoản mở ra
+    expect(await screen.findByText('Khóa tài khoản khách hàng')).toBeInTheDocument();
+
+    const submitBtn = screen.getByRole('button', { name: 'Xác nhận khóa' });
+    expect(submitBtn).toBeDisabled();
+
+    // Nhập lý do khóa dưới 10 ký tự -> nút vẫn disabled
+    const textarea = screen.getByPlaceholderText(/Nhập lý do chi tiết/);
+    await user.type(textarea, 'Lý do');
+    expect(submitBtn).toBeDisabled();
+
+    // Nhập lý do khóa đủ tối thiểu 10 ký tự -> nút enable
+    await user.clear(textarea);
+    await user.type(textarea, 'Phát hiện gian lận hoàn tiền VietQR');
+    expect(submitBtn).toBeEnabled();
 
     // Click confirm button
-    const confirmBtn = screen.getByRole('button', { name: 'Khóa tài khoản' });
-    await user.click(confirmBtn);
+    await user.click(submitBtn);
 
     await waitFor(() => {
-      expect(adminUserService.updateStatus).toHaveBeenCalledWith(10, 'BLOCKED');
+      expect(adminUserService.updateStatus).toHaveBeenCalledWith(
+        10,
+        'BLOCKED',
+        'Phát hiện gian lận hoàn tiền VietQR'
+      );
     });
   });
 
@@ -187,5 +203,64 @@ describe('AdminUsersPage Component', () => {
     await waitFor(() => {
       expect(adminUserService.updateStatus).toHaveBeenCalledWith(11, 'ACTIVE');
     });
+  });
+
+  it('renders correct serial numbers across pagination pages (page 1 is 1-15, page 2 is 16-30)', async () => {
+    const user = userEvent.setup();
+    const page2Customers: UserDTO[] = [
+      {
+        id: 20,
+        fullName: 'Khach Hang Trang Hai',
+        email: 'trang2@example.com',
+        phone: '0908889900',
+        role: 'ROLE_CUSTOMER',
+        status: 'ACTIVE',
+        address: '789 Duong Trang 2',
+      },
+    ];
+
+    vi.mocked(adminUserService.list).mockImplementation(async (params) => {
+      if (params?.page === '1') {
+        return {
+          content: page2Customers,
+          page: 1,
+          size: 15,
+          totalElements: 16,
+          totalPages: 2,
+          last: true,
+        };
+      }
+      return {
+        content: mockCustomerList,
+        page: 0,
+        size: 15,
+        totalElements: 16,
+        totalPages: 2,
+        last: false,
+      };
+    });
+
+    render(
+      <Provider store={createMockStore()}>
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter>
+            <AdminUsersPage />
+          </MemoryRouter>
+        </QueryClientProvider>
+      </Provider>
+    );
+
+    // Ở trang 1: kiểm tra STT dòng đầu tiên là 1
+    expect(await screen.findByText('Nguyen Van Khach Hang')).toBeInTheDocument();
+    const cellsWithOne = screen.getAllByText('1');
+    expect(cellsWithOne.length).toBeGreaterThanOrEqual(1);
+
+    // Chuyển sang trang 2 bằng cách click nút phân trang '2'
+    const page2Button = screen.getByRole('listitem', { name: '2' });
+    await user.click(page2Button);
+
+    // Ở trang 2: kiểm tra STT hiển thị là 16 (tiếp nối phân trang 15/trang, thay vì quay về 1)
+    expect(await screen.findByText('Khach Hang Trang Hai')).toBeInTheDocument();
+    expect(screen.getByText('16')).toBeInTheDocument();
   });
 });

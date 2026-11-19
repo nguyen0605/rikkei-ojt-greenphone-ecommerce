@@ -136,7 +136,7 @@ public class AuthService {
         }
 
         if ("BLOCKED".equalsIgnoreCase(user.getStatus())) {
-            throw new BadRequestException("Tài khoản đã bị khóa. Vui lòng liên hệ với quản trị viên để được hỗ trợ.");
+            throw new com.re.greenphone.common.exception.AccountBlockedException(user.getBlockedReason());
         }
         if ("UNVERIFIED".equalsIgnoreCase(user.getStatus())) {
             throw new BadRequestException("Tài khoản chưa được kích hoạt. Vui lòng xác thực email của bạn.");
@@ -207,7 +207,7 @@ public class AuthService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if ("BLOCKED".equalsIgnoreCase(user.getStatus())) {
-            throw new BadRequestException("Tài khoản đã bị khóa. Vui lòng liên hệ với quản trị viên để được hỗ trợ.");
+            throw new com.re.greenphone.common.exception.AccountBlockedException(user.getBlockedReason());
         }
         if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
             throw new BadRequestException("Tài khoản không hoạt động. Vui lòng liên hệ với quản trị viên để được hỗ trợ.");
