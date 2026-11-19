@@ -11,11 +11,13 @@ import MaskedValue from '@/components/admin/MaskedValue';
 
 /* Hallmark · Workbench (design.md): page header, table card, avatar + pill status. */
 
+const PAGE_SIZE = 15;
+
 export default function AdminUsersPage() {
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const params: Record<string, string> = { page: String(page - 1), size: '15' };
+  const params: Record<string, string> = { page: String(page - 1), size: String(PAGE_SIZE) };
   if (search) params.search = search;
   const { data, isLoading } = useQuery({
     queryKey: ['admin-users', params],
@@ -28,7 +30,19 @@ export default function AdminUsersPage() {
   });
 
   const columns: TableColumnsType<UserDTO> = [
-    { title: 'STT', width: 60, align: 'center', render: (_: unknown, __: UserDTO, index?: number) => <span className="text-ink-2">{(index ?? 0) + 1}</span> },
+    {
+      title: 'STT',
+      width: 60,
+      align: 'center',
+      render: (_: unknown, __: UserDTO, index?: number) => {
+        const pageSize = data?.size || PAGE_SIZE;
+        return (
+          <span className="text-ink-2 font-medium">
+            {(page - 1) * pageSize + (index ?? 0) + 1}
+          </span>
+        );
+      },
+    },
     {
       title: 'Khách hàng', dataIndex: 'fullName', render: (v: string, r) => (
         <div className="flex items-center gap-2.5">
@@ -104,7 +118,7 @@ export default function AdminUsersPage() {
           size="middle"
           pagination={{
             current: page,
-            pageSize: 15,
+            pageSize: data?.size || PAGE_SIZE,
             total: data?.totalElements || 0,
             onChange: (p) => setPage(p),
             showSizeChanger: false,

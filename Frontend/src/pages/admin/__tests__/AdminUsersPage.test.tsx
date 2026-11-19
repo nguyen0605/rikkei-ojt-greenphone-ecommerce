@@ -188,4 +188,63 @@ describe('AdminUsersPage Component', () => {
       expect(adminUserService.updateStatus).toHaveBeenCalledWith(11, 'ACTIVE');
     });
   });
+
+  it('renders correct serial numbers across pagination pages (page 1 is 1-15, page 2 is 16-30)', async () => {
+    const user = userEvent.setup();
+    const page2Customers: UserDTO[] = [
+      {
+        id: 20,
+        fullName: 'Khach Hang Trang Hai',
+        email: 'trang2@example.com',
+        phone: '0908889900',
+        role: 'ROLE_CUSTOMER',
+        status: 'ACTIVE',
+        address: '789 Duong Trang 2',
+      },
+    ];
+
+    vi.mocked(adminUserService.list).mockImplementation(async (params) => {
+      if (params?.page === '1') {
+        return {
+          content: page2Customers,
+          page: 1,
+          size: 15,
+          totalElements: 16,
+          totalPages: 2,
+          last: true,
+        };
+      }
+      return {
+        content: mockCustomerList,
+        page: 0,
+        size: 15,
+        totalElements: 16,
+        totalPages: 2,
+        last: false,
+      };
+    });
+
+    render(
+      <Provider store={createMockStore()}>
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter>
+            <AdminUsersPage />
+          </MemoryRouter>
+        </QueryClientProvider>
+      </Provider>
+    );
+
+    // Ở trang 1: kiểm tra STT dòng đầu tiên là 1
+    expect(await screen.findByText('Nguyen Van Khach Hang')).toBeInTheDocument();
+    const cellsWithOne = screen.getAllByText('1');
+    expect(cellsWithOne.length).toBeGreaterThanOrEqual(1);
+
+    // Chuyển sang trang 2 bằng cách click nút phân trang '2'
+    const page2Button = screen.getByRole('listitem', { name: '2' });
+    await user.click(page2Button);
+
+    // Ở trang 2: kiểm tra STT hiển thị là 16 (tiếp nối phân trang 15/trang, thay vì quay về 1)
+    expect(await screen.findByText('Khach Hang Trang Hai')).toBeInTheDocument();
+    expect(screen.getByText('16')).toBeInTheDocument();
+  });
 });
