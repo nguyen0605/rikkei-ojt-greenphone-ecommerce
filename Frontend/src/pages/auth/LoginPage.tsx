@@ -19,7 +19,18 @@ export default function LoginPage() {
   useEffect(() => { setConfig({ title: 'Chào mừng bạn quay lại', subtitle: 'Đăng nhập để tiếp tục hành trình mua sắm tại GreenPhone.', heroImage: authHeroImg }); }, [setConfig]);  
   const { isAuthenticated, user, error, loading, rememberedEmail } = useAppSelector((s) => s.auth);  
   const [showPassword, setShowPassword] = useState(false);  
+  const [blockedNotice, setBlockedNotice] = useState<string | null>(null);
   const [form] = Form.useForm<LoginFormValues>(); 
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const msg = sessionStorage.getItem('greenphone.blocked_message');
+      if (msg) {
+        setBlockedNotice(msg);
+        sessionStorage.removeItem('greenphone.blocked_message');
+      }
+    }
+  }, []); 
   useEffect(() => { if (rememberedEmail) form.setFieldsValue({ email: rememberedEmail, remember: true }); }, [rememberedEmail, form]);  
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -36,6 +47,16 @@ export default function LoginPage() {
         <div className="mx-auto mb-2 inline-flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-green-600"><ShieldCheck className="h-5 w-5" strokeWidth={2.2} /></div>  
         <h2 className="text-xl font-bold text-gray-900 md:text-2xl">Đăng nhập</h2>  
       </div> 
+      {blockedNotice && (
+        <Alert
+          message={blockedNotice}
+          type="error"
+          showIcon
+          closable
+          className="mb-4"
+          onClose={() => setBlockedNotice(null)}
+        />
+      )}
       {error && (
         <Alert
           message={

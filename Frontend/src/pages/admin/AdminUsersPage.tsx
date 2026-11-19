@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Table, Select, Input, message, type TableColumnsType, Avatar } from 'antd';
+import { Table, Switch, Popconfirm, Input, message, type TableColumnsType, Avatar } from 'antd';
 import { UserOutlined } from '@ant-design/icons';
 import { adminUserService } from '@/services';
 import type { UserDTO } from '@/types/api';
@@ -28,29 +28,55 @@ export default function AdminUsersPage() {
   });
 
   const columns: TableColumnsType<UserDTO> = [
-    { title: 'STT', width: 60, render: (_: unknown, __: UserDTO, index?: number) => <span className="text-ink-2">{(index ?? 0) + 1}</span> },
+    { title: 'STT', width: 60, align: 'center', render: (_: unknown, __: UserDTO, index?: number) => <span className="text-ink-2">{(index ?? 0) + 1}</span> },
     {
       title: 'Khách hàng', dataIndex: 'fullName', render: (v: string, r) => (
         <div className="flex items-center gap-2.5">
           <Avatar size={32} icon={<UserOutlined />} className="!bg-primary-100 !text-primary-700" />
-          <div>
-            <div className="font-medium text-ink">{v}</div>
-            <div className="text-xs text-ink-2"><MaskedValue value={r.email} type="email" /></div>
+          <div className="min-w-0">
+            <div className="font-medium text-ink truncate">{v || 'Chưa đặt tên'}</div>
+            <div className="text-xs text-ink-2 truncate"><MaskedValue value={r.email} type="email" /></div>
           </div>
         </div>
       ),
     },
-    { title: 'SĐT', dataIndex: 'phone', width: 150, render: (v: string) => <MaskedValue value={v} type="phone" /> },
+    { title: 'SĐT', dataIndex: 'phone', width: 140, render: (v: string) => <MaskedValue value={v} type="phone" /> },
     { title: 'Địa chỉ', dataIndex: 'address', width: 180, render: (v: string) => <MaskedValue value={v} type="address" /> },
-    { title: 'Vai trò', dataIndex: 'role', width: 110, render: (v: string) => <span className="rounded-full bg-bg-muted px-2.5 py-0.5 text-xs font-medium text-ink-2">{v === 'ROLE_ADMIN' ? 'Quản trị' : 'Khách hàng'}</span> },
+    { title: 'Vai trò', dataIndex: 'role', width: 110, align: 'center', render: (v: string) => <span className="rounded-full bg-bg-muted px-2.5 py-0.5 text-xs font-medium text-ink-2">{v === 'ROLE_ADMIN' ? 'Quản trị' : 'Khách hàng'}</span> },
     {
-      title: 'Trạng thái', dataIndex: 'status', width: 170,
-      render: (s: string, r) => (
-        <div className="flex items-center gap-2">
-          <StatusTag status={s} />
-          <Select size="small" value={s} style={{ width: 100 }} onChange={(v) => statusMut.mutate({ id: r.id, status: v })} options={['ACTIVE', 'LOCKED'].map(o => ({ value: o, label: o === 'ACTIVE' ? 'ACTIVE' : 'LOCKED' }))} />
-        </div>
-      ),
+      title: 'Trạng thái', dataIndex: 'status', width: 130, align: 'center',
+      render: (s: string) => <StatusTag status={s} />,
+    },
+    {
+      title: 'Khóa tài khoản', width: 140, align: 'center',
+      render: (_: unknown, r: UserDTO) => {
+        const isActive = r.status === 'ACTIVE';
+        return (
+          <Popconfirm
+            title={isActive ? 'Khóa tài khoản khách hàng' : 'Mở khóa tài khoản'}
+            description={
+              isActive
+                ? `Bạn có chắc muốn khóa tài khoản "${r.fullName || r.email}"? Khách hàng sẽ bị đăng xuất ngay lập tức.`
+                : `Bạn có chắc muốn mở khóa cho tài khoản "${r.fullName || r.email}"?`
+            }
+            onConfirm={() => {
+              const nextStatus = isActive ? 'BLOCKED' : 'ACTIVE';
+              statusMut.mutate({ id: r.id, status: nextStatus });
+            }}
+            okText={isActive ? 'Khóa tài khoản' : 'Mở khóa'}
+            cancelText="Hủy"
+            okButtonProps={{ danger: isActive }}
+          >
+            <Switch
+              checked={isActive}
+              loading={statusMut.isPending && (statusMut.variables as any)?.id === r.id}
+              checkedChildren="Mở"
+              unCheckedChildren="Khóa"
+              className={isActive ? '!bg-primary-600' : '!bg-red-500'}
+            />
+          </Popconfirm>
+        );
+      },
     },
   ];
 

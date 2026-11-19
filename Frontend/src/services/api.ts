@@ -46,13 +46,35 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (error) => {
-    // Logout on 401: Xóa sạch toàn bộ dấu vết PII và phiên trên client
-    if (error.response?.status === 401) {
+    const status = error.response?.status;
+    const backendMessage = error.response?.data?.message || '';
+
+    // Logout on 401 hoặc tài khoản bị khóa (403): Xóa sạch toàn bộ dấu vết PII và phiên trên client
+    const isAccountBlocked =
+      status === 401 ||
+      (status === 403 &&
+        (backendMessage.toLowerCase().includes('khóa') ||
+          backendMessage.toLowerCase().includes('không hoạt động') ||
+          backendMessage.toUpperCase().includes('BLOCKED') ||
+          backendMessage.toUpperCase().includes('LOCKED')));
+
+    if (isAccountBlocked) {
       clearClientStorage();
       if (typeof window !== 'undefined' && window.location.pathname !== '/dang-nhap') {
+        if (
+          backendMessage.toLowerCase().includes('khóa') ||
+          backendMessage.toUpperCase().includes('BLOCKED') ||
+          backendMessage.toUpperCase().includes('LOCKED')
+        ) {
+          sessionStorage.setItem(
+            'greenphone.blocked_message',
+            'Tài khoản của bạn đã bị khóa hoặc phiên đăng nhập đã hết hiệu lực. Vui lòng liên hệ với quản trị viên để được hỗ trợ.'
+          );
+        }
         window.location.href = '/dang-nhap';
       }
     }
+
     // Replace generic axios message with backend message if available
     if (error.response?.data?.message) {
       error.message = error.response.data.message;

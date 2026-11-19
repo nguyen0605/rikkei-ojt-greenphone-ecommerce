@@ -6,6 +6,7 @@ import com.re.greenphone.common.pagination.PageResponse;
 import com.re.greenphone.dto.response.UserDTO;
 import com.re.greenphone.entity.User;
 import com.re.greenphone.mapper.UserMapper;
+import com.re.greenphone.repository.UserDeviceSessionRepository;
 import com.re.greenphone.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +26,7 @@ public class AdminUserService {
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
+    private final UserDeviceSessionRepository userDeviceSessionRepository;
 
     public PageResponse<UserDTO> getUsers(String search, PageRequest pageRequest) {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(
@@ -76,8 +78,19 @@ public class AdminUserService {
             }
         }
 
-        targetUser.setStatus(status);
+        String upperStatus = status != null ? status.trim().toUpperCase() : "ACTIVE";
+        if ("LOCKED".equals(upperStatus)) {
+            upperStatus = "BLOCKED";
+        }
+        targetUser.setStatus(upperStatus);
         targetUser = userRepository.save(targetUser);
+
+        if ("BLOCKED".equals(upperStatus) || "INACTIVE".equals(upperStatus)) {
+            if (userDeviceSessionRepository != null && targetUser.getId() != null) {
+                userDeviceSessionRepository.revokeAllSessionsByUserId(targetUser.getId());
+                log.info("Khóa tài khoản khách hàng id={}. Đã thu hồi toàn bộ phiên đăng nhập.", targetUser.getId());
+            }
+        }
         return userMapper.toDto(targetUser);
     }
 }

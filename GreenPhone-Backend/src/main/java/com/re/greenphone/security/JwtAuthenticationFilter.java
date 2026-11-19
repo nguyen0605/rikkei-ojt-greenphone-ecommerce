@@ -118,11 +118,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     if (userOpt.isPresent()) {
                         User user = userOpt.get();
 
-                        if (!"ACTIVE".equals(user.getStatus())) {
+                        if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
                             response.setContentType("application/json");
                             response.setCharacterEncoding("UTF-8");
-                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                            response.getWriter().write("{\"code\":403,\"message\":\"Tài khoản đã bị khóa hoặc không hoạt động. Vui lòng liên hệ với quản trị viên để được hỗ trợ.\",\"data\":null}");
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.getWriter().write("{\"code\":401,\"message\":\"Tài khoản của bạn đã bị khóa hoặc không còn hoạt động. Phiên đăng nhập đã bị chấm dứt.\",\"data\":null}");
                             return;
                         }
 
