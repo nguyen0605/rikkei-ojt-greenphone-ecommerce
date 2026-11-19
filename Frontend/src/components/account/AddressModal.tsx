@@ -729,7 +729,7 @@ export default function AddressModal({
         layout="vertical"
         onFinish={handleFinish}
         className="pt-2"
-        requiredMark="optional"
+        requiredMark={false}
       >
         {duplicateError && (
           <div
@@ -1100,7 +1100,7 @@ export default function AddressModal({
         {/* Note */}
         <Form.Item
           name="note"
-          label={<span className="text-sm font-medium text-gray-700">Ghi chú giao hàng (Tùy chọn)</span>}
+          label={<span className="text-sm font-medium text-gray-700">Ghi chú giao hàng</span>}
           rules={[{ max: 200, message: 'Ghi chú tối đa 200 ký tự' }]}
         >
           <Input.TextArea
