@@ -160,5 +160,44 @@ class WarehouseControllerTest {
                 .andExpect(jsonPath("$.data.stocks['602']").value(17))
                 .andExpect(jsonPath("$.data.stocks['603']").value(0));
     }
+
+    @Test
+    @DisplayName("GET /api/v1/warehouses/variant-stock/{variantId} tra ve danh sach chi nhanh kem ton kho")
+    void getVariantBranchStocks_returnsBranchStocksList() throws Exception {
+        com.re.greenphone.dto.response.WarehouseBranchStockResponse b1 =
+                com.re.greenphone.dto.response.WarehouseBranchStockResponse.builder()
+                        .id(1L)
+                        .code("WH-HN-MAIN")
+                        .name("Kho Tổng Hà Nội")
+                        .province("Hà Nội")
+                        .quantity(17)
+                        .inStock(true)
+                        .build();
+        com.re.greenphone.dto.response.WarehouseBranchStockResponse b2 =
+                com.re.greenphone.dto.response.WarehouseBranchStockResponse.builder()
+                        .id(2L)
+                        .code("WH-HCM-Q1")
+                        .name("Kho Chi Nhánh TP.HCM")
+                        .province("TP. Hồ Chí Minh")
+                        .quantity(0)
+                        .inStock(false)
+                        .build();
+
+        when(warehouseRoutingService.getBranchStocksForVariant(eq(602L), eq(10.8), eq(106.6)))
+                .thenReturn(java.util.List.of(b1, b2));
+
+        mockMvc.perform(get("/api/v1/warehouses/variant-stock/602")
+                        .param("lat", "10.8")
+                        .param("lng", "106.6")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data[0].code").value("WH-HN-MAIN"))
+                .andExpect(jsonPath("$.data[0].quantity").value(17))
+                .andExpect(jsonPath("$.data[0].inStock").value(true))
+                .andExpect(jsonPath("$.data[1].code").value("WH-HCM-Q1"))
+                .andExpect(jsonPath("$.data[1].quantity").value(0))
+                .andExpect(jsonPath("$.data[1].inStock").value(false));
+    }
 }
 

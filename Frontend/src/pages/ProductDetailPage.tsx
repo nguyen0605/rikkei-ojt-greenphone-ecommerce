@@ -7,6 +7,7 @@ import { getStoredCompareSlots } from '@/services/phoneComparisonService';
 import { Breadcrumb, ProductCard } from '@/components/common';
 import ProductGallery from '@/components/product-detail/ProductGallery';
 import ProductDetailSkeleton from '@/components/product-detail/ProductDetailSkeleton';
+import { BranchStockAvailability } from '@/components/product-detail/BranchStockAvailability';
 import { ProductReviewsSection } from '@/components/product/detail';
 import { phoneService } from '@/services';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -373,9 +374,21 @@ export default function ProductDetailPage() {
                 ) : isVariantInactive ? (
                   <p className="text-sm font-medium text-amber-700">Phiên bản ngừng kinh doanh</p>
                 ) : selectedVariant.stockQuantity > 0 ? (
-                  <p className="flex items-center gap-1 text-sm text-green-600">
-                    <CheckCircle className="h-4 w-4" /> Còn hàng ({selectedVariant.stockQuantity} sản phẩm)
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="flex items-center gap-1 text-sm text-green-600 font-medium">
+                      <CheckCircle className="h-4 w-4" /> Còn hàng ({selectedVariant.stockQuantity} sản phẩm)
+                    </p>
+                    <a
+                      href="#branch-stock-section"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        document.getElementById('branch-stock-section')?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className="text-xs font-semibold text-red-600 hover:text-red-700 hover:underline cursor-pointer"
+                    >
+                      (Xem chi nhánh có hàng)
+                    </a>
+                  </div>
                 ) : (
                   <p className="text-sm text-red-500">Tạm hết hàng</p>
                 )}
@@ -429,6 +442,16 @@ export default function ProductDetailPage() {
                 iconSize={22}
               />
             </div>
+
+            {/* CellphoneS style Branch Stock Availability box */}
+            {selectedVariant && !isProductInactive && (
+              <div className="mt-5">
+                <BranchStockAvailability
+                  variantId={selectedVariant.id}
+                  variantName={`${selectedVariant.ram}/${selectedVariant.storage} — ${selectedVariant.color}`}
+                />
+              </div>
+            )}
           </div>
         </div>
 

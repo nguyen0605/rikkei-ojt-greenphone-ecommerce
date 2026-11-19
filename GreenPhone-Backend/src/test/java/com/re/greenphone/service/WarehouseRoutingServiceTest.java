@@ -605,5 +605,44 @@ class WarehouseRoutingServiceTest {
         assertEquals(warehouseHcm.getId(), res.getWarehouseId());
         assertEquals(17, res.getStocks().get(602L));
     }
+
+    @Test
+    @DisplayName("getBranchStocksForVariant tra ve danh sach tat ca chi nhanh kem so luong ton cua bien the")
+    void getBranchStocksForVariant_returnsAllBranchesWithStock() {
+        when(warehouseRepository.findByStatus("ACTIVE")).thenReturn(List.of(warehouseHn, warehouseHcm));
+
+        PhoneVariant pv602 = PhoneVariant.builder().sku("SKU-602").build();
+        pv602.setId(602L);
+
+        WarehouseStock stockHn = new WarehouseStock();
+        stockHn.setWarehouse(warehouseHn);
+        stockHn.setPhoneVariant(pv602);
+        stockHn.setQuantity(10);
+        stockHn.setReservedQuantity(0);
+
+        WarehouseStock stockHcm = new WarehouseStock();
+        stockHcm.setWarehouse(warehouseHcm);
+        stockHcm.setPhoneVariant(pv602);
+        stockHcm.setQuantity(5);
+        stockHcm.setReservedQuantity(0);
+
+        when(warehouseStockRepository.findByWarehouseIdInAndPhoneVariantIdIn(
+                eq(List.of(warehouseHn.getId(), warehouseHcm.getId())), eq(List.of(602L))))
+                .thenReturn(List.of(stockHn, stockHcm));
+
+        var list = routingService.getBranchStocksForVariant(602L, HCM_LAT, HCM_LNG);
+        assertNotNull(list);
+        assertEquals(2, list.size());
+        // Since HCM coordinates were passed, HCM warehouse should be closest (first in sorted list)
+        assertEquals(warehouseHcm.getId(), list.get(0).getId());
+        assertEquals(5, list.get(0).getQuantity());
+        assertTrue(list.get(0).getInStock());
+        assertEquals("TP. Hồ Chí Minh", list.get(0).getProvince());
+
+        assertEquals(warehouseHn.getId(), list.get(1).getId());
+        assertEquals(10, list.get(1).getQuantity());
+        assertTrue(list.get(1).getInStock());
+        assertEquals("Hà Nội", list.get(1).getProvince());
+    }
 }
 
