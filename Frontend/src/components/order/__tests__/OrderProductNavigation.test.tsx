@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
@@ -373,16 +373,32 @@ describe('ORD-20: Order Product Quick Navigation to PDP', () => {
     expect(screen.getByText(/256GB — Titan Tự Nhiên/)).toBeInTheDocument();
   });
 
-  it('9: Sản phẩm inactive không tạo link chết và hiển thị thông báo ngừng kinh doanh', async () => {
+  it('9: Sản phẩm inactive không tạo link chết và hiển thị thông báo phù hợp theo trạng thái đơn', async () => {
+    // Trường hợp 1: Đơn hàng đang trong tiến trình xử lý/giao (CONFIRMED) -> hiển thị thông điệp trấn an đang giao
     renderComponent(<OrderCard order={inactiveProductOrder} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('product-inactive-badge')).toBeInTheDocument();
+      expect(screen.getByText('Đang xử lý giao hàng • Tạm dừng nhận đặt mới')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByTestId('order-item-name-link')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('order-item-image-link')).not.toBeInTheDocument();
+
+    cleanup();
+
+    // Trường hợp 2: Đơn hàng đã hoàn tất (DELIVERED) -> hiển thị ngừng kinh doanh
+    const deliveredInactiveOrder: OrderDTO = {
+      ...inactiveProductOrder,
+      id: 104,
+      orderStatus: 'DELIVERED',
+    };
+    renderComponent(<OrderCard order={deliveredInactiveOrder} />);
 
     await waitFor(() => {
       expect(screen.getByTestId('product-inactive-badge')).toBeInTheDocument();
       expect(screen.getByText('Sản phẩm hiện đã ngừng kinh doanh')).toBeInTheDocument();
     });
-
-    expect(screen.queryByTestId('order-item-name-link')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('order-item-image-link')).not.toBeInTheDocument();
   });
 
   it('10: Biến thể inactive không bị thay thế âm thầm và hiển thị cảnh báo phù hợp trên PDP', async () => {
