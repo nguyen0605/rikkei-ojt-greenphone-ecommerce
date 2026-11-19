@@ -3,6 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAppSelector } from '@/store/hooks';
 import { ROUTES } from '@/routes/routePaths';
 import { Result, Button } from 'antd';
+import { GlobalPageLoader } from '@/components/common';
 
 interface RequireRoleProps {
   children: ReactNode;
@@ -10,8 +11,12 @@ interface RequireRoleProps {
 }
 
 export default function RequireRole({ children, allowedRoles }: RequireRoleProps) {
-  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, user, isRestoringSession } = useAppSelector((state) => state.auth);
   const location = useLocation();
+
+  if (isRestoringSession) {
+    return <GlobalPageLoader />;
+  }
 
   if (!isAuthenticated) {
     return <Navigate to={ROUTES.LOGIN} state={{ from: location }} replace />;

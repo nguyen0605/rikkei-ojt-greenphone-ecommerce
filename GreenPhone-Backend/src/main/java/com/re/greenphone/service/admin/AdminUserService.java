@@ -11,6 +11,7 @@ import com.re.greenphone.mapper.UserMapper;
 import com.re.greenphone.repository.UserDeviceSessionRepository;
 import com.re.greenphone.repository.UserRepository;
 import com.re.greenphone.service.EmailService;
+import com.re.greenphone.service.TokenRedisService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
@@ -34,6 +35,7 @@ public class AdminUserService {
     private final UserDeviceSessionRepository userDeviceSessionRepository;
     @Lazy
     private final EmailService emailService;
+    private final TokenRedisService tokenRedisService;
 
     public PageResponse<UserDTO> getUsers(String search, PageRequest pageRequest) {
         Pageable pageable = org.springframework.data.domain.PageRequest.of(
@@ -111,6 +113,12 @@ public class AdminUserService {
             if (userDeviceSessionRepository != null && targetUser.getId() != null) {
                 userDeviceSessionRepository.revokeAllSessionsByUserId(targetUser.getId());
                 log.info("Khóa tài khoản khách hàng id={}. Đã thu hồi toàn bộ Device Sessions.", targetUser.getId());
+            }
+
+            // Thu hồi Refresh Token trên Redis whitelist ngay lập tức
+            if (tokenRedisService != null && targetUser.getId() != null) {
+                tokenRedisService.deleteRefreshToken(targetUser.getId());
+                log.info("Khóa tài khoản khách hàng id={}. Đã xóa Refresh Token khỏi Redis whitelist.", targetUser.getId());
             }
 
             // Gửi email thông báo bất đồng bộ (@Async) ngay lập tức

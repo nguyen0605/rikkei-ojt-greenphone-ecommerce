@@ -28,6 +28,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final StringRedisTemplate redisTemplate;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.re.greenphone.repository.UserDeviceSessionRepository userDeviceSessionRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.re.greenphone.service.TokenRedisService tokenRedisService;
 
     public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider, UserRepository userRepository, StringRedisTemplate redisTemplate) {
         this(jwtTokenProvider, userRepository, redisTemplate, null);
@@ -82,9 +84,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String jwt = extractToken(request);
             if (StringUtils.hasText(jwt)) {
-                // 1. Check blacklist in Redis (revoked tokens) with graceful degradation if Redis is offline
+                // 1. Check blacklist in Redis (revoked tokens / JTI) with graceful degradation if Redis is offline
                 try {
-                    if (Boolean.TRUE.equals(redisTemplate.hasKey(BLACKLIST_TOKEN_PREFIX + jwt))) {
+                    String jti = jwtTokenProvider.getJtiFromToken(jwt);
+                    boolean isBlacklisted = (tokenRedisService != null && tokenRedisService.isAccessTokenBlacklisted(jti, jwt))
+                            || Boolean.TRUE.equals(redisTemplate.hasKey(BLACKLIST_TOKEN_PREFIX + jwt))
+                            || (jti != null && Boolean.TRUE.equals(redisTemplate.hasKey("blacklist:access:" + jti)));
+
+                    if (isBlacklisted) {
                         response.setContentType("application/json");
                         response.setCharacterEncoding("UTF-8");
                         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
