@@ -24,24 +24,24 @@
 
 ## 2. CHI TIẾT DANH MỤC CÁC CỘT TRÊN TRELLO
 
-### CỘT: DONE SPRINT 1 (17 thẻ)
-1. `[3 SP] [INF-01] Base Architecture, Exception Handling & API Response Standard`
-2. `[5 SP] [USR-01] Authentication Service (JWT Bearer & User Security)`
-3. `[3 SP] [USR-02] User Profile & Sổ Địa Chỉ Giao Hàng (User Address Management)`
-4. `[3 SP] [CAT-01] Quản Lý Hãng Sản Xuất (Brand) & Banner Khuyến Mãi`
-5. `[5 SP] [CAT-02] Cây Thuộc Tính & Thông Số Kỹ Thuật (Option & OptionItem Tree)`
-6. `[5 SP] [MKT-01] Module Quản Lý Mã Giảm Giá & Voucher Engine (Promotion Service)`
-7. `[3 SP] [ORD-01] Giỏ Hàng & Quản Lý Cart Items (Shopping Cart Service)`
-8. `[3 SP] [USR-03] Giao Diện Đăng Ký, Đăng Nhập & Quên Mật Khẩu (Auth Pages)`
-9. `[5 SP] [CAT-03] Giao Diện Trang Chi Tiết Điện Thoại (Product Detail Page - PDP)`
-10. `[3 SP] [CAT-04] Thiết Kế Header, Navigation Bar & Footer Thương Hiệu`
-11. `[3 SP] [CAT-05] Giao Diện Trang Chủ (Homepage) & Banner Chiến Dịch`
-12. `[5 SP] [CAT-06] Giao Diện Trang Danh Sách Sản Phẩm & Sidebar Bộ Lọc Động`
-13. `[3 SP] [ORD-02] Trang Giỏ Hàng Chi Tiết (/cart) & Áp Dụng Mã Giảm Giá`
-14. `[5 SP] [CAT-07] Giao Diện Quản Trị: Quản Lý Sản Phẩm & Biến Thể Kho Máy (Admin Product CRUD)`
-15. `[5 SP] [INF-02] Khởi Tạo Dự Án Frontend & Cấu Hình Kiến Trúc Base (React 19 + Vite)`
-16. `[3 SP] [INF-03] Tích Hợp Upload Đa Phương Tiện (Cloudinary Image Service)`
-17. `[3 SP] [CAT-08] Kiểm Tra Tồn Kho Biến Thể Thời Gian Thực & Validate Variant`
+### CỘT: DONE SPRINT 1 (18 thẻ: 1 Goal Card + 17 Tasks - 65 SP)
+1. `[3 SP] [INF-01] Base Architecture, Exception Handling & API Response Standard` (dangnguyenvu)
+2. `[5 SP] [USR-01] Authentication Service (JWT Bearer & User Security)` (dangnguyenvu)
+3. `[3 SP] [USR-02] User Profile & Sổ Địa Chỉ Giao Hàng (User Address Management)` (dangnguyenvu)
+4. `[5 SP] [INF-02] Khởi Tạo Dự Án Frontend & Cấu Hình Kiến Trúc Base (React 19 + Vite)` (dangnguyenvu)
+5. `[3 SP] [CAT-01] Quản Lý Hãng Sản Xuất (Brand) & Banner Khuyến Mãi` (38phucthinh)
+6. `[5 SP] [CAT-02] Cây Thuộc Tính & Thông Số Kỹ Thuật (Option & OptionItem Tree)` (38phucthinh)
+7. `[3 SP] [INF-03] Tích Hợp Upload Đa Phương Tiện (Cloudinary Image Service)` (38phucthinh)
+8. `[5 SP] [MKT-01] Module Quản Lý Mã Giảm Giá & Voucher Engine (Promotion Service)` (dtphanvan3)
+9. `[3 SP] [ORD-01] Giỏ Hàng & Quản Lý Cart Items (Shopping Cart Service)` (dtphanvan3)
+10. `[3 SP] [CAT-08] Kiểm Tra Tồn Kho Biến Thể Thời Gian Thực & Validate Variant` (dtphanvan3)
+11. `[3 SP] [USR-03] Giao Diện Đăng Ký, Đăng Nhập & Quên Mật Khẩu (Auth Pages)` (toannguynvan12)
+12. `[5 SP] [CAT-03] Giao Diện Trang Chi Tiết Điện Thoại (Product Detail Page - PDP)` (toannguynvan12)
+13. `[3 SP] [CAT-04] Thiết Kế Header, Navigation Bar & Footer Thương Hiệu` (vungle)
+14. `[3 SP] [CAT-05] Giao Diện Trang Chủ (Homepage) & Banner Chiến Dịch` (vungle)
+15. `[5 SP] [CAT-06] Giao Diện Trang Danh Sách Sản Phẩm & Sidebar Bộ Lọc Động` (vungle)
+16. `[3 SP] [ORD-02] Trang Giỏ Hàng Chi Tiết (/cart) & Áp Dụng Mã Giảm Giá` (dangduongre)
+17. `[5 SP] [CAT-07] Giao Diện Quản Trị: Quản Lý Sản Phẩm & Biến Thể Kho Máy (Admin Product CRUD)` (dangduongre)
 
 ### CỘT: DONE SPRINT 2 (34 thẻ)
 18. `[3 SP] [USR-04] Email Service & Gửi Mã Xác Thực OTP / Quên Mật Khẩu` (dangnguyenvu)
@@ -79,54 +79,56 @@
 50. `[3 SP] [CAT-14] Tái Thiết Kế Bộ Chọn Biến Thể Độc Lập (Dung Lượng + Màu Sắc Swatch)` (38phucthinh)
 51. `[2 SP] [CAT-15] Khu Vực Đánh Giá & Nhận Xét Trực Quan Trên PDP` (38phucthinh)
 
-### CỘT: DONE SPRINT 3 (34 thẻ)
+### CỘT: DONE SPRINT 3 (34 thẻ - 135 SP)
 52. `[3 SP] [CAT-18] [FS] Khắc Phục Lỗi Hiển Thị Ảnh Sản Phẩm & Mở Rộng Dữ Liệu` (dangnguyenvu)
 53. `[3 SP] [WAR-08] [BE] Migration V13 & Nghiệp Vụ Tiếp Nhận Sửa Chữa Bảo Hành Theo IMEI` (dangnguyenvu)
 54. `[5 SP] [WAR-07] Tự Động Kích Hoạt Và API Tra Cứu Bảo Hành Điện Tử Theo Mã IMEI` (dangnguyenvu)
 55. `[5 SP] [USR-10] [BE] Cấu Hình Đa Vai Trò & Bảo Vệ Toàn Diện API Admin Endpoints` (dangnguyenvu)
 56. `[3 SP] [USR-11] [BE] API Quản Lý Danh Sách Nhân Viên & Điều Chỉnh Vai Trò Nghiệp Vụ` (dangnguyenvu)
-57. `[3 SP] [ORD-21] [BE] API Tiếp Nhận & Xử Lý Yêu Cầu Hoàn Tiền Đơn Hàng (Refund Service)` (vunguynle1)
-58. `[3 SP] [WAR-06] [FE] Giao Diện Khách Hàng Gửi Yêu Cầu Đổi Trả & Hoàn Tiền` (vunguynle1)
-59. `[3 SP] [WAR-05] [FE] Giao Diện Thẩm Định Kỹ Thuật Đổi Máy & Hoàn Tiền Phía Admin` (vunguynle1)
-60. `[3 SP] [WAR-04] [BE] Nghiệp Vụ Thẩm Định Kỹ Thuật, Đổi Máy Mới & Duyệt Hoàn Tiền` (vunguynle1)
-61. `[3 SP] [CAT-19] [BE] API Quản Lý Danh Sách Sản Phẩm Yêu Thích (Wishlist Service)` (toannguynvan12)
-62. `[2 SP] [CAT-20] [FE] Đồng Bộ Danh Sách Yêu Thích Với Redux Và API (Wishlist State)` (toannguynvan12)
-63. `[3 SP] [CAT-21] [FE] Giao Diện Trang Danh Mục Yêu Thích & Nút Thả Tim Tương Tác` (toannguynvan12)
-64. `[5 SP] [MKT-03] Quản Lý Vòng Đời Voucher, Kiểm Tra Hạn Mức & Đồng Bộ Hoàn Trả` (dtphanvan3)
-65. `[3 SP] [ORD-22] [BE] API Quản Trị Chi Tiết Đơn Hàng & Cập Nhật Trạng Thái Vận Chuyển` (dtphanvan3)
-66. `[3 SP] [INV-03] [BE] Quản Lý Danh Mục Kho Hàng Và Chi Nhánh Đa Điểm` (dangduongre)
-67. `[5 SP] [INV-04] [FS] Quản Lý Nhà Cung Cấp Và Lập Đơn Nhập Hàng Tăng Tồn Kho (PO)` (dangduongre)
-68. `[5 SP] [WAR-01] [FS] Tự Động Kích Hoạt Và Giao Diện Tra Cứu Bảo Hành Điện Tử` (dangduongre)
-69. `[3 SP] [ORD-19] [FE] Tích Hợp Bản Đồ OpenStreetMap & Mô Phỏng Tiến Trình Giao Hàng` (38phucthinh)
-70. `[2 SP] [ORD-20] [FE] Điều Hướng Nhanh Đến Trang Chi Tiết Sản Phẩm Từ Chi Tiết Đơn Hàng` (38phucthinh)
-71. `[2 SP] [ORD-30] [FE] Giao Diện Admin Điều Phối Giao Hàng & In Phiếu Giao Vận` (38phucthinh)
-72. `[3 SP] [INF-07] Cấu Hình & Triển Khai Dịch Vụ Redis Server Lên VPS Production` (dangnguyenvu)
-73. `[INF-09] Thiết Lập Nginx Reverse Proxy & Chứng Chỉ SSL Cho VPS GreenPhone`
-74. `[CAT-23] Tìm Kiếm Tự Động Hoàn Thành (Search Autocomplete & Suggestions)`
-75. `[INF-10] Quản Lý Cài Đặt Hệ Thống (System Settings API)`
-76. `[CAT-25] Phân Tích Top Smartphone Bán Chạy Nhất & Cơ Cấu Hãng`
-(Cùng 9 thẻ chuyển đổi kiểm thử và hoàn thiện quy trình giao vận tại Sprint 3).
+57. `[5 SP] [USR-09] [FE] Giao Diện Quản Trị Nhân Sự & Điều Hướng Sidebar Theo Vai Trò` (dangnguyenvu)
+58. `[5 SP] [USR-12] [BE] API Quản Lý Thông Báo Người Dùng & Cơ Sở Dữ Liệu Notification` (dangnguyenvu)
+59. `[3 SP] [USR-13] [FE] Giao Diện Chuông Thông Báo Header & Trang Trung Tâm Thông Báo` (dangnguyenvu)
+60. `[5 SP] [USR-14] [BE] Tự Động Kích Hoạt Thông Báo Đa Kênh Cho Đơn Hàng, Bảo Hành Và Khuyến Mãi` (dangnguyenvu)
+61. `[8 SP] [MKT-03] Quản Lý Vòng Đời Voucher, Kiểm Tra Hạn Mức & Đồng Bộ Hoàn Trả` (dtphanvan3)
+62. `[3 SP] [ORD-29] [FS] Quy Trình Hủy Đơn Hoàn Tiền Online Khách Hàng Và Tối Ưu Mua Lại An Toàn` (dtphanvan3)
+63. `[3 SP] [ORD-22] API Quản Trị Chi Tiết Đơn Hàng & Cập Nhật Trạng Thái Vận Chuyển Toàn Diện` (dtphanvan3)
+64. `[3 SP] [ORD-30] [FS] Nút Mua Ngay Trên Trang Chi Tiết Sản Phẩm & Điều Hướng Thanh Toán Nhanh` (dtphanvan3)
+65. `[5 SP] [WAR-06] Giao Diện Admin Thẩm Định Kỹ Thuật, Xử Lý Đổi Máy & Duyệt Hoàn Tiền` (dtphanvan3)
+66. `[5 SP] [ORD-31] [FS] Chọn Nhanh Địa Chỉ Giao Hàng Khi Thanh Toán Và Ngăn Chặn Trùng Lặp Sổ Địa Chỉ` (vunguynle1)
+67. `[2 SP] [BUG-PRC-01] Khắc Phục Lỗi Đồng Bộ Giá Giỏ Hàng & Thanh Toán Khi Điều Chỉnh Giá Sản Phẩm Từ Admin` (vunguynle1)
+68. `[3 SP] [ORD-21] API Tiếp Nhận & Xử Lý Yêu Cầu Hoàn Tiền Đơn Hàng (Refund Service)` (vunguynle1)
+69. `[3 SP] [WAR-04] Nghiệp Vụ Đổi Trả Sản Phẩm Lỗi Trong 7 Ngày & Hoàn Tiền (Refund)` (vunguynle1)
+70. `[5 SP] [WAR-05] Giao Diện Khách Hàng Gửi Yêu Cầu Đổi Trả & Theo Dõi Tiến Độ` (vunguynle1)
+71. `[3 SP] [ORD-20] Điều Hướng Nhanh Đến Trang Chi Tiết Sản Phẩm Từ Chi Tiết Đơn Hàng` (38phucthinh)
+72. `[5 SP] [ORD-19][FS] Tích Hợp Bản Đồ Leaflet OpenStreetMap & Sổ Địa Chỉ Giao Hàng Checkout` (38phucthinh)
+73. `[2 SP] [INV-09] [BE] Migration Phân Bổ Cân Bằng Tồn Kho Đều Cho Các Chi Nhánh` (38phucthinh)
+74. `[3 SP] [INV-07] [BE] Thuật Toán Tự Động Định Tuyến Kho Gần Nhất Theo Tọa Độ Giao Hàng` (38phucthinh)
+75. `[3 SP] [USR-08] [BE] API CRUD Sổ Địa Chỉ Giao Hàng Người Dùng Và Tọa Độ Bản Đồ` (38phucthinh)
+76. `[5 SP] [INV-08] [BE] Cơ Chế Tách Kiện Hàng Xuất Kho Đa Chi Nhánh Khi Tồn Kho Bị Phân Mảnh` (38phucthinh)
+77. `[3 SP] [INV-05] [FE] Giao Diện Admin Quản Lý Danh Mục Kho Hàng Và Chi Nhánh Đa Điểm` (dangduongre)
+78. `[3 SP] [INV-03] Quản Lý Danh Mục Kho Hàng Và Chi Nhánh Đa Điểm` (dangduongre)
+79. `[5 SP] [INV-06] [FE] Giao Diện Admin Quản Lý Nhà Cung Cấp Và Lập Đơn Nhập Hàng Tăng Tồn Kho (PO)` (dangduongre)
+80. `[5 SP] [INV-04] Quản Lý Nhà Cung Cấp Và Lập Đơn Nhập Hàng Tăng Tồn Kho (Purchase Orders)` (dangduongre)
+81. `[5 SP] [CAT-21] Giao Diện Trang Danh Mục Yêu Thích & Nút Thả Tim Tương Tác` (toannguynvan12)
+82. `[5 SP] [CAT-19] API Quản Lý Danh Sách Sản Phẩm Yêu Thích (Wishlist Service & Controller)` (toannguynvan12)
+83. `[3 SP] [CAT-20] Đồng Bộ Danh Sách Yêu Thích Với Redux Và API (Wishlist State & Service)` (toannguynvan12)
+84. `[3 SP] [CAT-22] [FE] Màn Hình Chờ Toàn Cục Nhận Diện Thương Hiệu Và Thanh Tiến Trình Chuyển Trang` (toannguynvan12)
+85. `[5 SP] [WAR-01] [FE] Giao Diện Khách Hàng Tra Cứu Bảo Hành Điện Tử Theo Mã IMEI Và Số Điện Thoại` (toannguynvan12)
 
-### CỘT: IN PROGRESS (1 thẻ)
-77. `[8 SP] [CAT-23] [FS] Tính Năng Và Giao Diện Bảng So Sánh Thông Số Cấu Hình Điện Thoại` (dtphanvan3)
-
-### CỘT: SPRINT BACKLOG (SPRINT 4) (16 thẻ chính thức)
-78. `[5 SP] [ORD-32] [BE] Nâng Cấp API Báo Cáo Tài Chính Đa Chiều, Giá Vốn COGS & Phân Quyền RBAC Thống Kê` (dangduongre)
-79. `[5 SP] [ORD-33] [FE] Giao Diện Thống Kê Dashboard Trực Quan & Phân Tầng Dữ Liệu Theo Quyền Hạn` (dangduongre)
-80. `[3 SP] [ORD-34] [FE] Nâng Cấp Xuất Báo Cáo Excel Đa Sheet & PDF Chuẩn Hóa Theo Phân Quyền` (vunguynle1)
-81. `[5 SP] [USR-16] [FE] Giao Diện Quản Lý Thiết Bị Đăng Nhập & Đăng Xuất Từ Xa` (vunguynle1)
-82. `[2 SP] [ORD-35] [FE] Đồng Bộ Trang Thái Đơn Hàng Giữa Danh Sách Đơn Mua Và Chi Tiết Đơn` (vunguynle1)
-83. `[5 SP] [USR-15] [BE] Trang quan lí thiết bị đăng nhập phía người dùng` (38phucthinh)
-84. `[3 SP] [CAT-26] [FE] Giao Diện Tải Ảnh Đánh Giá & Đồng Bộ Trình Chiếu Lightbox Trên PDP` (38phucthinh)
-85. `[3 SP] [CAT-25] [BE] API Quản Lý Hình Ảnh Đánh Giá Sản Phẩm & Tích Hợp Lưu Trữ Cloudflare R2` (38phucthinh)
-86. `[3 SP] [CAT-24] [FE] Khắc Phục Lỗi Đồng Bộ Trạng Thái Bộ Lọc Danh Sách Sản Phẩm Khi Điều Hướng` (toannguynvan12)
-87. `[3 SP] [USR-17] [FE] Khắc Phục Rò Rỉ Trạng Thái Sản Phẩm Yêu Thích Khi Chưa Đăng Nhập` (toannguynvan12)
-88. `[3 SP] [CAT-29] [FE] Tối Ưu Hóa Trải Nghiệm Mobile & Responsive Toàn Diện` (toannguynvan12)
-89. `[5 SP] [ORD-36] [FS] In Hóa Đơn Bán Lẻ Kiêm Phiếu Xuất Kho Và Tiếp Nhận Thông Tin Hóa Đơn VAT` (dtphanvan3)
-90. `[5 SP] [MKT-04] [FS] Pop-up Thông Báo Mã Khuyến Mãi Sâu Cho Người Dùng Đăng Nhập Lần Đầu` (dtphanvan3)
-91. `[5 SP] [CAT-27] [BE] Tích Hợp Gemini AI Engine & API Tư Vấn Sản Phẩm (AI Shopping Assistant Service)` (dangnguyenvu)
-92. `[3 SP] [CAT-28] [FE] Khung Chatbot AI Nổi & Thẻ Sản Phẩm Đính Kèm Tương Tác Trực Tiếp` (dangnguyenvu)
-93. `[5 SP] [INF-12] [FE] Tối Ưu Tốc Độ Tải Trang & Google Lighthouse > 90 Điểm` (dangnguyenvu)
-
-### CỘT: PRODUCT BACKLOG (1 thẻ tham chiếu)
-94. `[QUY TẮC DỰ ÁN] Chuẩn Git Branch, ApiResponse & Tiêu Chuẩn Kỹ Thuật GreenPhone`
+### CỘT: DONE SPRINT 4 (16 thẻ - 66 SP)
+86. `[3 SP] [ORD-34] [FE] Nâng Cấp Xuất Báo Cáo Excel Đa Sheet & PDF Chuẩn Hóa Theo Phân Quyền` (vunguynle1)
+87. `[5 SP] [USR-16] [FE] Giao Diện Quản Lý Thiết Bị Đăng Nhập & Đăng Xuất Từ Xa` (vunguynle1)
+88. `[5 SP] [USR-15] [BE] Trang quan lí thiết bị đăng nhập phía người dùng` (vunguynle1)
+89. `[2 SP] [ORD-35] [FE] Đồng Bộ Trang Thái Đơn Hàng Giữa Danh Sách Đơn Mua Và Chi Tiết Đơn` (38phucthinh)
+90. `[3 SP] [CAT-26] [FE] Giao Diện Tải Ảnh Đánh Giá & Đồng Bộ Trình Chiếu Lightbox Trên PDP` (38phucthinh)
+91. `[3 SP] [CAT-25] [BE] API Quản Lý Hình Ảnh Đánh Giá Sản Phẩm & Tích Hợp Lưu Trữ Cloudflare R2` (38phucthinh)
+92. `[3 SP] [USR-17] [FE] Khắc Phục Rò Rỉ Trạng Thái Sản Phẩm Yêu Thích Khi Chưa Đăng Nhập` (toannguynvan12)
+93. `[3 SP] [CAT-24] [FE] Khắc Phục Lỗi Đồng Bộ Trạng Thái Bộ Lọc Danh Sách Sản Phẩm Khi Điều Hướng` (toannguynvan12)
+94. `[3 SP] [CAT-29] Tối Ưu Hóa Trải Nghiệm Mobile & Responsive Toàn Diện` (toannguynvan12)
+95. `[8 SP] [CAT-23] [FS] Tính Năng Và Giao Diện Bảng So Sánh Thông Số Cấu Hình Điện Thoại` (dtphanvan3)
+96. `[5 SP] [ORD-36] [FS] In Hóa Đơn Bán Lẻ Kiêm Phiếu Xuất Kho Và Tiếp Nhận Thông Tin Hóa Đơn VAT` (dtphanvan3)
+97. `[5 SP] [ORD-33] [FE] Giao Diện Thống Kê Dashboard Trực Quan & Phân Tầng Dữ Liệu Theo Quyền Hạn` (dangduongre)
+98. `[5 SP] [ORD-32] [BE] Nâng Cấp API Báo Cáo Tài Chính Đa Chiều, Giá Vốn COGS & Phân Quyền RBAC Thống Kê` (dangduongre)
+99. `[3 SP] [CAT-28] [FE] Khung Chatbot AI Nổi & Thẻ Sản Phẩm Đính Kèm Tương Tác Trực Tiếp` (dangnguyenvu)
+100. `[5 SP] [CAT-27] [BE] Tích Hợp Gemini AI Engine & API Tư Vấn Sản Phẩm (AI Shopping Assistant Service)` (dangnguyenvu)
+101. `[5 SP] [INF-12] [FE] Tối Ưu Tốc Độ Tải Trang & Google Lighthouse > 90 Điểm` (dangnguyenvu)
