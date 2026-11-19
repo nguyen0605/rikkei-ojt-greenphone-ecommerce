@@ -18,24 +18,30 @@ vi.mock('@/services', () => ({
 
 const mockOrder: OrderDTO = {
   id: 101,
+  userId: 1,
+  userName: 'nguyenvana',
   receiverName: 'Nguyen Van A',
   receiverPhone: '0987654321',
   shippingAddress: '123 Nguyen Trai, Ha Noi',
+  totalAmount: 25000000,
+  discountAmount: 0,
   finalAmount: 25000000,
   orderStatus: 'PENDING',
   paymentStatus: 'UNPAID',
   paymentMethod: 'COD',
+  note: '',
+  promotionCode: '',
   createdAt: '2026-11-19T10:00:00',
   orderDetails: [],
 };
 
 const mockPageResponse: PageResponse<OrderDTO> = {
   content: [mockOrder],
-  pageNumber: 0,
-  pageSize: 15,
+  page: 0,
+  size: 15,
   totalElements: 1,
   totalPages: 1,
-  isLast: true,
+  last: true,
 };
 
 describe('AdminOrdersPage - Confirmation Dialog on Status Change', () => {
