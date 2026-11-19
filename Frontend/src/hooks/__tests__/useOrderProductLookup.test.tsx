@@ -120,7 +120,6 @@ describe('useOrderProductLookup', () => {
       quantity: 1,
       subtotal: 30000000,
     };
-    // @ts-expect-error test direct phoneId
     item.phoneId = 1;
 
     const resolved = result.current.resolveItem(item);
@@ -212,6 +211,95 @@ describe('useOrderProductLookup', () => {
     expect(resolved.phoneId).toBeUndefined();
     expect(resolved.navUrl).toBeUndefined();
     expect(resolved.imageUrl).toBeUndefined();
+  });
+
+  it('retains directImageUrl and marks as inactive when phone is disabled by admin', async () => {
+    const { result } = renderHook(() => useOrderProductLookup(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.phones.length).toBe(3);
+    });
+
+    const item: OrderDetailDTO = {
+      id: 14,
+      phoneVariantId: 201,
+      phoneId: 99,
+      imageUrl: 'https://img.example.com/xiaomi-14-ultra.png',
+      productStatus: 'INACTIVE',
+      productName: 'Xiaomi 14 Ultra',
+      ram: '16GB',
+      storage: '512GB',
+      color: 'Đen',
+      unitPrice: 26000000,
+      quantity: 1,
+      subtotal: 26000000,
+    };
+
+    const resolved = result.current.resolveItem(item);
+    expect(resolved.imageUrl).toBe('https://img.example.com/xiaomi-14-ultra.png');
+    expect(resolved.isInactive).toBe(true);
+    expect(resolved.navUrl).toBeUndefined();
+  });
+
+  it('prevents sub-model differentiator from matching base model (Xiaomi 14 Ultra does not match Xiaomi 14)', async () => {
+    // Add Xiaomi 14 to catalog
+    const catalogWithXiaomi14: PhoneDTO[] = [
+      ...mockCatalog,
+      {
+        id: 4,
+        brandId: 3,
+        brandName: 'Xiaomi',
+        name: 'Xiaomi 14',
+        description: '',
+        screen: '',
+        os: '',
+        chip: '',
+        rearCamera: '',
+        frontCamera: '',
+        battery: '',
+        warranty: '',
+        status: 'ACTIVE',
+        mainImageUrl: 'https://img.example.com/xiaomi-14-orange.png',
+        variantCount: 1,
+        avgRating: 5,
+        lowestPrice: 18000000,
+      },
+    ];
+    vi.mocked(phoneService.list).mockResolvedValue({
+      content: catalogWithXiaomi14,
+      page: 0,
+      size: 50,
+      totalElements: catalogWithXiaomi14.length,
+      totalPages: 1,
+      last: true,
+    });
+
+    const { result } = renderHook(() => useOrderProductLookup(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.phones.length).toBe(4);
+    });
+
+    const item: OrderDetailDTO = {
+      id: 15,
+      phoneVariantId: 202,
+      productName: 'Xiaomi 14 Ultra 16GB - 512GB - Đen',
+      ram: '16GB',
+      storage: '512GB',
+      color: 'Đen',
+      unitPrice: 26000000,
+      quantity: 1,
+      subtotal: 26000000,
+    };
+
+    const resolved = result.current.resolveItem(item);
+    // Must NOT match Xiaomi 14 with orange image
+    expect(resolved.imageUrl).toBeUndefined();
+    expect(resolved.phoneId).toBeUndefined();
   });
 });
 

@@ -288,7 +288,6 @@ describe('ORD-20: Order Product Quick Navigation to PDP', () => {
       orderDetails: [
         {
           ...activeOrder.orderDetails[0],
-          // @ts-expect-error test custom image
           imageUrl: 'https://example.com/images/variant-custom.png',
         },
       ],
