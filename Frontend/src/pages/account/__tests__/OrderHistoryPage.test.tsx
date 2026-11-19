@@ -284,5 +284,79 @@ describe('OrderHistoryPage', () => {
     expect(testClient.getQueryData(['order', 101])).toEqual(mockOrders[0]);
     expect(testClient.getQueryData(['order', '102'])).toEqual(mockOrders[1]);
   });
+
+  it('renders order tabs container with custom scrollbar class and handles scroll buttons', async () => {
+    vi.mocked(orderService.list).mockResolvedValue({
+      content: mockOrders,
+      totalElements: 3,
+      totalPages: 1,
+      page: 0,
+      size: 10,
+      last: true,
+    });
+
+    renderWithClient('/tai-khoan/don-hang');
+
+    const tabList = screen.getByRole('tablist', { name: /bộ lọc trạng thái đơn hàng/i });
+    expect(tabList).toHaveClass('order-tabs-scroll');
+    expect(tabList).toHaveClass('overflow-x-auto');
+  });
+
+  it('paginates orders with a maximum of 10 orders per page and navigates between pages', async () => {
+    // Tạo 15 đơn hàng
+    const fifteenOrders: OrderDTO[] = Array.from({ length: 15 }, (_, i) => ({
+      id: 201 + i,
+      userId: 2,
+      userName: 'Nguyễn Văn An',
+      receiverName: 'Nguyễn Văn An',
+      receiverPhone: '0912345678',
+      shippingAddress: '123 Đường Láng',
+      totalAmount: 10000000,
+      discountAmount: 0,
+      finalAmount: 10000000,
+      orderStatus: 'PENDING',
+      paymentStatus: 'UNPAID',
+      paymentMethod: 'COD',
+      note: '',
+      promotionCode: '',
+      createdAt: `2026-08-${String(i + 1).padStart(2, '0')}T10:00:00`,
+      orderDetails: [],
+    }));
+
+    vi.mocked(orderService.list).mockResolvedValue({
+      content: fifteenOrders,
+      totalElements: 15,
+      totalPages: 2,
+      page: 0,
+      size: 100,
+      last: true,
+    });
+
+    renderWithClient('/tai-khoan/don-hang');
+
+    // Trang 1: Phải có đơn #201 đến #210, không có đơn #211
+    await waitFor(() => {
+      expect(screen.getByText('#201')).toBeInTheDocument();
+      expect(screen.getByText('#210')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('#211')).not.toBeInTheDocument();
+    expect(screen.getByText('1 - 10')).toBeInTheDocument();
+
+    // Kiểm tra có phân trang
+    const pagination = screen.getByTestId('orders-pagination');
+    expect(pagination).toBeInTheDocument();
+
+    // Chuyển sang trang 2
+    const page2Btn = screen.getByRole('listitem', { name: '2' });
+    await userEvent.click(page2Btn);
+
+    // Trang 2: Phải có đơn #211 đến #215, không còn đơn #201
+    await waitFor(() => {
+      expect(screen.getByText('#211')).toBeInTheDocument();
+      expect(screen.getByText('#215')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('#201')).not.toBeInTheDocument();
+    expect(screen.getByText('11 - 15')).toBeInTheDocument();
+  });
 });
 

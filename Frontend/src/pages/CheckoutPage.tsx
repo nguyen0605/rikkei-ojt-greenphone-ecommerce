@@ -10,7 +10,7 @@ import { clearCart, removeVoucher } from '@/store/slices/cartSlice';
 import { orderService, paymentService, phoneService } from '@/services';
 import { warehouseService } from '@/services/warehouseService';
 import { Button, App, Input } from 'antd';
-import { Shield, CheckCircle, Banknote, Building2, FileText, Info } from 'lucide-react';
+import { Shield, CheckCircle, Banknote, Building2, FileText, Info, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { z } from 'zod';
 import { formatVND } from '@/utils';
@@ -534,10 +534,11 @@ export default function CheckoutPage() {
                             }
                             message.info('Đã bỏ áp dụng mã khuyến mãi');
                           }}
-                          className="rounded px-1.5 py-0.5 text-xs text-red-500 hover:bg-red-50 hover:underline transition-colors"
+                          className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600 hover:bg-red-100 hover:border-red-300 transition-colors cursor-pointer"
                           title="Bỏ áp dụng mã khuyến mãi"
                         >
-                          [Bỏ áp dụng]
+                          <X className="h-3 w-3" />
+                          Bỏ áp dụng
                         </button>
                       </div>
                       <span className="text-green-600 font-medium">-{formatVND(voucherDiscount)}</span>
@@ -552,7 +553,7 @@ export default function CheckoutPage() {
                 {/* Payment method */}
                 <div className="mt-4 rounded-xl bg-gray-50 p-3">
                   <span className="text-sm text-gray-700">
-                    {payment === 'cod' ? 'Thanh toán khi nhận hàng (COD)' : payment === 'bank-transfer' ? 'Chuyển khoản ngân hàng (VietQR)' : payment === 'e-wallet' ? 'Ví điện tử' : payment === 'credit-card' ? 'Thẻ tín dụng' : 'Thẻ ATM'}
+                    {payment === 'cod' ? 'Thanh toán khi nhận hàng (COD)' : 'Chuyển khoản ngân hàng (VietQR)'}
                   </span>
                 </div>
               </div>
