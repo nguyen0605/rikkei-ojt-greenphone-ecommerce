@@ -14,15 +14,25 @@ function VariantPicker({ value, onChange, initialSku }: { value: number; onChang
   const [phone, setPhone] = useState<number>();
   const products = useQuery({ queryKey: ['po-product-search', keyword], queryFn: () => adminPhoneService.list({ keyword, page: '0', size: '20' }) });
   const variants = useQuery({ queryKey: ['po-variants', phone], queryFn: () => adminPhoneService.variants(phone!), enabled: !!phone });
-  return <div className="grid gap-2 sm:grid-cols-2">
-    <Select aria-label="Chọn sản phẩm" placeholder="Tìm sản phẩm" showSearch filterOption={false} onSearch={setKeyword} loading={products.isFetching}
-      options={(products.data?.content ?? []).map((item) => ({ value: item.id, label: item.name }))} onChange={(id: number) => { setPhone(id); onChange(0); }} />
-    <Select aria-label="Chọn biến thể" value={value || undefined} placeholder="RAM / ROM / Màu / SKU" disabled={!phone && !value} loading={variants.isFetching} onChange={onChange}
-      options={[
-        ...(initialSku && value && !(variants.data ?? []).some((item) => item.id === value) ? [{ value, label: initialSku }] : []),
-        ...(variants.data ?? []).filter((item) => item.status === 'ACTIVE').map((item) => ({ value: item.id, label: `${item.ram} / ${item.storage} / ${item.color} · ${item.sku}` })),
-      ]} />
-    {(products.isError || variants.isError) && <Alert type="error" title="Không tải được sản phẩm; vui lòng thử lại" />}
+  const hasNoVariants = Boolean(phone && variants.isSuccess && (variants.data ?? []).length === 0);
+
+  return <div>
+    <div className="grid gap-2 sm:grid-cols-2">
+      <Select aria-label="Chọn sản phẩm" placeholder="Tìm sản phẩm" showSearch filterOption={false} onSearch={setKeyword} loading={products.isFetching}
+        options={(products.data?.content ?? []).map((item) => ({ value: item.id, label: item.name }))} onChange={(id: number) => { setPhone(id); onChange(0); }} />
+      <Select aria-label="Chọn biến thể" value={value || undefined} placeholder={hasNoVariants ? 'Chưa có biến thể' : 'RAM / ROM / Màu / SKU'} disabled={!phone || hasNoVariants} loading={variants.isFetching} onChange={onChange}
+        notFoundContent={hasNoVariants ? 'Sản phẩm này chưa có biến thể nào' : undefined}
+        options={[
+          ...(initialSku && value && !(variants.data ?? []).some((item) => item.id === value) ? [{ value, label: initialSku }] : []),
+          ...(variants.data ?? []).filter((item) => item.status === 'ACTIVE').map((item) => ({ value: item.id, label: `${item.ram} / ${item.storage} / ${item.color} · ${item.sku}` })),
+        ]} />
+    </div>
+    {hasNoVariants && (
+      <div className="mt-1.5 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+        Sản phẩm này chưa có biến thể cấu hình (RAM, ROM, Màu sắc). Vui lòng vào menu <strong>Danh mục &gt; Sản phẩm</strong> và bấm nút <strong>&quot;Biến thể &amp; Giá&quot;</strong> để tạo cấu hình trước khi nhập hàng.
+      </div>
+    )}
+    {(products.isError || variants.isError) && <Alert type="error" title="Không tải được sản phẩm; vui lòng thử lại" className="mt-1" />}
   </div>;
 }
 export default function CreatePurchaseOrderModal({ onCancel, onSubmit, initialOrder }: { onCancel: () => void; onSubmit: (values: PurchaseOrderRequest) => Promise<unknown>; initialOrder?: PurchaseOrder }) {

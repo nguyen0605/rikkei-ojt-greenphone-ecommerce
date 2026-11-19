@@ -147,7 +147,20 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
 
   const createMut = useMutation({
     mutationFn: (v: PhoneRequest) => edit ? adminPhoneService.update(edit.id, v) : adminPhoneService.create(v),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-phones'] }); setOpen(false); setEdit(null); form.resetFields(); message.success(edit ? 'Cập nhật thành công' : 'Tạo thành công'); },
+    onSuccess: (savedPhone) => {
+      qc.invalidateQueries({ queryKey: ['admin-phones'] });
+      setOpen(false);
+      form.resetFields();
+      if (edit) {
+        setEdit(null);
+        message.success('Cập nhật thành công');
+      } else {
+        message.success('Tạo sản phẩm thành công! Hãy cấu hình biến thể (RAM, ROM, Màu, Giá).');
+        if (savedPhone) {
+          openVariantModal(savedPhone);
+        }
+      }
+    },
   });
 
   const deleteMut = useMutation({
@@ -294,7 +307,16 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
       render: (v: string, r) => (
         <div className="flex items-center gap-2.5">
           {r.mainImageUrl ? <Image src={r.mainImageUrl} width={40} height={40} className="!rounded-lg !object-cover" preview={false} /> : <div className="h-10 w-10 rounded-lg bg-bg-muted" />}
-          <span className="font-medium text-ink">{v}</span>
+          <div>
+            <div className="font-medium text-ink">{v}</div>
+            <div className="text-xs">
+              {r.variantCount && r.variantCount > 0 ? (
+                <span className="text-ink-2">{r.variantCount} biến thể</span>
+              ) : (
+                <span className="font-medium text-amber-600">Chưa có biến thể</span>
+              )}
+            </div>
+          </div>
         </div>
       ),
     },
@@ -309,7 +331,16 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
       render: (v: string, r) => (
         <div className="flex items-center gap-2.5">
           {r.mainImageUrl ? <Image src={r.mainImageUrl} width={40} height={40} className="!rounded-lg !object-cover" preview={false} /> : <div className="h-10 w-10 rounded-lg bg-bg-muted" />}
-          <span className="font-medium text-ink">{v}</span>
+          <div>
+            <div className="font-medium text-ink">{v}</div>
+            <div className="text-xs">
+              {r.variantCount && r.variantCount > 0 ? (
+                <span className="text-ink-2">{r.variantCount} biến thể</span>
+              ) : (
+                <span className="font-medium text-amber-600">Chưa có biến thể</span>
+              )}
+            </div>
+          </div>
         </div>
       ),
     },
@@ -331,7 +362,7 @@ export default function AdminProductsPage({ inventoryMode = false }: { inventory
       render: (_, r) => (
         <Space>
           <Button size="small" icon={<EditOutlined />} onClick={() => openForm(r)} className="!rounded-full">Sửa</Button>
-          <Button size="small" icon={<AppstoreOutlined />} onClick={() => openVariantModal(r)} className="!rounded-full">{inventoryMode ? 'Tồn kho' : 'Giá'}</Button>
+          <Button size="small" icon={<AppstoreOutlined />} onClick={() => openVariantModal(r)} className="!rounded-full">{inventoryMode ? 'Tồn kho' : 'Biến thể & Giá'}</Button>
           <Button size="small" icon={<PictureOutlined />} onClick={() => openImageModal(r)} className="!rounded-full">Ảnh</Button>
           <Popconfirm
             title="Xóa vĩnh viễn sản phẩm này?"
