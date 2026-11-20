@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   FileText,
   Smartphone,
+  ExternalLink,
   X,
 } from 'lucide-react';
 import type { OrderDTO } from '@/types/api';
@@ -645,6 +646,16 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
+              <Button
+                icon={<ExternalLink className="w-4 h-4" />}
+                onClick={() => {
+                  const tokenOrId = order.invoiceToken || String(order.id);
+                  window.open(`/hoa-don/${tokenOrId}`, '_blank');
+                }}
+                className="!rounded-lg"
+              >
+                Xem trực tuyến
+              </Button>
               {isAdminView && (
                 <Button
                   type="primary"

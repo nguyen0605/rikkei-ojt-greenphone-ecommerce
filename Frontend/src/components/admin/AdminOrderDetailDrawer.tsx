@@ -11,6 +11,8 @@ import {
   FileTextOutlined,
   CreditCardOutlined,
   PrinterOutlined,
+  EyeOutlined,
+  CopyOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminOrderService } from '@/services';
@@ -471,6 +473,35 @@ export default function AdminOrderDetailDrawer({
                   </Descriptions.Item>
                 )}
               </Descriptions>
+
+              {order.invoiceStatus === 'ISSUED' && (
+                <div className="mt-3 flex items-center gap-2 pt-2 border-t border-blue-100">
+                  <Button
+                    size="small"
+                    type="primary"
+                    icon={<EyeOutlined />}
+                    className="!bg-blue-600 hover:!bg-blue-700"
+                    onClick={() => {
+                      const tokenOrId = order.invoiceToken || String(order.id);
+                      window.open(`/hoa-don/${tokenOrId}`, '_blank');
+                    }}
+                  >
+                    Xem hóa đơn điện tử trực tuyến
+                  </Button>
+                  <Button
+                    size="small"
+                    icon={<CopyOutlined />}
+                    onClick={() => {
+                      const tokenOrId = order.invoiceToken || String(order.id);
+                      const fullUrl = `${window.location.origin}/hoa-don/${tokenOrId}`;
+                      navigator.clipboard.writeText(fullUrl);
+                      message.success('Đã sao chép liên kết hóa đơn điện tử');
+                    }}
+                  >
+                    Sao chép liên kết tra cứu
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
