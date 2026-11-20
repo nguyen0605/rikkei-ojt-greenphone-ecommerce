@@ -229,6 +229,51 @@ class OrderServiceTest {
         assertThrows(BadRequestException.class, () -> orderService.createOrder(req));
     }
 
+    @Test void createOrder_PromotionExceededUsageLimit_ThrowsBadRequest() {
+        stubUser();
+        User user = createUser(); user.setId(USER_ID);
+        PhoneVariant v = createVariant(100L, new BigDecimal("1000.00"), null, 10);
+        Promotion promo = Promotion.builder()
+                .discountType("FIXED")
+                .discountValue(new BigDecimal("100.00"))
+                .status("ACTIVE")
+                .quantity(10)
+                .usedQuantity(10)
+                .build();
+        UserPromotion up = UserPromotion.builder().user(user).promotion(promo).status("AVAILABLE").build();
+        up.setId(10L);
+        OrderRequest req = createOrderReq(List.of(createItemReq(100L, 2)), 10L);
+
+        when(phoneVariantRepository.findByIdWithLock(100L)).thenReturn(Optional.of(v));
+        when(userPromotionRepository.findById(10L)).thenReturn(Optional.of(up));
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> orderService.createOrder(req));
+        assertTrue(ex.getMessage().contains("đã hết lượt sử dụng trên hệ thống"));
+    }
+
+    @Test void applyPromotionToOrder_PromotionExceededUsageLimit_ThrowsBadRequest() {
+        stubUser();
+        User orderOwner = createUser(); orderOwner.setId(USER_ID);
+        Order order = Order.builder().orderStatus("PENDING").totalAmount(new BigDecimal("1000.00")).build();
+        order.setUser(orderOwner);
+
+        Promotion promo = Promotion.builder()
+                .discountType("FIXED")
+                .discountValue(new BigDecimal("100.00"))
+                .status("ACTIVE")
+                .quantity(5)
+                .usedQuantity(5)
+                .build();
+        UserPromotion up = UserPromotion.builder().user(orderOwner).promotion(promo).status("AVAILABLE").build();
+        up.setId(10L);
+
+        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+        when(userPromotionRepository.findById(10L)).thenReturn(Optional.of(up));
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> orderService.applyPromotionToOrder(1L, 10L));
+        assertTrue(ex.getMessage().contains("đã hết lượt sử dụng trên hệ thống"));
+    }
+
     @Test void applyPromotionToOrder_NotOwnerOfOrder_ThrowsBadRequest() {
         stubUser();
         User orderOwner = createUser(); orderOwner.setId(999L);

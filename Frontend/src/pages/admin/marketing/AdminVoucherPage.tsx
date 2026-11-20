@@ -53,6 +53,7 @@ export default function AdminVoucherPage() {
         : adminMarketingService.createVoucher(v),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-vouchers'] });
+      qc.invalidateQueries({ queryKey: ['promotions'] });
       setOpen(false);
       setEdit(null);
       message.success(edit ? 'Cập nhật voucher thành công' : 'Tạo mã voucher mới thành công');
@@ -83,6 +84,7 @@ export default function AdminVoucherPage() {
     },
     onSuccess: (_, voucher) => {
       qc.invalidateQueries({ queryKey: ['admin-vouchers'] });
+      qc.invalidateQueries({ queryKey: ['promotions'] });
       if (voucher.status === 'ACTIVE') {
         message.warning(`Đã vô hiệu hóa mã voucher ${voucher.code}`);
       } else {
@@ -98,6 +100,7 @@ export default function AdminVoucherPage() {
     mutationFn: (id: number) => adminMarketingService.deleteVoucher(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-vouchers'] });
+      qc.invalidateQueries({ queryKey: ['promotions'] });
       message.success('Đã xóa mã voucher');
     },
   });
