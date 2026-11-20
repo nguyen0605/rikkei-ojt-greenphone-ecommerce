@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -14,7 +14,7 @@ vi.mock('@/services', () => ({
   brandService: { list: vi.fn() }, optionService: { list: vi.fn() }, adminOptionService: {},
 }));
 vi.mock('@/services/warehouseService', () => ({
-  warehouseService: { list: vi.fn() }, warehouseInventoryService: { distribution: vi.fn() },
+  warehouseService: { list: vi.fn() }, warehouseInventoryService: { distribution: vi.fn(), movement: vi.fn(), transfer: vi.fn() },
 }));
 const branchStock = { warehouseId: 1, warehouseCode: 'A', warehouseName: 'Branch A', warehouseStatus: 'ACTIVE',
   variantId: 1, quantity: 2, aggregateQuantity: 22 } as WarehouseStock;
@@ -37,10 +37,33 @@ describe('inventory filter scope', () => {
     ] as Awaited<ReturnType<typeof warehouseService.list>>);
     vi.mocked(brandService.list).mockResolvedValue([]);
     vi.mocked(optionService.list).mockResolvedValue([]);
-    vi.mocked(warehouseInventoryService.distribution).mockResolvedValue([branchStock, { ...branchStock, warehouseId: 2, quantity: 20 }]);
+    vi.mocked(warehouseInventoryService.distribution).mockResolvedValue([branchStock, { ...branchStock, warehouseId: 2, warehouseCode: 'B', quantity: 20 }]);
   });
   afterEach(() => { cleanup(); client.clear(); vi.restoreAllMocks(); });
   function mount() { render(<MemoryRouter><QueryClientProvider client={client}><AdminProductsPage inventoryMode /></QueryClientProvider></MemoryRouter>); }
+
+  it.each(['IMPORT', 'EXPORT'] as const)('refreshes expanded branch quantity after %s succeeds', async changeType => {
+    const quantity = changeType === 'IMPORT' ? 3 : 1;
+    vi.mocked(warehouseInventoryService.movement).mockImplementation(async () => {
+      vi.mocked(warehouseInventoryService.distribution).mockResolvedValue([
+        { ...branchStock, quantity }, { ...branchStock, warehouseId: 2, warehouseCode: 'B', quantity: 20 },
+      ]);
+      return { ...low, stockQuantity: changeType === 'IMPORT' ? 23 : 21 };
+    });
+    mount();
+    await screen.findByText('Mixed phone');
+    fireEvent.click(screen.getByRole('button', { name: 'Mở rộng biến thể Mixed phone' }));
+    await screen.findByText('LOW-SKU');
+    fireEvent.click(document.querySelector('.ant-table-expanded-row .ant-table-row-expand-icon') as HTMLElement);
+    await screen.findByText('A');
+    const row = screen.getByText('LOW-SKU').closest('tr')!;
+    fireEvent.click(within(row).getByText(changeType === 'IMPORT' ? 'Nhập' : 'Xuất'));
+    fireEvent.change(await screen.findByLabelText('Lý do'), { target: { value: 'Regression movement' } });
+    fireEvent.click(screen.getByText('Xác nhận'));
+    await waitFor(() => expect(warehouseInventoryService.movement).toHaveBeenCalledWith(1,
+      { variantId: 1, quantity: 1, reason: 'Regression movement', changeType }));
+    await waitFor(() => expect(screen.getByText('A').closest('tr')?.querySelector('.font-semibold')?.textContent).toBe(String(quantity)));
+  }, 20000);
 
   it('refetches expanded variants on toggle and restores normal variants when disabled', async () => {
     mount(); const user = userEvent.setup({ delay: null });
