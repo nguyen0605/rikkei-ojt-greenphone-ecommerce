@@ -775,4 +775,54 @@ class OrderServiceTest {
 
         assertThrows(ResourceNotFoundException.class, () -> orderService.getPublicInvoiceByToken(token));
     }
+
+    @Test
+    void getPublicInvoiceByToken_WhenIssuedEvenIfPending_Success() {
+        String token = "issued-token-123";
+        Order order = Order.builder()
+                .orderStatus("PENDING")
+                .paymentStatus("UNPAID")
+                .invoiceStatus("ISSUED")
+                .invoiceToken(token)
+                .build();
+        order.setId(300L);
+
+        when(orderRepository.findByInvoiceTokenWithDetails(token)).thenReturn(Optional.of(order));
+        when(orderMapper.toDto(order)).thenReturn(OrderDTO.builder()
+                .id(300L)
+                .orderStatus("PENDING")
+                .paymentStatus("UNPAID")
+                .invoiceStatus("ISSUED")
+                .invoiceToken(token)
+                .build());
+
+        OrderDTO result = orderService.getPublicInvoiceByToken(token);
+        assertNotNull(result);
+        assertEquals(300L, result.getId());
+        assertEquals("ISSUED", result.getInvoiceStatus());
+    }
+
+    @Test
+    void getPublicInvoiceByToken_FallbackToNumericId_Success() {
+        String tokenOrId = "305";
+        Order order = Order.builder()
+                .orderStatus("CONFIRMED")
+                .paymentStatus("PAID")
+                .invoiceToken("generated-uuid-305")
+                .build();
+        order.setId(305L);
+
+        when(orderRepository.findByInvoiceTokenWithDetails(tokenOrId)).thenReturn(Optional.empty());
+        when(orderRepository.findByIdWithDetails(305L)).thenReturn(Optional.of(order));
+        when(orderMapper.toDto(order)).thenReturn(OrderDTO.builder()
+                .id(305L)
+                .orderStatus("CONFIRMED")
+                .paymentStatus("PAID")
+                .invoiceToken("generated-uuid-305")
+                .build());
+
+        OrderDTO result = orderService.getPublicInvoiceByToken(tokenOrId);
+        assertNotNull(result);
+        assertEquals(305L, result.getId());
+    }
 }

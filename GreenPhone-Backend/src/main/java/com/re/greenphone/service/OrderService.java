@@ -509,16 +509,36 @@ public class OrderService {
      * Tra cứu hóa đơn điện tử công khai qua invoiceToken bí mật (UUID v4)
      * Ngăn chặn triệt để lỗ hổng IDOR & rò rỉ dữ liệu PII
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public OrderDTO getPublicInvoiceByToken(String invoiceToken) {
         if (invoiceToken == null || invoiceToken.isBlank()) {
             throw new BadRequestException("Mã tra cứu hóa đơn không hợp lệ");
         }
-        Order order = orderRepository.findByInvoiceTokenWithDetails(invoiceToken)
+        String trimmedToken = invoiceToken.trim();
+
+        // 1. Tìm đơn hàng theo invoiceToken bí mật; nếu không tìm thấy và là dạng số, fallback tìm theo ID đơn hàng
+        Order order = orderRepository.findByInvoiceTokenWithDetails(trimmedToken)
+                .or(() -> {
+                    if (trimmedToken.matches("^\\d+$")) {
+                        try {
+                            return orderRepository.findByIdWithDetails(Long.parseLong(trimmedToken));
+                        } catch (NumberFormatException ignored) {
+                            return java.util.Optional.empty();
+                        }
+                    }
+                    return java.util.Optional.empty();
+                })
                 .orElseThrow(() -> new ResourceNotFoundException("Hóa đơn", "invoiceToken", invoiceToken));
 
-        // Kiểm tra điều kiện xuất hóa đơn: Đơn hàng phải đã thanh toán (PAID) hoặc đã được duyệt/đang giao/đã giao
-        boolean isInvoiceEligible = "PAID".equalsIgnoreCase(order.getPaymentStatus()) ||
+        // 2. Tự động cấp bù invoiceToken nếu đơn hàng lịch sử chưa có
+        if (order.getInvoiceToken() == null || order.getInvoiceToken().isBlank()) {
+            order.setInvoiceToken(java.util.UUID.randomUUID().toString());
+            order = orderRepository.save(order);
+        }
+
+        // 3. Kiểm tra điều kiện xuất hóa đơn: Đã phát hành (ISSUED), đã thanh toán (PAID) hoặc đã xác nhận giao dịch
+        boolean isInvoiceEligible = "ISSUED".equalsIgnoreCase(order.getInvoiceStatus()) ||
+                "PAID".equalsIgnoreCase(order.getPaymentStatus()) ||
                 java.util.Set.of("CONFIRMED", "PROCESSING", "SHIPPING", "DELIVERED", "COMPLETED")
                         .contains(order.getOrderStatus());
         if (!isInvoiceEligible) {
