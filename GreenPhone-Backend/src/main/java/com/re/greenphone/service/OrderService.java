@@ -312,7 +312,9 @@ public class OrderService {
 
         // Apply promotion
         if (request.getUserPromotionId() != null) {
-            UserPromotion up = userPromotionRepository.findById(request.getUserPromotionId())
+            // 1. Khóa bản ghi UserPromotion để chống 1 voucher bị dùng đồng thời trên 2 tab/request
+            UserPromotion up = userPromotionRepository.findByIdWithLock(request.getUserPromotionId())
+                    .or(() -> userPromotionRepository.findById(request.getUserPromotionId()))
                     .orElseThrow(() -> new ResourceNotFoundException("UserPromotion", "id", request.getUserPromotionId()));
 
             // Chống IDOR: Chỉ chủ sở hữu mới được dùng voucher này
@@ -321,16 +323,28 @@ public class OrderService {
             }
 
             if (!"AVAILABLE".equals(up.getStatus())) {
-                throw new BadRequestException("Mã khuyến mãi không còn khả dụng");
+                throw new BadRequestException("Mã khuyến mãi không còn khả dụng hoặc đã được sử dụng");
             }
 
+            // 2. Khóa bản ghi Promotion cha để kiểm tra số lượng sử dụng tổng thể
             Promotion promo = up.getPromotion();
+            if (promo != null && promo.getId() != null) {
+                promo = promotionRepository.findByIdWithLock(promo.getId())
+                        .orElse(promo);
+            }
+
             LocalDateTime now = LocalDateTime.now();
 
             if (!"ACTIVE".equals(promo.getStatus())
                     || (promo.getStartDate() != null && promo.getStartDate().isAfter(now))
                     || (promo.getEndDate() != null && promo.getEndDate().isBefore(now))) {
                 throw new BadRequestException("Chương trình khuyến mãi đã hết hạn hoặc không còn hiệu lực");
+            }
+
+            // 3. Kiểm tra giới hạn số lượt sử dụng tối đa của toàn bộ voucher
+            int currentUsed = promo.getUsedQuantity() != null ? promo.getUsedQuantity() : 0;
+            if (promo.getQuantity() != null && promo.getQuantity() > 0 && currentUsed >= promo.getQuantity()) {
+                throw new BadRequestException("Mã khuyến mãi này đã hết lượt sử dụng trên hệ thống");
             }
 
             BigDecimal minOrder = promo.getMinOrderValue();
@@ -345,7 +359,6 @@ public class OrderService {
             up.setUsedAt(now);
             userPromotionRepository.save(up);
 
-            int currentUsed = promo.getUsedQuantity() != null ? promo.getUsedQuantity() : 0;
             promo.setUsedQuantity(currentUsed + 1);
             promotionRepository.save(promo);
         }
@@ -745,7 +758,9 @@ public class OrderService {
             throw new BadRequestException("Chỉ có thể áp dụng mã khuyến mãi cho đơn hàng đang chờ xử lý");
         }
 
-        UserPromotion up = userPromotionRepository.findById(userPromotionId)
+        // 1. Khóa bản ghi UserPromotion để chống 1 voucher bị dùng đồng thời trên 2 tab/request
+        UserPromotion up = userPromotionRepository.findByIdWithLock(userPromotionId)
+                .or(() -> userPromotionRepository.findById(userPromotionId))
                 .orElseThrow(() -> new ResourceNotFoundException("UserPromotion", "id", userPromotionId));
 
         // 2. Chống IDOR: Chỉ chủ sở hữu mã mới được sử dụng
@@ -755,20 +770,31 @@ public class OrderService {
 
         // 3. Kiểm tra trạng thái khả dụng
         if (!"AVAILABLE".equals(up.getStatus())) {
-            throw new BadRequestException("Mã khuyến mãi không còn khả dụng");
+            throw new BadRequestException("Mã khuyến mãi không còn khả dụng hoặc đã được sử dụng");
         }
 
+        // 4. Khóa bản ghi Promotion cha để kiểm tra số lượng sử dụng tổng thể
         Promotion promo = up.getPromotion();
+        if (promo != null && promo.getId() != null) {
+            promo = promotionRepository.findByIdWithLock(promo.getId())
+                    .orElse(promo);
+        }
         LocalDateTime now = LocalDateTime.now();
 
-        // 4. Kiểm tra thời hạn và trạng thái chiến dịch
+        // 5. Kiểm tra thời hạn và trạng thái chiến dịch
         if (!"ACTIVE".equals(promo.getStatus())
                 || (promo.getStartDate() != null && promo.getStartDate().isAfter(now))
                 || (promo.getEndDate() != null && promo.getEndDate().isBefore(now))) {
             throw new BadRequestException("Chương trình khuyến mãi đã hết hạn hoặc không còn hiệu lực");
         }
 
-        // 5. Kiểm tra giá trị đơn hàng tối thiểu
+        // 6. Kiểm tra giới hạn số lượt sử dụng tối đa của toàn bộ voucher
+        int currentUsed = promo.getUsedQuantity() != null ? promo.getUsedQuantity() : 0;
+        if (promo.getQuantity() != null && promo.getQuantity() > 0 && currentUsed >= promo.getQuantity()) {
+            throw new BadRequestException("Mã khuyến mãi này đã hết lượt sử dụng trên hệ thống");
+        }
+
+        // 7. Kiểm tra giá trị đơn hàng tối thiểu
         BigDecimal minOrder = promo.getMinOrderValue();
         if (minOrder != null && order.getTotalAmount().compareTo(minOrder) < 0) {
             throw new BadRequestException("Giá trị đơn hàng chưa đạt mức tối thiểu để áp dụng mã khuyến mãi");
@@ -814,7 +840,6 @@ public class OrderService {
         up.setUsedAt(now);
         userPromotionRepository.save(up);
 
-        int currentUsed = promo.getUsedQuantity() != null ? promo.getUsedQuantity() : 0;
         promo.setUsedQuantity(currentUsed + 1);
         promotionRepository.save(promo);
 

@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { Badge, Dropdown, type MenuProps } from 'antd';
+import { useQuery } from '@tanstack/react-query';
 import {
   ShoppingCart,
   Heart,
@@ -17,6 +18,7 @@ import HeaderSearch from '@/components/layout/HeaderSearch';
 import BrandDropdown from '@/components/layout/BrandDropdown';
 import NotificationBell from '@/components/layout/NotificationBell';
 import { authService } from '@/services/authService';
+import { promotionService } from '@/services';
 import { getStoredCompareSlots, COMPARE_UPDATED_EVENT } from '@/services/phoneComparisonService';
 const navItems = [
   { key: 'home', label: 'Trang chủ', href: '/' },
@@ -67,6 +69,47 @@ export default function Header() {
       window.removeEventListener('storage', updateCount);
     };
   }, []);
+
+  // Lấy danh sách voucher công khai đang hoạt động
+  const { data: publicPromos } = useQuery({
+    queryKey: ['promotions', 'public'],
+    queryFn: () => promotionService.publicList() as Promise<any[]>,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+
+  // Lấy danh sách voucher người dùng hiện tại đã nhận
+  const { data: myPromos } = useQuery({
+    queryKey: ['promotions', 'my'],
+    queryFn: () => promotionService.myPromotions(),
+    enabled: isAuthenticated,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+
+  // Số lượng voucher chưa nhận
+  const unclaimedVoucherCount = useMemo(() => {
+    if (!publicPromos || !Array.isArray(publicPromos)) return 0;
+    if (!isAuthenticated) return publicPromos.length;
+
+    const claimedIds = new Set(
+      (myPromos || [])
+        .map((up: any) => up.promotionId)
+        .filter((id): id is number => typeof id === 'number'),
+    );
+    const claimedCodes = new Set(
+      (myPromos || [])
+        .map((up: any) => up.code?.trim().toUpperCase())
+        .filter(Boolean),
+    );
+
+    return publicPromos.filter((p: any) => {
+      const codeUpper = p.code?.trim().toUpperCase();
+      const isClaimed =
+        claimedIds.has(p.id) || (codeUpper ? claimedCodes.has(codeUpper) : false);
+      return !isClaimed;
+    }).length;
+  }, [publicPromos, myPromos, isAuthenticated]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -249,6 +292,11 @@ export default function Header() {
                   {item.key === 'compare' && compareCount > 0 && (
                     <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 text-[10px] font-bold text-white bg-emerald-600 rounded-full animate-in zoom-in">
                       {compareCount}
+                    </span>
+                  )}
+                  {item.key === 'vouchers' && unclaimedVoucherCount > 0 && (
+                    <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 text-[10px] font-bold text-white bg-emerald-600 rounded-full animate-in zoom-in">
+                      {unclaimedVoucherCount}
                     </span>
                   )}
                   <span

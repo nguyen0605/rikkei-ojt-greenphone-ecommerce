@@ -18,6 +18,10 @@ public interface PromotionRepository extends JpaRepository<Promotion, Long> {
     Optional<Promotion> findByCode(String code);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Promotion p WHERE p.id = :id")
+    Optional<Promotion> findByIdWithLock(@Param("id") Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Promotion p WHERE UPPER(TRIM(p.code)) = UPPER(TRIM(:code))")
     Optional<Promotion> findByCodeWithLock(@Param("code") String code);
 
