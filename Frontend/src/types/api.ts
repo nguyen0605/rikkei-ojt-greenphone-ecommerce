@@ -108,7 +108,7 @@ export interface PhoneDetailDTO extends PhoneDTO {
 }
 
 export interface PhoneVariantDTO {
-  warehouseStocks?: import('@/services/warehouseService').WarehouseStock[];
+  warehouseStocks?: import('@/services/warehouseService').WarehouseStock[] | null;
   id: number;
   phoneId: number;
   ramItemId: number;
