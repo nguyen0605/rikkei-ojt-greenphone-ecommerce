@@ -62,9 +62,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation(org.springframework.dao.DataIntegrityViolationException ex) {
         log.warn("Data integrity violation: {}", ex.getMessage());
-        ApiResponse<Void> response = ApiResponse.error(
-                HttpStatus.CONFLICT.value(),
-                "Không thể xóa dữ liệu do đã có giao dịch hoặc liên kết ràng buộc trong hệ thống (Đơn hàng, Đơn nhập hàng PO, Tồn kho). Vui lòng tắt trạng thái sản phẩm thay vì xóa vĩnh viễn.");
+        String msg = "Không thể xóa dữ liệu do đã có giao dịch hoặc liên kết ràng buộc trong hệ thống (Đơn hàng, Đơn nhập hàng PO, Tồn kho). Vui lòng tắt trạng thái sản phẩm thay vì xóa vĩnh viễn.";
+        String detail = ex.getMessage() != null ? ex.getMessage().toLowerCase() : "";
+        if (detail.contains("data too long") || detail.contains("data truncation")) {
+            msg = "Dữ liệu nhập vào quá dài so với giới hạn của hệ thống. Vui lòng kiểm tra lại độ dài các trường (ví dụ: đường dẫn hình ảnh hoặc ghi chú).";
+        } else if (detail.contains("duplicate entry")) {
+            msg = "Dữ liệu đã tồn tại trong hệ thống (trùng lặp giá trị duy nhất).";
+        }
+        ApiResponse<Void> response = ApiResponse.error(HttpStatus.CONFLICT.value(), msg);
         return new ResponseEntity<>(response, HttpStatus.CONFLICT);
     }
 

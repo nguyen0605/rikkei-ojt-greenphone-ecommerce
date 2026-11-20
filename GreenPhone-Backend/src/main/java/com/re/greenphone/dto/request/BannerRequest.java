@@ -16,6 +16,7 @@ public class BannerRequest {
     private String title;
 
     @NotBlank(message = "Image URL is required")
+    @Size(max = 500, message = "Image URL must not exceed 500 characters")
     private String imageUrl;
 
     private String linkUrl;

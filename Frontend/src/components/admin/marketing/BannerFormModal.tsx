@@ -103,6 +103,49 @@ export default function BannerFormModal({
     }, 300);
   };
 
+  // Tiện ích chuyển Base64 Data URL thành File để tự động upload lên R2
+  const base64ToFile = (dataUrl: string, filename = 'banner_upload.png'): File | null => {
+    try {
+      const arr = dataUrl.split(',');
+      if (arr.length < 2) return null;
+      const mimeMatch = arr[0].match(/:(.*?);/);
+      const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new File([u8arr], filename, { type: mime });
+    } catch {
+      return null;
+    }
+  };
+
+  const handleImageUrlChange = async (val: string) => {
+    const trimmed = val.trim();
+    if (trimmed.startsWith('data:image/')) {
+      const file = base64ToFile(trimmed);
+      if (file) {
+        message.loading({ content: 'Phát hiện ảnh Base64. Đang tự động tải lên Cloudflare R2...', key: 'upload_b64' });
+        try {
+          setUploading(true);
+          const r2Url = await adminMarketingService.uploadBannerImage(file);
+          form.setFieldsValue({ imageUrl: r2Url });
+          checkImageAspect(r2Url);
+          message.success({ content: 'Đã tự động tải ảnh lên Cloudflare R2 thành công!', key: 'upload_b64' });
+          return;
+        } catch {
+          message.error({ content: 'Không thể tự động upload ảnh Base64 lên R2. Vui lòng bấm nút "Tải lên R2" bên cạnh để chọn file ảnh.', key: 'upload_b64' });
+        } finally {
+          setUploading(false);
+        }
+      }
+    }
+    form.setFieldsValue({ imageUrl: trimmed });
+    checkImageAspect(trimmed);
+  };
+
   const handleUploadFile = async (file: File) => {
     // Kiểm tra định dạng ảnh
     const isImage = file.type.startsWith('image/');
@@ -169,39 +212,48 @@ export default function BannerFormModal({
 
         <Form.Item
           name="imageUrl"
-          label="Hình ảnh banner (Khuyến nghị tỷ lệ 3:1, vd: 1200x400)"
-          rules={[
-            { required: true, message: 'Vui lòng tải ảnh lên hoặc nhập URL hình ảnh' },
-          ]}
-        >
-          <div className="space-y-2">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Nhập URL ảnh hoặc bấm Tải ảnh lên R2 bên cạnh..."
-                value={form.getFieldValue('imageUrl')}
-                onChange={(e) => {
-                  form.setFieldsValue({ imageUrl: e.target.value.trim() });
-                  checkImageAspect(e.target.value.trim());
-                }}
-              />
+          label="URL hình ảnh"
+          extra={
+            <div className="flex items-center justify-between mt-1 gap-2">
+              <span className="text-xs text-gray-400">
+                Khuyến nghị tỷ lệ 3:1 (vd: 1200x400). Dán link ảnh hoặc dán ảnh từ clipboard.
+              </span>
               <Upload
                 accept="image/*"
                 showUploadList={false}
                 beforeUpload={handleUploadFile}
               >
                 <Button
+                  size="small"
                   icon={uploading ? <LoadingOutlined /> : <UploadOutlined />}
                   loading={uploading}
-                  className="!rounded-xl border-emerald-500 text-emerald-700 hover:!border-emerald-600 hover:!text-emerald-800"
+                  className="!rounded-lg border-emerald-500 text-emerald-700 hover:!border-emerald-600 hover:!text-emerald-800"
                 >
                   Tải lên R2
                 </Button>
               </Upload>
             </div>
-            <p className="text-xs text-gray-400">
-              Hỗ trợ tải trực tiếp file từ máy tính lên Cloudflare R2 hoặc dán đường dẫn link ảnh.
-            </p>
-          </div>
+          }
+          rules={[
+            { required: true, message: 'Nhập URL hình ảnh' },
+            {
+              validator: (_, value) => {
+                if (value && typeof value === 'string' && value.startsWith('data:image/')) {
+                  return Promise.reject(new Error('Vui lòng đợi ảnh tải lên Cloudflare R2 hoặc bấm nút "Tải lên R2" bên dưới để upload ảnh'));
+                }
+                if (value && typeof value === 'string' && value.length > 500) {
+                  return Promise.reject(new Error('Đường dẫn hình ảnh không được vượt quá 500 ký tự'));
+                }
+                return Promise.resolve();
+              }
+            }
+          ]}
+        >
+          <Input
+            placeholder="Nhập URL ảnh hoặc dán ảnh..."
+            disabled={uploading}
+            onChange={(e) => handleImageUrlChange(e.target.value)}
+          />
         </Form.Item>
 
         {aspectRatioWarning && (
@@ -219,7 +271,7 @@ export default function BannerFormModal({
               <LinkOutlined className="text-gray-400" />
             </div>
           }
-          rules={[{ required: true, message: 'Nhập hoặc chọn link điều hướng' }]}
+          rules={[{ required: true, message: 'Nhập link điều hướng' }]}
         >
           {/* Tự động gợi ý sản phẩm khi gõ tìm kiếm, không fix cứng danh mục hệ thống */}
           <AutoComplete
