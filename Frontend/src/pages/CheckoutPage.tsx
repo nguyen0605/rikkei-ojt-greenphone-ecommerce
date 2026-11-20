@@ -400,7 +400,7 @@ export default function CheckoutPage() {
 
                     <div className="flex items-center gap-2 rounded-lg bg-blue-50/60 p-3 text-xs text-blue-800">
                       <Info className="w-4 h-4 text-blue-600 shrink-0" />
-                      <span>Hóa đơn điện tử sẽ được phát hành và gửi về email doanh nghiệp sau khi đơn hàng giao thành công.</span>
+                      <span>Hóa đơn điện tử sẽ được phát hành và gửi về email doanh nghiệp sau khi đơn hàng thanh toán và giao hàng thành công.</span>
                     </div>
                   </div>
                 )}
