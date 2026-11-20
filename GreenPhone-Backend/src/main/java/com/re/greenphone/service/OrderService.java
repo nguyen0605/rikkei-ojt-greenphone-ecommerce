@@ -289,6 +289,11 @@ public class OrderService {
             String storageVal = variant.getStorageItem() != null ? variant.getStorageItem().getValue() : "";
             String colorVal = variant.getColorItem() != null ? variant.getColorItem().getValue() : "";
 
+            BigDecimal itemCost = orderCostService.snapshot(variant.getId());
+            if (itemCost == null && price != null && price.compareTo(BigDecimal.ZERO) > 0) {
+                itemCost = price.multiply(new BigDecimal("0.750000")).setScale(6, java.math.RoundingMode.HALF_UP);
+            }
+
             OrderDetail detail = OrderDetail.builder()
                     .warehouseId(routedWarehouse.getId())
                     .order(order)
@@ -298,7 +303,7 @@ public class OrderService {
                     .storage(storageVal)
                     .color(colorVal)
                     .quantity(itemReq.getQuantity())
-                    .unitCost(orderCostService.snapshot(variant.getId()))
+                    .unitCost(itemCost)
                     .unitPrice(price)
                     .subtotal(subtotal)
                     .build();

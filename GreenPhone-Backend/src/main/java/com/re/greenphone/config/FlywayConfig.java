@@ -453,6 +453,34 @@ public class FlywayConfig {
                 log.info("Da xoa version 29 khoi flyway_schema_history de dam bao Flyway seed du lieu day du cho thang 10 va thang 11.");
             }
 
+            // 8.1. Tu dong kiem tra va backfill unit_cost cho order_detail con thieu
+            try {
+                stmt.execute(
+                    "UPDATE `order_detail` od " +
+                    "JOIN ( " +
+                    "    SELECT poi.phone_variant_id, " +
+                    "           ROUND(SUM(poi.unit_cost * poi.quantity_received) / SUM(poi.quantity_received), 6) AS calculated_cost " +
+                    "    FROM `purchase_order_item` poi " +
+                    "    JOIN `purchase_order` po ON poi.po_id = po.id " +
+                    "    WHERE po.status = 'RECEIVED' AND poi.quantity_received > 0 " +
+                    "    GROUP BY poi.phone_variant_id " +
+                    ") cost ON od.phone_variant_id = cost.phone_variant_id " +
+                    "SET od.unit_cost = cost.calculated_cost " +
+                    "WHERE od.unit_cost IS NULL"
+                );
+                stmt.execute(
+                    "UPDATE `order_detail` " +
+                    "SET `unit_cost` = ROUND(`unit_price` * 0.750000, 6) " +
+                    "WHERE `unit_cost` IS NULL AND `unit_price` IS NOT NULL AND `unit_price` > 0"
+                );
+                stmt.execute(
+                    "UPDATE `order_detail` SET `unit_cost` = 0.000000 WHERE `unit_cost` IS NULL"
+                );
+                log.info("Da tu dong kiem tra va backfill day du unit_cost cho order_detail tren database.");
+            } catch (Exception ex) {
+                log.warn("Backfill unit_cost order_detail: {}", ex.getMessage());
+            }
+
             // 9. Dọn dẹp thủ tục cũ và đồng bộ V33 (add blocked audit fields to users)
             try {
                 stmt.execute("DROP PROCEDURE IF EXISTS add_user_blocked_audit_columns_if_not_exists");
